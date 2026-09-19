@@ -7,49 +7,86 @@
 <meta name="description" content="Paste a mess, get a table. CSV, TSV, JSON, NDJSON or plain text, parsed entirely in your browser. No accounts, no uploads, no network calls.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgcng9IjUuNSIgZmlsbD0iIzE3MTgxQSIvPgo8cGF0aCBkPSJNNiA2LjRIMThMMTIgMTQuNFoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0Y3RjdGNSIgc3Ryb2tlLXdpZHRoPSIxLjciIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTEyIDE0LjRWMTcuNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRjdGN0Y1IiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik04LjcgMTBIMTUuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRjdGN0Y1IiBzdHJva2Utd2lkdGg9IjEuMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNSIvPgo8cmVjdCB4PSI5LjgiIHk9IjE4IiB3aWR0aD0iNC40IiBoZWlnaHQ9IjMuOCIgcng9IjEiIGZpbGw9IiNDOTdBMzQiLz4KPC9zdmc+Cg==">
 <style>
-@font-face{font-family:'Instrument Serif';src:url('InstrumentSerif-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
-@font-face{font-family:'Instrument Serif';src:url('InstrumentSerif-Italic.ttf') format('truetype');font-weight:400;font-style:italic;font-display:swap}
 :root{
-  --bg:#F7F7F5; --surface:#FFFFFF; --raised:#EFEFEA;
-  --border:#E2E1DB; --border-hi:#CBCAC2;
-  --ink:#17181A; --ink-dim:#5B5C56; --ink-mute:#96968C;
-  --primary:#17181A; --primary-hi:#000000; --primary-dim:#17181A; --primary-wash:#ECECE7;
-  --amber:#B4641E; --amber-wash:#F3E6D7;
-  --rose:#A33B32; --rose-wash:#F3E0DC;
-  --green:#2E6F5E; --green-wash:#E1EBE7;
-  --violet:#6E5A9E; --violet-dim:#584880; --violet-wash:#EBE7F2;
+  --bg:#F1ECE0; --surface:#FFFCF4; --surface-strong:#FFFDF8; --raised:#E8E0D1; --raised-2:#DDD3C1;
+  --border:#C9BDA8; --border-hi:#91836D;
+  --ink:#20231E; --ink-dim:#4D5148; --ink-mute:#696C62;
+  --primary:#263A31; --primary-hi:#17271F; --primary-dim:#344C40; --primary-wash:#DFE8E1;
+  --amber:#8A4C16; --amber-wash:#F2E2C8;
+  --rose:#8B3833; --rose-wash:#F1DDDA;
+  --green:#2F6653; --green-wash:#DCEAE2;
+  --violet:#574A82; --violet-dim:#43386A; --violet-wash:#E8E3F1;
+  --focus:#1E6C78;
   --sh:none;
-  --sh-lift:3px 3px 0 rgba(23,24,26,.9);
-  --r-lg:4px; --r-md:3px; --r-sm:2px;
-  --row-h:28px;
+  --sh-lift:4px 4px 0 var(--ink);
+  --sh-paper:0 1px 0 rgba(42,45,39,.14),0 8px 24px rgba(42,45,39,.08);
+  --r-lg:10px; --r-md:7px; --r-sm:4px;
+  --row-h:34px;
   --ease:cubic-bezier(.2,.8,.2,1);
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
-  --serif:'Instrument Serif',ui-serif,Georgia,'Times New Roman',serif;
+  --serif:ui-serif,Georgia,'Times New Roman',serif;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#171914; --surface:#20231D; --surface-strong:#262A23; --raised:#2C3028; --raised-2:#383C32;
+    --border:#4A4F43; --border-hi:#777D6E;
+    --ink:#F1EBDD; --ink-dim:#C3BDAF; --ink-mute:#AAA497;
+    --primary:#B9D1C0; --primary-hi:#D4E4D7; --primary-dim:#98B7A2; --primary-wash:#2C4035;
+    --amber:#E4A45F; --amber-wash:#49331F;
+    --rose:#E28B82; --rose-wash:#492B29;
+    --green:#85BCA3; --green-wash:#263C32;
+    --violet:#B6A7E0; --violet-dim:#D0C5ED; --violet-wash:#342F49;
+    --focus:#75C7D0;
+    --sh-lift:4px 4px 0 rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#171914; --surface:#20231D; --surface-strong:#262A23; --raised:#2C3028; --raised-2:#383C32;
+  --border:#4A4F43; --border-hi:#777D6E;
+  --ink:#F1EBDD; --ink-dim:#C3BDAF; --ink-mute:#AAA497;
+  --primary:#B9D1C0; --primary-hi:#D4E4D7; --primary-dim:#98B7A2; --primary-wash:#2C4035;
+  --amber:#E4A45F; --amber-wash:#49331F;
+  --rose:#E28B82; --rose-wash:#492B29;
+  --green:#85BCA3; --green-wash:#263C32;
+  --violet:#B6A7E0; --violet-dim:#D0C5ED; --violet-wash:#342F49;
+  --focus:#75C7D0;
+  --sh-lift:4px 4px 0 rgba(0,0,0,.6);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scrollbar-width:thin;scrollbar-color:var(--border-hi) transparent}
-body{background:var(--bg);color:var(--ink);font:400 13px/1.5 var(--sans);height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font:400 14px/1.5 var(--sans);height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
 ::selection{background:var(--primary-wash)}
 button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:inherit}
 input{font-family:var(--sans)}
-:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(23,24,26,.24);border-radius:var(--r-sm)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 *::-webkit-scrollbar{width:9px;height:9px}
 *::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:var(--r-sm);border:2px solid transparent;background-clip:padding-box}
 *::-webkit-scrollbar-track{background:transparent}
 .hidden{display:none!important}
 svg{display:block;flex:none}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+@media(forced-colors:active){
+  :focus-visible{outline:2px solid CanvasText}
+  .gh:focus,.gc:focus,.gh:focus-visible,.gc:focus-visible{outline:2px solid CanvasText}
+  button,.hbtn,.miniselect{border:1px solid ButtonText}
+}
 
-header{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface);flex:none;z-index:5}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1.5px solid var(--border-hi);background:var(--surface-strong);flex:none;z-index:5;box-shadow:0 1px 0 rgba(42,45,39,.06)}
 .brand{display:flex;align-items:center;gap:8px}
 .brand .mark{width:27px;height:27px;border-radius:var(--r-sm);background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center}
 .brand .bt{font:400 23px/1 var(--serif);font-style:italic;color:var(--ink);position:relative;top:1px}
 .filemeta{display:flex;align-items:center;gap:8px;font:500 12px var(--mono);color:var(--ink-dim);padding-left:6px;border-left:1px solid var(--border)}
 .fmttag{font:700 10px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);background:var(--raised);padding:3px 8px;border-radius:var(--r-sm)}
+.privacydot{display:inline-flex;align-items:center;gap:5px;font:600 11px var(--sans);color:var(--ink-mute);letter-spacing:.01em}
+.privacydot i{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none;display:block}
 .spacer{flex:1}
-.hbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:var(--r-sm);font:600 12.5px var(--sans);color:var(--ink-dim);transition:background .1s linear,color .1s linear}
+.hbtn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;min-height:36px;border-radius:var(--r-sm);font:600 12.5px var(--sans);color:var(--ink-dim);transition:background .1s linear,color .1s linear}
 .hbtn:hover{background:var(--raised);color:var(--ink)}
-.searchw{display:flex;align-items:center;gap:6px;background:var(--raised);border-radius:var(--r-sm);padding:0 10px;height:30px;min-width:180px}
+.hbtn:active{transform:translate(1px,1px)}
+.searchw{display:flex;align-items:center;gap:6px;background:var(--raised);border-radius:var(--r-sm);padding:0 10px;height:32px;min-width:180px}
 .searchw input{background:none;border:none;flex:1;font:500 12.5px var(--mono);color:var(--ink);min-width:0}
 .searchw input::placeholder{color:var(--ink-mute)}
 .searchw svg{color:var(--ink-mute)}
@@ -62,7 +99,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .empty h1 .messword{font:400 62px/1 var(--serif);font-style:italic;color:var(--amber);letter-spacing:-.01em;margin-left:2px}
 .empty .lede{color:var(--ink-dim);font:500 13.5px var(--sans);text-align:center;max-width:460px}
 .dropzone{position:relative;width:min(560px,92vw);border:1.5px dashed var(--border-hi);border-radius:var(--r-lg);transition:border-color .1s linear}
-.dropzone-inner{border-radius:calc(var(--r-lg) - 1.5px);background:var(--surface);padding:20px;display:flex;flex-direction:column;gap:12px;transition:background .1s linear}
+.dropzone-inner{border-radius:calc(var(--r-lg) - 1.5px);background:var(--surface);padding:20px;display:flex;flex-direction:column;gap:12px;transition:background .1s linear;background-image:repeating-linear-gradient(var(--surface) 0 33px,var(--border) 33px 34px);background-position:0 4px;border-left:3px solid var(--border-hi)}
 .dropzone.drag{border-color:var(--ink)}
 .dropzone.drag .dropzone-inner{background:var(--primary-wash)}
 .dropzone textarea{width:100%;min-height:120px;resize:vertical;border:none;background:var(--raised);border-radius:var(--r-md);padding:12px 14px;font:500 12.5px/1.5 var(--mono);color:var(--ink)}
@@ -79,6 +116,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 
 .databar{display:flex;align-items:center;gap:16px;padding:8px 18px;border-bottom:1px solid var(--border);background:var(--surface);flex:none;font:500 12px var(--sans);color:var(--ink-dim);flex-wrap:wrap}
 .swrow{display:flex;align-items:center;gap:7px}
+.miniselect{font:500 12px var(--sans);color:var(--ink-dim);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm,4px);padding:2px 6px}
 .sw{position:relative;width:28px;height:16px;border-radius:var(--r-sm);background:var(--border-hi);flex:none;display:inline-block}
 .sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
 .sw i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:1px;background:#fff;transition:transform .1s linear}
@@ -93,6 +131,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .ghead.sweep::before{animation:headsweep .3s linear forwards}
 @keyframes headsweep{0%{transform:scaleX(0);opacity:1}85%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
 .gh{flex:none;padding:0 6px 0 12px;height:var(--row-h);display:flex;align-items:center;gap:4px;font:700 11px var(--sans);color:var(--ink-dim);letter-spacing:.01em;border-right:1px solid var(--border);cursor:pointer;user-select:none;background:var(--surface)}
+.gh:focus,.gc:focus{outline:2px solid var(--focus,#1E6C78);outline-offset:-2px;z-index:1}
+.gh:focus-visible,.gc:focus-visible{outline:2px solid var(--focus,#1E6C78);outline-offset:-2px;z-index:1}
 .gh:hover{background:var(--raised)}
 .gh.idx{color:var(--ink-mute);justify-content:flex-end;cursor:default;padding-right:12px}
 .gh.idx:hover{background:var(--surface)}
@@ -102,7 +142,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .gh.s-asc .sicon{opacity:1}
 .gh.s-desc .sicon{opacity:1;transform:rotate(180deg)}
 .gh .picon{flex:none;opacity:0;color:var(--ink-mute);padding:4px;border-radius:var(--r-sm);margin-left:auto}
-.gh:hover .picon{opacity:1}
+.gh:hover .picon,.gh:focus-within .picon,.gh .picon:focus{opacity:1}
+@media(hover:none){.gh .picon{opacity:1}}
 .gh .picon:hover{background:var(--primary-wash);color:var(--primary)}
 .gbody{position:relative}
 .grow{position:absolute;left:0;top:0;display:flex;border-bottom:1px solid var(--border)}
@@ -125,8 +166,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .sedlist{overflow:auto;padding:8px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
 .sedrow{font:500 11.5px var(--mono);color:var(--ink-dim);background:var(--raised);border-radius:var(--r-sm);padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gfoot{flex:none;display:flex;align-items:center;justify-content:space-between;padding:7px 18px;border-top:1px solid var(--border);background:var(--surface);font:600 11px var(--mono);color:var(--ink-mute)}
+.footinfo{display:flex;align-items:center;gap:10px}
+.densityctl{display:flex;align-items:center;gap:6px;font:600 11px var(--mono);color:var(--ink-mute)}
 
-.pop{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-lift);z-index:30;padding:14px;display:none;width:270px}
+.pop{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-paper);z-index:30;padding:14px;display:none;width:270px}
 .pop.open{display:block}
 .ptitle{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .ptitle b{font:700 13px var(--sans);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -160,7 +203,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .exprow .eacts{display:flex;gap:2px}
 .exprow .eacts button{padding:6px;border-radius:var(--r-sm);color:var(--ink-dim)}
 .exprow .eacts button:hover{background:var(--primary-wash);color:var(--primary)}
-.expopt{display:flex;align-items:center;gap:8px;padding:8px 8px 2px;font:500 12px var(--sans);color:var(--ink-dim);border-top:1px solid var(--border);margin-top:4px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.expopts{border-top:1px solid var(--border);margin-top:4px;padding:6px 8px 4px;display:flex;flex-direction:column;gap:4px}
+.expopt{display:flex;align-items:center;gap:8px;font:500 12px var(--sans);color:var(--ink-dim)}
+.expopthint{color:var(--ink-mute);font-weight:500}
 .expwarn{background:var(--amber-wash);color:var(--amber);border-radius:var(--r-sm);padding:8px 9px;font:600 11.5px var(--sans);margin-bottom:6px}
 .expwarn button{display:block;margin-top:6px;padding:5px 9px;border-radius:var(--r-sm);background:var(--amber);color:#fff;font:700 11px var(--sans)}
 .sourcespanel{padding:8px 14px;background:var(--amber-wash);border-bottom:1px solid var(--border)}
@@ -188,21 +234,27 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .stratum.tone-neutral{border-left-color:var(--border-hi)}
 .stratum.active{background:var(--primary-wash)}
 .stratum.dragover{box-shadow:0 -2px 0 var(--ink) inset}
-.stratum.muted{opacity:.45}
+.stratum.muted{opacity:.7}
+.stratum.muted .sname{text-decoration:line-through;text-decoration-color:var(--ink-mute)}
 .stratum .srow1{display:flex;align-items:center;gap:7px}
+.stepnum{flex:none;width:17px;height:17px;border-radius:50%;background:var(--raised);border:1px solid var(--border-hi);color:var(--ink-dim);font:700 9.5px var(--mono);display:flex;align-items:center;justify-content:center}
+.stratum.active .stepnum{background:var(--primary);border-color:var(--primary);color:#fff}
+.mutedtag{font:700 9px var(--sans);letter-spacing:.03em;text-transform:uppercase;color:var(--ink-mute);background:var(--raised);padding:1px 5px;border-radius:var(--r-sm);flex:none}
 .stratum .sname{flex:1;font:700 12px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stratum .sacts{display:flex;gap:1px;opacity:0;transition:opacity .1s linear}
-.stratum:hover .sacts{opacity:1}
+.stratum:hover .sacts,.stratum:focus-within .sacts{opacity:1}
+@media(hover:none){.stratum .sacts{opacity:1}}
 .stratum .sacts button{padding:4px;border-radius:var(--r-sm);color:var(--ink-mute)}
 .stratum .sacts button:hover{background:var(--raised);color:var(--ink)}
-.stratum .sdesc{font:500 11px var(--mono);color:var(--ink-dim);margin-top:3px;line-height:1.4}
-.stratum .sstats{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.stratum .sdesc{font:500 11px var(--mono);color:var(--ink-dim);margin-top:3px;line-height:1.4;margin-left:24px}
+.stratum .sstats{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;margin-left:24px}
 .schip{font:700 10px var(--mono);padding:2px 7px;border-radius:var(--r-sm);background:var(--raised);color:var(--ink-dim)}
 .schip.plus{background:var(--green-wash);color:var(--green)}
 .schip.minus{background:var(--rose-wash);color:var(--rose)}
 .schip.warn{background:var(--amber-wash);color:var(--amber)}
 
 .scrubbar{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);background:var(--surface);flex:none}
+.scrubend{font:700 10px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-mute);flex:none}
 .scrubbar input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:16px;background:transparent;outline:none;border-radius:0}
 .scrubbar input[type=range]::-webkit-slider-runnable-track{height:4px;background:transparent}
 .scrubbar input[type=range]::-moz-range-track{height:4px;background:transparent}
@@ -331,6 +383,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
   .filemeta{display:none}
   .searchw{min-width:120px}
   .hbtn span.lbl-full{display:none}
+  .scrubbar{flex-wrap:wrap;row-gap:4px}
+  .scrublabel{order:3;width:100%;min-width:0}
 }
 </style>
 </head>
@@ -344,6 +398,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
     <span class="mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 5H19L12 14Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 14V18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8.1 9.3H15.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".5"/><rect x="9.8" y="18.3" width="4.4" height="3.9" rx="1" fill="#C97A34"/></svg></span>
     <span class="bt">Sift</span>
   </div>
+  <span class="privacydot" title="Your data is processed locally in this tab and is never sent anywhere"><i></i>Local processing</span>
   <div class="filemeta hidden" id="fileMeta">
     <span class="fmttag" id="fmtTag">CSV</span>
     <span id="metaText"></span>
@@ -355,27 +410,27 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
     <button class="hbtn hidden" id="btnFilterToStep" type="button" title="Make this search a permanent step in the recipe" style="margin-left:6px;padding:5px 9px;font-size:11px">Add as step</button>
   </div>
   <div class="hactions hidden" id="headerActions">
-    <button class="hbtn" id="btnExport" type="button">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
-      Export
+    <button class="hbtn" id="btnExport" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="exportMenu">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10.5"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
+      <span class="lbl-full">Export</span>
     </button>
-    <div class="pop exportmenu" id="exportMenu"></div>
-    <button class="hbtn" id="btnSave" type="button">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h11l3 3v12H5z"/><path d="M8 4.5v5h7v-5"/><path d="M8 20v-6h8v6"/></svg>
-      Save
+    <div class="pop exportmenu" id="exportMenu" role="dialog" aria-label="Export options"></div>
+    <button class="hbtn" id="btnSave" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="savePop">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h11l3 3v12H5z"/><path d="M8 4.5v5h7v-5"/><path d="M8 20v-6h8v6"/></svg>
+      <span class="lbl-full">Save</span>
     </button>
-    <div class="pop savepop" id="savePop"></div>
-    <button class="hbtn" id="btnLibrary" type="button">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h4.5v15H5z"/><path d="M11 6l4.2-1.1 3.8 14.5-4.2 1.1z"/></svg>
-      Library
+    <div class="pop savepop" id="savePop" role="dialog" aria-label="Save recipe"></div>
+    <button class="hbtn" id="btnLibrary" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="libPop">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h4.5v15H5z"/><path d="M11 6l4.2-1.1 3.8 14.5-4.2 1.1z"/></svg>
+      <span class="lbl-full">Library</span>
     </button>
-    <div class="pop libpop" id="libPop"></div>
-    <button class="hbtn" id="btnCompare" type="button" title="Compare against another file">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="7.5" height="14" rx="1.6"/><rect x="12.5" y="5" width="7.5" height="14" rx="1.6"/></svg>
+    <div class="pop libpop" id="libPop" role="dialog" aria-label="Recipe library"></div>
+    <button class="hbtn" id="btnCompare" type="button" title="Compare against another file" aria-label="Compare against another file">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="7.5" height="14" rx="1.6"/><rect x="12.5" y="5" width="7.5" height="14" rx="1.6"/></svg>
     </button>
     <button class="hbtn" id="btnReplace" type="button">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3.5L4 7l3.5 3.5"/><path d="M4 7h9.5a4.5 4.5 0 0 1 4.5 4.5"/><path d="M16.5 20.5L20 17l-3.5-3.5"/><path d="M20 17h-9.5a4.5 4.5 0 0 1-4.5-4.5"/></svg>
-      Replace file
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 3.5L4 7l3.5 3.5"/><path d="M4 7h9.5a4.5 4.5 0 0 1 4.5 4.5"/><path d="M16.5 20.5L20 17l-3.5-3.5"/><path d="M20 17h-9.5a4.5 4.5 0 0 1-4.5-4.5"/></svg>
+      <span class="lbl-full">Replace file</span>
     </button>
   </div>
 </header>
@@ -434,7 +489,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
     </aside>
     <section class="gridwrap" id="gridView">
       <div class="scrubbar hidden" id="scrubBar">
-        <input type="range" id="scrubRange" min="0" max="0" value="0" step="1">
+        <span class="scrubend">Original</span>
+        <input type="range" id="scrubRange" min="0" max="0" value="0" step="1" list="scrubTicks" aria-label="Pipeline position">
+        <datalist id="scrubTicks"></datalist>
+        <span class="scrubend">Current</span>
         <span class="scrublabel" id="scrubLabel">Original input</span>
       </div>
       <div class="databar hidden" id="dataBar">
@@ -442,19 +500,42 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
           <span class="sw"><input type="checkbox" id="hdrToggle" checked><i></i></span>
           first row is headers
         </label>
+        <label class="swrow hidden" id="delimRow">
+          Delimiter
+          <select id="delimSelect" class="miniselect">
+            <option value=",">Comma</option>
+            <option value="&#9;">Tab</option>
+            <option value=";">Semicolon</option>
+            <option value="|">Pipe</option>
+          </select>
+        </label>
+        <label class="swrow" id="dateOrderRow">
+          Dates
+          <select id="dateOrderSelect" class="miniselect">
+            <option value="mdy">MDY</option>
+            <option value="dmy">DMY</option>
+            <option value="reject">Reject ambiguous</option>
+          </select>
+        </label>
         <div class="warnline hidden" id="warnLine">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5l8.3 14.5H3.7L12 4.5z"/><path d="M12 10.5v3.6"/><path d="M12 17.4h.01"/></svg>
           <span id="warnText"></span>
         </div>
       </div>
-      <div class="gscroll" id="gscroll">
-        <div class="ghead" id="ghead"></div>
-        <div class="gbody" id="gbody"></div>
+      <div class="gscroll" id="gscroll" role="grid" aria-label="Data table">
+        <div class="ghead" id="ghead" role="row" aria-rowindex="1"></div>
+        <div class="gbody" id="gbody" role="rowgroup"></div>
         <div class="gempty hidden" id="gempty"></div>
       </div>
       <div class="gfoot">
-        <span id="footLeft">—</span>
-        <span id="footRight"></span>
+        <div class="footinfo"><span id="footLeft">—</span><span id="footRight"></span></div>
+        <label class="densityctl">Density
+          <select id="densitySelect" class="miniselect" aria-label="Row density">
+            <option value="comfortable">Comfortable</option>
+            <option value="standard" selected>Standard</option>
+            <option value="compact">Compact</option>
+          </select>
+        </label>
       </div>
     </section>
   </div>
@@ -462,10 +543,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 
 <div class="scrim" id="paletteScrim"></div>
 <div class="scrim" id="railScrim"></div>
-<div class="palette" id="palette">
+<div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Add or edit pipeline step" tabindex="-1">
   <div class="psearch">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>
-    <input id="paletteSearch" type="text" placeholder="Add a step — trim, dedupe, dates…" spellcheck="false" autocomplete="off">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>
+    <input id="paletteSearch" type="text" placeholder="Add a step — trim, dedupe, dates…" spellcheck="false" autocomplete="off" aria-label="Search for a pipeline step">
   </div>
   <div id="paletteBody"></div>
 </div>
@@ -474,14 +555,15 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 <div class="halo" id="halo"></div>
 <div class="pop driftpop" id="driftPop"></div>
 <div class="scrim" id="reviewScrim"></div>
-<div class="rmodal" id="reviewModal">
-  <div class="rhead">This shared recipe wants to run <span id="reviewStepCount">0</span> step(s) on your data</div>
+<div class="rmodal" id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewStepCountHead" tabindex="-1">
+  <div class="rhead" id="reviewStepCountHead">This shared recipe wants to run <span id="reviewStepCount">0</span> step(s) on your data</div>
   <div class="rbody" id="reviewBody"></div>
   <div class="rfoot"><button class="hbtn" id="reviewSkip" type="button" style="background:var(--raised)">Don't apply</button><button class="hbtn" id="reviewApply" type="button" style="background:var(--primary);color:#fff">Apply recipe</button></div>
 </div>
 <div class="pop sedpop" id="sedPop"></div>
 <div class="subhalo" id="subhalo"></div>
 <div id="toast" aria-live="polite"></div>
+<div id="srAnnounce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <input type="file" id="fileInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,text/csv,text/plain,application/json">
 <input type="file" id="siftJsonInput" hidden accept=".json,application/json">
 <input type="file" id="refFileInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,text/csv,text/plain,application/json">
@@ -489,11 +571,59 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 <script type="text/js-worker" id="workerSrc">
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
+function stripBOM(text){return text.length&&text.charCodeAt(0)===0xFEFF?text.slice(1):text}
+function normalizeNewlines(text){return text.replace(/\r\n|\r/g,'\n')}
+function normalizeInput(text){return normalizeNewlines(stripBOM(String(text==null?'':text)))}
+function scanQuoteMask(text){
+  const mask=new Array(text.length);
+  let q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      mask[i]=true;
+      if(c==='"'){
+        if(text[i+1]==='"'){mask[i+1]=true;i++}
+        else q=false
+      }
+    }else{
+      if(c==='"'){mask[i]=true;q=true}
+      else mask[i]=false
+    }
+  }
+  return{mask,unterminated:q}
+}
+function splitLinesWithOffsets(text){
+  const lines=[];let start=0;
+  for(let i=0;i<text.length;i++){
+    if(text[i]==='\n'){lines.push({start,text:text.slice(start,i)});start=i+1}
+  }
+  lines.push({start,text:text.slice(start)});
+  return lines
+}
+function detectDelimiter(text,mask){
+  const lines=splitLinesWithOffsets(text).filter(l=>l.text.trim()!=='');
+  const sample=lines.slice(0,Math.min(lines.length,20));
+  const candidates=[',','\t',';','|'];
+  let best=null,bestFreq=0,bestCount=0;
+  for(const delim of candidates){
+    const counts=sample.map(l=>{
+      let c=0;
+      for(let i=0;i<l.text.length;i++)if(l.text[i]===delim&&!mask[l.start+i])c++;
+      return c
+    });
+    const freq=new Map();
+    for(const c of counts)if(c>0)freq.set(c,(freq.get(c)||0)+1);
+    let fBest=0,cBest=0;
+    for(const[c,f]of freq)if(f>fBest||(f===fBest&&c>cBest)){fBest=f;cBest=c}
+    if(fBest>bestFreq||(fBest===bestFreq&&cBest>bestCount)){bestFreq=fBest;bestCount=cBest;best=delim}
+  }
+  return bestCount>0?best:null
+}
 function detectFormat(text){
-  const t=text.trim();
+  const t=normalizeInput(text).trim();
   if(!t)return null;
   if(t[0]==='{'||t[0]==='['){try{JSON.parse(t);return'JSON'}catch(e){}}
-  const lines=t.split(/\r?\n/).filter(l=>l.trim()!=='');
+  const lines=t.split('\n').filter(l=>l.trim()!=='');
   if(lines.length>=2){
     let ok=true;
     const sampleN=Math.min(lines.length,50);
@@ -503,53 +633,70 @@ function detectFormat(text){
     }
     if(ok)return'NDJSON';
   }
-  const line=lines[0]||'';
-  const counts={',':0,'\t':0,';':0,'|':0};
-  for(const ch of line)if(counts[ch]!==undefined)counts[ch]++;
-  let best=null,bestN=0;
-  for(const d in counts)if(counts[d]>bestN){bestN=counts[d];best=d}
-  if(bestN>0){
-    if(best==='\t')return'TSV';
-    if(best===';')return'CSV;';
-    if(best==='|')return'CSVPIPE';
+  const{mask}=scanQuoteMask(t);
+  const delim=detectDelimiter(t,mask);
+  if(delim){
+    if(delim==='\t')return'TSV';
+    if(delim===';')return'CSV;';
+    if(delim==='|')return'CSVPIPE';
     return'CSV'
   }
   return'TEXT'
 }
 
 function parseDelimited(text,delim){
-  const rows=[];let row=[],f='',q=false;
+  const rows=[];let row=[],f='',q=false,line=1,quoteLine=null;
   for(let i=0;i<text.length;i++){
     const c=text[i];
     if(q){
-      if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}
-      else f+=c;
+      if(c==='"'){
+        if(text[i+1]==='"'){f+='"';i++}
+        else{q=false;quoteLine=null}
+      }else{
+        if(c==='\n')line++;
+        f+=c
+      }
     }else{
-      if(c==='"')q=true;
+      if(c==='"'){q=true;quoteLine=line}
       else if(c===delim){row.push(f);f=''}
-      else if(c==='\n'){row.push(f);f='';rows.push(row);row=[]}
-      else if(c!=='\r')f+=c;
+      else if(c==='\n'){row.push(f);f='';rows.push(row);row=[];line++}
+      else if(c!=='\r')f+=c
     }
   }
+  if(q)throw new Error('Unterminated quoted field starting near line '+quoteLine+' — a closing " is missing.');
   if(f!==''||row.length){row.push(f);rows.push(row)}
   return rows
 }
 
-function flattenValue(value,prefix,out){
-  if(value===null||typeof value!=='object'){out[prefix||'value']=value==null?'':String(value);return}
-  if(Array.isArray(value)){
-    if(value.length===0){out[prefix||'value']='';return}
-    value.forEach((v,i)=>flattenValue(v,prefix?prefix+'['+i+']':'['+i+']',out));
-    return
+const FLATTEN_MAX_DEPTH=25;
+const FLATTEN_MAX_COLUMNS=2000;
+function flattenValue(value,prefix,out,opts){
+  opts=opts||{};
+  const maxDepth=opts.maxDepth||FLATTEN_MAX_DEPTH;
+  const maxCols=opts.maxColumns||FLATTEN_MAX_COLUMNS;
+  const stack=[{value,prefix:prefix||'',depth:0}];
+  let truncated=false;
+  while(stack.length){
+    if(truncated)break;
+    const frame=stack.pop(),v=frame.value,p=frame.prefix,depth=frame.depth;
+    if(Object.keys(out).length>=maxCols){truncated=true;break}
+    if(v===null||typeof v!=='object'){out[p||'value']=v==null?'':String(v);continue}
+    if(depth>=maxDepth){out[p||'value']=Array.isArray(v)?'[Array]':'[Object]';continue}
+    if(Array.isArray(v)){
+      if(v.length===0){out[p||'value']='[]';continue}
+      for(let i=v.length-1;i>=0;i--)stack.push({value:v[i],prefix:p?p+'['+i+']':'['+i+']',depth:depth+1});
+      continue
+    }
+    const keys=Object.keys(v);
+    if(keys.length===0){out[p||'value']='{}';continue}
+    for(let i=keys.length-1;i>=0;i--){const k=keys[i];stack.push({value:v[k],prefix:p?p+'.'+k:k,depth:depth+1})}
   }
-  const keys=Object.keys(value);
-  if(keys.length===0){out[prefix||'value']='';return}
-  keys.forEach(k=>flattenValue(value[k],prefix?prefix+'.'+k:k,out))
+  return truncated
 }
 
 function jsonValueToTable(val){
   const arr=Array.isArray(val)?val:[val];
-  if(!arr.length)return{cols:[],rows:[]};
+  if(!arr.length)return{cols:[],rows:[],warnings:[]};
   if(Array.isArray(arr[0])){
     let w=0;for(const r of arr)if(Array.isArray(r)&&r.length>w)w=r.length;
     const cols=Array.from({length:w},(_,i)=>'c'+(i+1));
@@ -558,17 +705,24 @@ function jsonValueToTable(val){
       while(nr.length<w)nr.push('');
       return nr
     });
-    return{cols,rows}
+    return{cols,rows,warnings:[]}
   }
+  let anyTruncated=false;
   const flatRecords=arr.map(o=>{
     if(o===null||typeof o!=='object'){const out={};out.value=o==null?'':String(o);return out}
-    const out={};flattenValue(o,'',out);return out
+    const out={};
+    if(flattenValue(o,'',out))anyTruncated=true;
+    return out
   });
   const cols=[],seen=new Set();
   for(const rec of flatRecords)for(const k of Object.keys(rec))if(!seen.has(k)){seen.add(k);cols.push(k)}
   const rows=flatRecords.map(rec=>cols.map(k=>rec[k]===undefined?'':rec[k]));
-  return{cols,rows}
+  const warnings=[];
+  if(cols.length>500)warnings.push('Flattening produced '+fmtIntW(cols.length)+' columns — the JSON may be very deeply nested or wide');
+  if(anyTruncated)warnings.push('Some deeply-nested or very large records were truncated while flattening to stay within limits');
+  return{cols,rows,warnings}
 }
+function fmtIntW(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 
 function dedupeColNames(cols){
   const seen=new Map();
@@ -582,21 +736,21 @@ function dedupeColNames(cols){
 }
 function doParse(text,opts){
   opts=opts||{};
-  text=String(text==null?'':text);
+  text=normalizeInput(text);
   const trimmed=text.trim();
   if(!trimmed)throw new Error('Nothing to parse — the input is empty.');
-  const fmt=detectFormat(text);
+  const fmt=opts.forceDelimiter?(opts.forceDelimiter==='\t'?'TSV':opts.forceDelimiter===';'?'CSV;':opts.forceDelimiter==='|'?'CSVPIPE':'CSV'):detectFormat(text);
   let cols,rows,warnings=[];
   if(fmt==='JSON'){
     const val=JSON.parse(trimmed);
-    const t=jsonValueToTable(val);cols=t.cols;rows=t.rows;
+    const t=jsonValueToTable(val);cols=t.cols;rows=t.rows;warnings=warnings.concat(t.warnings);
     if(!cols.length)throw new Error('The JSON has no fields to build a table from.')
   }else if(fmt==='NDJSON'){
-    const lines=trimmed.split(/\r?\n/).filter(l=>l.trim()!=='');
+    const lines=trimmed.split('\n').filter(l=>l.trim()!=='');
     const records=lines.map(l=>JSON.parse(l));
-    const t=jsonValueToTable(records);cols=t.cols;rows=t.rows
+    const t=jsonValueToTable(records);cols=t.cols;rows=t.rows;warnings=warnings.concat(t.warnings)
   }else if(fmt==='TEXT'){
-    const lines=text.split(/\r?\n/);
+    const lines=text.split('\n');
     while(lines.length&&lines[lines.length-1]==='')lines.pop();
     cols=['line'];rows=lines.map(l=>[l])
   }else{
@@ -613,13 +767,22 @@ function doParse(text,opts){
       dataRows=raw
     }
     if(!dataRows.length)throw new Error('No data rows — the input only has a header.');
-    const w=header.length;let ragged=0;
+    let w=header.length,maxLen=w;
+    for(const r of dataRows)if(r.length>maxLen)maxLen=r.length;
+    let extendedCols=[];
+    if(maxLen>w){
+      for(let i=w;i<maxLen;i++)extendedCols.push('extra_'+(i-w+1));
+      header=header.concat(extendedCols);
+      w=maxLen
+    }
+    let padded=0;
     rows=dataRows.map(r=>{
       if(r.length===w)return r;
-      ragged++;const nr=r.slice(0,w);while(nr.length<w)nr.push('');return nr
+      padded++;const nr=r.slice(0);while(nr.length<w)nr.push('');return nr
     });
     cols=header;
-    if(ragged)warnings.push(ragged+' row'+(ragged>1?'s':'')+' had a mismatched field count — padded or trimmed to '+w+' columns')
+    if(extendedCols.length)warnings.push('Some rows had more fields than the header — added generated column'+(extendedCols.length>1?'s':'')+' ('+extendedCols.join(', ')+') so no values were discarded');
+    if(padded)warnings.push(padded+' row'+(padded>1?'s':'')+' had fewer fields than the header and were padded with blanks')
   }
   if(!rows.length)throw new Error('No data rows found.');
   cols=dedupeColNames(cols);
@@ -759,45 +922,93 @@ function mkD2(y,mo,d){
   const dt=new Date(Date.UTC(y,mo-1,d));
   return dt.getUTCFullYear()===y&&dt.getUTCMonth()===mo-1&&dt.getUTCDate()===d?{y,mo,d}:null
 }
-function parseDate2(s){
+function resolveTwoDigitYear(yy,pivot){return yy<=pivot?2000+yy:1900+yy}
+function parseDate2(s,opts){
+  opts=opts||{};
+  const order=opts.order||'mdy';
+  const pivot=opts.yearPivot!=null?opts.yearPivot:69;
   s=String(s).trim();if(!s)return null;
   let m;
   if(m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))return mkD2(+m[1],+m[2],+m[3]);
   if(m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/)){
-    const a=+m[1],b=+m[2];let y=+m[3];if(y<100)y+=2000;
-    return a>12&&b<=12?mkD2(y,b,a):mkD2(y,a,b)
+    const a=+m[1],b=+m[2],yStr=m[3];
+    let y=+yStr;if(yStr.length<=2)y=resolveTwoDigitYear(y,pivot);
+    if(a>12&&b<=12)return mkD2(y,b,a);
+    if(b>12&&a<=12)return mkD2(y,a,b);
+    if(a>12&&b>12)return null;
+    if(order==='reject')return null;
+    return order==='dmy'?mkD2(y,b,a):mkD2(y,a,b)
   }
   if(m=s.match(/^([A-Za-z]{3,9})[\s\-.]+(\d{1,2})(?:st|nd|rd|th)?[\s\-,]+(\d{2,4})$/)){
-    const mo=MON2[m[1].slice(0,3).toLowerCase()];let y=+m[3];if(y<100)y+=2000;
+    const mo=MON2[m[1].slice(0,3).toLowerCase()];const yStr=m[3];let y=+yStr;if(yStr.length<=2)y=resolveTwoDigitYear(y,pivot);
     return mo?mkD2(y,mo,+m[2]):null
   }
   if(m=s.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s\-.]+([A-Za-z]{3,9})[\s\-,]+(\d{2,4})$/)){
-    const mo=MON2[m[2].slice(0,3).toLowerCase()];let y=+m[3];if(y<100)y+=2000;
+    const mo=MON2[m[2].slice(0,3).toLowerCase()];const yStr=m[3];let y=+yStr;if(yStr.length<=2)y=resolveTwoDigitYear(y,pivot);
     return mo?mkD2(y,mo,+m[1]):null
   }
   if(m=s.match(/^(\d{4})(\d{2})(\d{2})$/))return mkD2(+m[1],+m[2],+m[3]);
   return null
 }
-function buildSortKeys(values,indices,type){
+function isDateAmbiguous(s){
+  s=String(s).trim();
+  const m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.]\d{2,4}$/);
+  if(!m)return false;
+  const a=+m[1],b=+m[2];
+  return a<=12&&b<=12&&a!==b
+}
+const CURRENCY_CHARS=/[$€£¥₹₩₽₺₴₦₪﷼]/g;
+function parseNumericValue(raw,opts){
+  opts=opts||{};
+  const locale=opts.locale||'us';
+  let s=String(raw==null?'':raw).trim();
+  if(s==='')return null;
+  let neg=false;
+  if(s.length>1&&s[0]==='('&&s[s.length-1]===')'){neg=true;s=s.slice(1,-1).trim()}
+  if(s[0]==='-'){neg=true;s=s.slice(1).trim()}
+  else if(s[0]==='+'){s=s.slice(1).trim()}
+  const isPercent=/%\s*$/.test(s);
+  if(isPercent)s=s.replace(/%\s*$/,'').trim();
+  s=s.replace(CURRENCY_CHARS,'').replace(/\s+/g,'');
+  if(!s)return null;
+  if(locale==='eu')s=s.replace(/\./g,'').replace(/,/g,'.');
+  else s=s.replace(/,/g,'');
+  const num=Number(s);
+  if(!isFinite(num))return null;
+  const value=(neg?-Math.abs(num):num)*(isPercent?0.01:1);
+  return{value,isPercent,negative:neg}
+}
+function detectNumberLocale(values){
+  let us=0,eu=0;
+  const usPat=/^[+-]?\(?[$€£¥₹₩₽₺₴₦₪﷼]?\s?\d{1,3}(,\d{3})+(\.\d+)?%?\)?$/;
+  const euPat=/^[+-]?\(?[$€£¥₹₩₽₺₴₦₪﷼]?\s?\d{1,3}(\.\d{3})+(,\d+)?%?\)?$/;
+  for(const raw of values){
+    const s=String(raw==null?'':raw).trim();
+    if(!s)continue;
+    if(usPat.test(s))us++;
+    else if(euPat.test(s))eu++
+  }
+  return eu>us?'eu':'us'
+}
+function buildSortKeys(values,indices,type,opts){
+  opts=opts||{};
   const n=indices.length;
   if(type==='number'){
+    const locale=opts.numLocale||'us';
     const keys=new Float64Array(n);
     for(let i=0;i<n;i++){
-      let v=String(values[indices[i]]??'').trim();
-      if(v===''){keys[i]=NaN;continue}
-      let neg=false;
-      if(v.length>1&&v[0]==='('&&v[v.length-1]===')'){neg=true;v=v.slice(1,-1)}
-      const num=Number(v.replace(/[$,€£%\s]/g,''));
-      keys[i]=isFinite(num)?(neg?-Math.abs(num):num):NaN
+      const parsed=parseNumericValue(values[indices[i]],{locale});
+      keys[i]=parsed?parsed.value:NaN
     }
     return keys
   }
   if(type==='date'){
+    const dateOpts={order:opts.dateOrder||'mdy',yearPivot:opts.yearPivot};
     const keys=new Float64Array(n);
     for(let i=0;i<n;i++){
       const v=String(values[indices[i]]??'').trim();
       if(v===''){keys[i]=NaN;continue}
-      const d=parseDate2(v);
+      const d=parseDate2(v,dateOpts);
       keys[i]=d?d.y*10000+d.mo*100+d.d:NaN
     }
     return keys
@@ -806,9 +1017,9 @@ function buildSortKeys(values,indices,type){
   for(let i=0;i<n;i++)keys[i]=String(values[indices[i]]??'').trim().toLowerCase();
   return keys
 }
-function doSort(values,indices,type,dir){
+function doSort(values,indices,type,dir,opts){
   const n=indices.length;
-  const keys=buildSortKeys(values,indices,type);
+  const keys=buildSortKeys(values,indices,type,opts);
   const positions=new Array(n);
   for(let i=0;i<n;i++)positions[i]=i;
   positions.sort((a,b)=>{
@@ -830,9 +1041,9 @@ onmessage=function(e){
   const msg=e.data,id=msg.id,type=msg.type,payload=msg.payload||{};
   try{
     let result;
-    if(type==='parse')result=doParse(payload.text,{headerRow:payload.headerRow});
+    if(type==='parse')result=doParse(payload.text,{headerRow:payload.headerRow,forceDelimiter:payload.forceDelimiter});
     else if(type==='sample')result=doSample(payload.kind,payload.n);
-    else if(type==='sort')result={order:doSort(payload.values,payload.indices,payload.colType,payload.dir)};
+    else if(type==='sort')result={order:doSort(payload.values,payload.indices,payload.colType,payload.dir,{numLocale:payload.numLocale,dateOrder:payload.dateOrder,yearPivot:payload.yearPivot})};
     else throw new Error('unknown request type '+type);
     postMessage({id:id,ok:true,result:result})
   }catch(err){
@@ -932,6 +1143,12 @@ function toast(msg,err){
   t.textContent=msg;t.classList.toggle('err',!!err);t.classList.add('show');
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3000)
 }
+function announce(msg){
+  const el=$('#srAnnounce');
+  if(!el)return;
+  el.textContent='';
+  requestAnimationFrame(()=>{el.textContent=msg})
+}
 async function copyText(text,msg){
   try{await navigator.clipboard.writeText(text);toast(msg)}
   catch(e){
@@ -955,13 +1172,70 @@ function buildSyncCore(){
   const src=$('#workerSrc').textContent;
   const cut=src.indexOf('\nonmessage=');
   const body=cut===-1?src:src.slice(0,cut);
-  return new Function(body+'\nreturn{doParse:doParse,doSort:doSort,doSample:doSample};')()
+  return new Function(body+'\nreturn{doParse:doParse,doSort:doSort,doSample:doSample,parseDate2:parseDate2,parseNumericValue:parseNumericValue,detectNumberLocale:detectNumberLocale,mkD2:mkD2,isDateAmbiguous:isDateAmbiguous,flattenValue:flattenValue,jsonValueToTable:jsonValueToTable};')()
 }
+syncCore=buildSyncCore();
+function parseDate(s,opts){return syncCore.parseDate2(s,opts)}
+function parseNumericValue(s,opts){return syncCore.parseNumericValue(s,opts)}
+function detectNumberLocale(vals){return syncCore.detectNumberLocale(vals)}
+function isDateAmbiguous(s){return syncCore.isDateAmbiguous(s)}
+stTest('parseDate: two-digit years use a sensible pivot instead of always landing in the 2000s',()=>{
+  const d=parseDate('12/10/95');
+  stAssert(!!d&&d.y===1995,'12/10/95 should resolve to 1995, not 2095 — got '+JSON.stringify(d))
+});
+stTest('parseDate: ambiguous D/M dates follow the requested order and can be rejected',()=>{
+  const mdy=parseDate('01/02/2025',{order:'mdy'});
+  stAssert(!!mdy&&mdy.mo===1&&mdy.d===2,'mdy order reads 01/02/2025 as Jan 2');
+  const dmy=parseDate('01/02/2025',{order:'dmy'});
+  stAssert(!!dmy&&dmy.mo===2&&dmy.d===1,'dmy order reads 01/02/2025 as Feb 1');
+  stAssert(parseDate('01/02/2025',{order:'reject'})===null,'reject order refuses to guess on an ambiguous date')
+});
+stTest('parseDate: unambiguous dates are unaffected by the order setting',()=>{
+  const d=parseDate('25/12/2024',{order:'mdy'});
+  stAssert(!!d&&d.mo===12&&d.d===25,'day>12 is unambiguous regardless of the order setting')
+});
+stTest('isDateAmbiguous: flags only genuinely ambiguous D/M pairs',()=>{
+  stAssert(isDateAmbiguous('3/4/2024'),'3/4/2024 is ambiguous');
+  stAssert(!isDateAmbiguous('25/4/2024'),'25/4/2024 is not ambiguous — 25 cannot be a month')
+});
+stTest('parseNumericValue: one canonical parser handles locale, percent, and currency',()=>{
+  stEqual(parseNumericValue('1,234.50',{locale:'us'}).value,1234.5,'US-style thousands/decimal');
+  stEqual(parseNumericValue('1.234,50',{locale:'eu'}).value,1234.5,'EU-style thousands/decimal');
+  stAssert(Math.abs(parseNumericValue('12%').value-0.12)<1e-9,'percent is scaled to a fraction, not left as 12');
+  stEqual(parseNumericValue('₹1,234',{locale:'us'}).value,1234,'currency symbols beyond $/€/£ are recognized');
+  stEqual(parseNumericValue('(12.5)').value,-12.5,'accounting parentheses mean negative')
+});
+stTest('detectNumberLocale: distinguishes US and EU formatted columns',()=>{
+  stEqual(detectNumberLocale(['1.234,56','2.000,00','500,25']),'eu','a column of EU-formatted numbers is detected as eu');
+  stEqual(detectNumberLocale(['1,234.56','2,000.00']),'us','a column of US-formatted numbers is detected as us')
+});
+stTest('flattenValue: empty arrays/objects stay distinct from null and each other',()=>{
+  const out={};
+  syncCore.flattenValue({a:[],b:{},c:null,d:''},'',out);
+  stEqual(out.a,'[]','empty array flattens to the literal "[]"');
+  stEqual(out.b,'{}','empty object flattens to the literal "{}"');
+  stEqual(out.c,'','null still flattens to a blank cell');
+  stEqual(out.d,'','an explicit empty string still flattens to a blank cell')
+});
+stTest('flattenValue: pathologically deep JSON does not overflow the call stack',()=>{
+  let deep={v:1};
+  for(let i=0;i<20000;i++)deep={n:deep};
+  const out={};
+  let threw=false;
+  try{syncCore.flattenValue(deep,'',out)}catch(e){threw=true}
+  stAssert(!threw,'flattening 20,000 levels of nesting should not throw a stack overflow')
+});
+stTest('jsonValueToTable: warns instead of silently generating thousands of columns',()=>{
+  const wide={};
+  for(let i=0;i<600;i++)wide['f'+i]=i;
+  const t=syncCore.jsonValueToTable([wide]);
+  stAssert(t.warnings.some(w=>/column/.test(w)),'a very wide flattened record produces a warning')
+});
 function runSync(type,payload){
   if(!syncCore)syncCore=buildSyncCore();
-  if(type==='parse')return syncCore.doParse(payload.text,{headerRow:payload.headerRow});
+  if(type==='parse')return syncCore.doParse(payload.text,{headerRow:payload.headerRow,forceDelimiter:payload.forceDelimiter});
   if(type==='sample')return syncCore.doSample(payload.kind,payload.n);
-  if(type==='sort')return{order:syncCore.doSort(payload.values,payload.indices,payload.colType,payload.dir)};
+  if(type==='sort')return{order:syncCore.doSort(payload.values,payload.indices,payload.colType,payload.dir,{numLocale:payload.numLocale,dateOrder:payload.dateOrder,yearPivot:payload.yearPivot})};
   throw new Error('unknown request type '+type)
 }
 function fallBackToSync(reason){
@@ -976,27 +1250,43 @@ function fallBackToSync(reason){
     catch(err){p.reject(err)}
   })
 }
-try{
-  const workerBlob=new Blob([$('#workerSrc').textContent],{type:'text/javascript'});
-  worker=new Worker(URL.createObjectURL(workerBlob));
-  worker.onmessage=e=>{
-    const d=e.data,p=pending.get(d.id);
-    if(!p)return;
-    pending.delete(d.id);
-    clearTimeout(p.timer);
-    d.ok?p.resolve(d.result):p.reject(new Error(d.error))
-  };
-  worker.onerror=e=>{if(e&&e.preventDefault)e.preventDefault();fallBackToSync((e&&e.message)||'worker error')};
-  worker.onmessageerror=()=>fallBackToSync('worker message error')
-}catch(err){
-  workerOK=false
+let workerBlobUrl=null;
+function spawnWorker(){
+  try{
+    const workerBlob=new Blob([$('#workerSrc').textContent],{type:'text/javascript'});
+    workerBlobUrl=URL.createObjectURL(workerBlob);
+    const w=new Worker(workerBlobUrl);
+    URL.revokeObjectURL(workerBlobUrl);
+    w.onmessage=e=>{
+      const d=e.data,p=pending.get(d.id);
+      if(!p)return;
+      pending.delete(d.id);
+      clearTimeout(p.timer);
+      d.ok?p.resolve(d.result):p.reject(new Error(d.error))
+    };
+    w.onerror=e=>{if(e&&e.preventDefault)e.preventDefault();fallBackToSync((e&&e.message)||'worker error')};
+    w.onmessageerror=()=>fallBackToSync('worker message error');
+    return w
+  }catch(err){
+    return null
+  }
+}
+worker=spawnWorker();
+if(!worker)workerOK=false;
+function restartWorker(reason){
+  try{if(worker)worker.terminate()}catch(e){}
+  const stalled=Array.from(pending.values());
+  pending.clear();
+  stalled.forEach(p=>{clearTimeout(p.timer);p.reject(new Error('The background worker was restarted ('+reason+') — try again.'))});
+  worker=spawnWorker();
+  if(!worker)workerOK=false
 }
 function workerCall(type,payload){
   if(!workerOK)return new Promise((resolve,reject)=>{try{resolve(runSync(type,payload))}catch(err){reject(err)}});
   return new Promise((resolve,reject)=>{
     const id=++reqSeq;
     const timer=setTimeout(()=>{
-      if(pending.has(id)){pending.delete(id);reject(new Error('The worker timed out — try again or reload the tab.'))}
+      if(pending.has(id))restartWorker('a request took too long')
     },WORKER_TIMEOUT_MS);
     pending.set(id,{type,payload,timer,resolve:v=>{clearTimeout(timer);resolve(v)},reject:e=>{clearTimeout(timer);reject(e)}});
     worker.postMessage({id,type,payload})
@@ -1023,39 +1313,16 @@ stTest('worker: unknown request type rejects instead of hanging',async()=>{
   stAssert(threw,'unknown type should reject the promise')
 });
 
-const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 const M3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function mkD(y,mo,d){
-  if(!(y>=1900&&y<=2999)||mo<1||mo>12||d<1||d>31)return null;
-  const dt=new Date(Date.UTC(y,mo-1,d));
-  return dt.getUTCFullYear()===y&&dt.getUTCMonth()===mo-1&&dt.getUTCDate()===d?{y,mo,d}:null
-}
-function parseDate(s){
-  s=String(s).trim();if(!s)return null;
-  let m;
-  if(m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))return mkD(+m[1],+m[2],+m[3]);
-  if(m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/)){
-    const a=+m[1],b=+m[2];let y=+m[3];if(y<100)y+=2000;
-    return a>12&&b<=12?mkD(y,b,a):mkD(y,a,b)
-  }
-  if(m=s.match(/^([A-Za-z]{3,9})[\s\-.]+(\d{1,2})(?:st|nd|rd|th)?[\s\-,]+(\d{2,4})$/)){
-    const mo=MON[m[1].slice(0,3).toLowerCase()];let y=+m[3];if(y<100)y+=2000;
-    return mo?mkD(y,mo,+m[2]):null
-  }
-  if(m=s.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s\-.]+([A-Za-z]{3,9})[\s\-,]+(\d{2,4})$/)){
-    const mo=MON[m[2].slice(0,3).toLowerCase()];let y=+m[3];if(y<100)y+=2000;
-    return mo?mkD(y,mo,+m[1]):null
-  }
-  if(m=s.match(/^(\d{4})(\d{2})(\d{2})$/))return mkD(+m[1],+m[2],+m[3]);
-  return null
-}
 function fmtDateShort(d){return M3[d.mo-1]+' '+d.d+', '+d.y}
 
 const FMT_LABEL={CSV:'CSV',TSV:'TSV','CSV;':'CSV (;)',CSVPIPE:'CSV (|)',JSON:'JSON',NDJSON:'NDJSON',TEXT:'TEXT'};
-const ROW_H=28;
+let ROW_H=34;
+const DENSITY_HEIGHTS={comfortable:38,standard:34,compact:28};
 let T=null;
 let VIEW={filteredBase:[],order:[],sortCol:-1,sortDir:1,filterQuery:''};
 let lastRawText=null;
+let DATE_ORDER='mdy',DATE_YEAR_PIVOT=69;
 const profileCache=new Map();
 const GRID={rows:[],cols:0,widths:[],w:0};
 let paintPending=false;
@@ -1069,14 +1336,31 @@ function inferTypes(t){
     const col=t.data[ci];
     for(let r=0;r<sampleN;r++){
       const v=String(col[r]??'').trim();if(v==='')continue;seen++;
-      if(/^(\([$€£]?\s?[\d,]*\d(\.\d+)?%?\)|[$€£]?\s?-?[\d,]*\d(\.\d+)?%?)$/.test(v))numN++;
-      else if(parseDate(v))dateN++
+      if(parseNumericValue(v,{locale:'us'})||parseNumericValue(v,{locale:'eu'}))numN++;
+      else if(parseDate(v,{order:DATE_ORDER,yearPivot:DATE_YEAR_PIVOT}))dateN++
     }
     if(seen===0)return'text';
     if(numN/seen>0.9)return'number';
     if(dateN/seen>0.9)return'date';
     return'text'
   })
+}
+function detectDateAmbiguityWarnings(base){
+  if(DATE_ORDER==='reject')return[];
+  const types=inferTypes({cols:base.cols,data:base.data,n:base.n});
+  const warnings=[];
+  const sampleN=Math.min(base.n,400);
+  types.forEach((type,ci)=>{
+    if(type!=='date')return;
+    let ambiguous=0;
+    const col=base.data[ci];
+    for(let r=0;r<sampleN;r++){
+      const v=String(col[r]??'').trim();if(!v)continue;
+      if(isDateAmbiguous(v))ambiguous++
+    }
+    if(ambiguous>0)warnings.push('"'+base.cols[ci]+'" has ambiguous D/M dates (e.g. 3/4) — read as '+(DATE_ORDER==='dmy'?'day/month':'month/day')+'. Change under Dates in the toolbar if that\'s wrong.')
+  });
+  return warnings
 }
 stTest('inferTypes: a column of accounting-negative amounts is still detected as numeric',()=>{
   const t={cols:['amount'],data:[['100.00','(50.00)','$1,234.00','(2,000.50)']],n:4};
@@ -1097,30 +1381,37 @@ function computeWidths(t){
 }
 function setLoading(on,label){
   document.querySelectorAll('.ghost,.stresslink,#btnParse,#btnBrowse').forEach(b=>b.disabled=on);
+  const hdrToggle=$('#hdrToggle'),replaceBtn=$('#btnReplace');
+  if(hdrToggle)hdrToggle.disabled=on;
+  if(replaceBtn)replaceBtn.disabled=on;
   if(on&&label)toast(label)
 }
-
+let loadGen=0;
 async function requestParseText(text,sourceName,opts){
+  const myGen=++loadGen;
   setLoading(true);
   try{
-    const result=await workerCall('parse',{text,headerRow:opts&&opts.headerRow});
+    const result=await workerCall('parse',{text,headerRow:opts&&opts.headerRow,forceDelimiter:opts&&opts.forceDelimiter});
+    if(myGen!==loadGen)return;
     result.sourceName=sourceName||'sift';
     lastRawText=text;
     loadTable(result);
     toast('Parsed · '+FMT_LABEL[result.format]+' · '+fmtInt(result.n)+' rows × '+result.cols.length+' columns')
-  }catch(err){showParseError(err.message)}
-  setLoading(false)
+  }catch(err){if(myGen===loadGen)showParseError(err.message)}
+  if(myGen===loadGen)setLoading(false)
 }
 async function requestSample(kind,n,label){
+  const myGen=++loadGen;
   setLoading(true,label);
   try{
     const result=await workerCall('sample',{kind,n});
+    if(myGen!==loadGen)return;
     result.sourceName=kind;
     lastRawText=null;
     loadTable(result);
     toast('Loaded '+fmtInt(result.n)+' rows × '+result.cols.length+' columns')
-  }catch(err){showParseError(err.message)}
-  setLoading(false)
+  }catch(err){if(myGen===loadGen)showParseError(err.message)}
+  if(myGen===loadGen)setLoading(false)
 }
 function showParseError(msg){
   $('#parseErr').textContent=msg;
@@ -1133,6 +1424,10 @@ function loadTable(result){
   states=[{cols:BASE.cols,data:BASE.data,n:BASE.n,rowIds:identityOrder(BASE.n)}];
   undoStack=[];redoStack=[];
   closePalette();
+  cancelCellEdit();
+  closeHalo();
+  closeAllHeaderPopovers();
+  closeProfile();
   $('#emptyView').classList.add('hidden');
   $('#workspace').classList.remove('hidden');
   $('#fileMeta').classList.remove('hidden');
@@ -1143,8 +1438,16 @@ function loadTable(result){
   const delimited=BASE.format==='CSV'||BASE.format==='TSV'||BASE.format==='CSV;'||BASE.format==='CSVPIPE';
   $('#hdrToggleRow').classList.toggle('hidden',!delimited||!lastRawText);
   $('#hdrToggle').checked=true;
-  $('#warnLine').classList.toggle('hidden',!BASE.warnings.length);
-  $('#warnText').textContent=BASE.warnings.join(' · ');
+  $('#delimRow').classList.toggle('hidden',!delimited||!lastRawText);
+  if(delimited){
+    const delimChar=BASE.format==='TSV'?'\t':BASE.format==='CSV;'?';':BASE.format==='CSVPIPE'?'|':',';
+    currentDelimiterOverride=delimChar;
+    $('#delimSelect').value=delimChar
+  }
+  const dateWarnings=detectDateAmbiguityWarnings(BASE);
+  const allWarnings=BASE.warnings.concat(dateWarnings);
+  $('#warnLine').classList.toggle('hidden',!allWarnings.length);
+  $('#warnText').textContent=allWarnings.join(' · ');
   VIEW={filteredBase:identityOrder(BASE.n),order:identityOrder(BASE.n),sortCol:-1,sortDir:1,filterQuery:''};
   $('#searchInp').value='';
   $('#btnFilterToStep').classList.add('hidden');
@@ -1179,6 +1482,7 @@ function resetPipeline(){
 }
 function setViewIdx(i){
   if(typeof halo!=='undefined'&&halo.open)closeHalo();
+  if(editingCell)cancelCellEdit();
   viewIdx=Math.max(0,Math.min(i,states.length-1));
   const st=states[viewIdx];
   T={cols:st.cols,data:st.data,n:st.n,rowIds:st.rowIds,format:BASE.format,warnings:BASE.warnings,sourceName:BASE.sourceName};
@@ -1260,7 +1564,8 @@ function recomputeFilter(){
     performSort()
   }else{
     VIEW.order=idxs.slice();
-    settleView()
+    settleView();
+    if(VIEW.filterQuery)announce(fmtInt(idxs.length)+' row'+(idxs.length===1?'':'s')+' match')
   }
   $('#btnFilterToStep').classList.toggle('hidden',!VIEW.filterQuery)
 }
@@ -1277,10 +1582,17 @@ let sortSeq=0;
 async function performSort(){
   const ci=VIEW.sortCol,dir=VIEW.sortDir,type=T.types[ci],mySeq=++sortSeq;
   try{
-    const res=await workerCall('sort',{values:T.data[ci],indices:VIEW.filteredBase,colType:type,dir});
+    let numLocale;
+    if(type==='number'){
+      const sample=[];
+      for(let r=0;r<T.n&&sample.length<200;r++){const v=String(T.data[ci][r]??'').trim();if(v!=='')sample.push(v)}
+      numLocale=detectNumberLocale(sample)
+    }
+    const res=await workerCall('sort',{values:T.data[ci],indices:VIEW.filteredBase,colType:type,dir,numLocale,dateOrder:DATE_ORDER,yearPivot:DATE_YEAR_PIVOT});
     if(mySeq!==sortSeq)return;
     VIEW.order=res.order;
-    settleView()
+    settleView();
+    announce('Sorted by '+T.cols[ci]+', '+(dir===1?'ascending':'descending'))
   }catch(err){
     if(mySeq!==sortSeq)return;
     toast('Sort failed — '+err.message,true)
@@ -1295,17 +1607,21 @@ function settleView(){
 
 function renderHead(){
   const wrap=$('#ghead');
-  let h='<div class="gh idx" style="width:52px">#</div>';
+  let h='<div class="gh idx" role="columnheader" aria-colindex="1" tabindex="-1" style="width:52px">#</div>';
   T.cols.forEach((c,i)=>{
     const type=T.types[i],num=type==='number';
-    const sortCls=VIEW.sortCol===i?(VIEW.sortDir===1?' s-asc':' s-desc'):'';
-    h+='<div class="gh'+(num?' num':'')+' type-'+type+sortCls+'" data-ci="'+i+'" style="width:'+T.widths[i]+'px" title="'+esc(c)+'">'+
+    const sorted=VIEW.sortCol===i;
+    const sortCls=sorted?(VIEW.sortDir===1?' s-asc':' s-desc'):'';
+    const ariaSort=sorted?(VIEW.sortDir===1?'ascending':'descending'):'none';
+    h+='<div class="gh'+(num?' num':'')+' type-'+type+sortCls+'" data-ci="'+i+'" role="columnheader" aria-colindex="'+(i+2)+'" aria-sort="'+ariaSort+'" tabindex="-1" style="width:'+T.widths[i]+'px" title="'+esc(c)+'">'+
        '<span class="lbl">'+esc(c)+'</span>'+
-       '<svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'+
-       '<button class="picon" data-profile="'+i+'" title="Profile this column" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="13" width="4" height="7" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="16" y="4" width="4" height="16" rx="1"/></svg></button>'+
+       '<svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'+
+       '<button class="picon" data-profile="'+i+'" title="Profile this column" aria-label="Profile column '+esc(c)+'" type="button" tabindex="-1"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="13" width="4" height="7" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="16" y="4" width="4" height="16" rx="1"/></svg></button>'+
        '</div>'
   });
-  wrap.innerHTML=h
+  wrap.setAttribute('aria-rowindex','1');
+  wrap.innerHTML=h;
+  applyGridFocus()
 }
 let sedimentCache=new Map();
 function computeSedimentMap(){
@@ -1384,15 +1700,17 @@ function layoutGrid(){
 }
 function makeRow(){
   const r=document.createElement('div');
-  r.className='grow';r.style.width=GRID.w+'px';
-  let h='<div class="gc idx" style="width:52px"></div>';
-  for(let i=0;i<GRID.cols;i++)h+='<div class="gc'+(T.types[i]==='number'?' num':'')+'" data-ci="'+i+'" style="width:'+GRID.widths[i]+'px"></div>';
+  r.className='grow';r.style.width=GRID.w+'px';r.setAttribute('role','row');
+  let h='<div class="gc idx" role="gridcell" aria-colindex="1" tabindex="-1" style="width:52px"></div>';
+  for(let i=0;i<GRID.cols;i++)h+='<div class="gc'+(T.types[i]==='number'?' num':'')+'" data-ci="'+i+'" role="gridcell" aria-colindex="'+(i+2)+'" tabindex="-1" style="width:'+GRID.widths[i]+'px"></div>';
   r.innerHTML=h;
   $('#gbody').appendChild(r);GRID.rows.push(r)
 }
 function paint(){
   if(!T)return;
   const sc=$('#gscroll'),seq=GRID.displaySeq,total=seq.length,realTotal=VIEW.order.length;
+  sc.setAttribute('aria-rowcount',String(realTotal+1));
+  sc.setAttribute('aria-colcount',String(GRID.cols+1));
   const first=Math.max(0,Math.floor(sc.scrollTop/ROW_H)-6);
   const count=Math.max(0,Math.min(Math.ceil(sc.clientHeight/ROW_H)+12,total-first));
   while(GRID.rows.length<count)makeRow();
@@ -1401,9 +1719,11 @@ function paint(){
   const previewSet=halo.open&&halo.previewSet?halo.previewSet:null;
   for(let k=0;k<GRID.rows.length;k++){
     const el=GRID.rows[k],di=first+k;
-    if(k>=count){el.style.display='none';continue}
+    if(k>=count){el.style.display='none';delete el.dataset.di;continue}
     el.style.display='flex';
     el.style.transform='translateY('+(di*ROW_H)+'px)';
+    el.dataset.di=di;
+    el.setAttribute('aria-rowindex',String(di+2));
     const entry=seq[di],kids=el.children;
     if(entry.type==='sediment'){
       el.classList.add('sediment');
@@ -1445,7 +1765,8 @@ function paint(){
   const notes=[];
   if(VIEW.filterQuery)notes.push(fmtInt(realTotal)+' match'+(realTotal===1?'':'es'));
   if(VIEW.sortCol>=0)notes.push('sorted by '+T.cols[VIEW.sortCol]);
-  $('#footRight').textContent=notes.join(' · ')
+  $('#footRight').textContent=notes.join(' · ');
+  applyGridFocus()
 }
 $('#gscroll').addEventListener('scroll',()=>{
   if(!paintPending){paintPending=true;requestAnimationFrame(()=>{paintPending=false;paint()})}
@@ -1501,7 +1822,100 @@ $('#ghead').addEventListener('click',e=>{
   const pbtn=e.target.closest('.picon');
   if(pbtn){openProfile(+pbtn.dataset.profile,pbtn);return}
   const gh=e.target.closest('.gh[data-ci]');
-  if(gh)cycleSort(+gh.dataset.ci)
+  if(gh){
+    gridFocus={rowPos:-1,col:[...$('#ghead').children].indexOf(gh)};
+    cycleSort(+gh.dataset.ci)
+  }else{
+    const idx=e.target.closest('.gh.idx');
+    if(idx)gridFocus={rowPos:-1,col:0}
+  }
+});
+let gridFocus={rowPos:-1,col:0};
+function clampGridFocus(){
+  gridFocus.col=Math.max(0,Math.min(gridFocus.col,GRID.cols));
+  const maxRowPos=(GRID.displaySeq?GRID.displaySeq.length:0)-1;
+  if(gridFocus.rowPos>maxRowPos)gridFocus.rowPos=maxRowPos;
+  if(gridFocus.rowPos<-1)gridFocus.rowPos=-1
+}
+function applyGridFocus(){
+  clampGridFocus();
+  const headCells=$('#ghead').children;
+  for(let i=0;i<headCells.length;i++)headCells[i].tabIndex=(gridFocus.rowPos===-1&&gridFocus.col===i)?0:-1;
+  GRID.rows.forEach(rowEl=>{
+    if(rowEl.style.display==='none')return;
+    const cells=rowEl.children;
+    for(let i=0;i<cells.length;i++)cells[i].tabIndex=-1
+  });
+  if(gridFocus.rowPos>=0){
+    const rowEl=GRID.rows.find(r=>r.dataset.di===String(gridFocus.rowPos)&&r.style.display!=='none');
+    if(rowEl&&rowEl.children[gridFocus.col])rowEl.children[gridFocus.col].tabIndex=0
+  }
+}
+function focusActiveGridCell(){
+  applyGridFocus();
+  if(gridFocus.rowPos===-1){
+    const headCells=$('#ghead').children;
+    if(headCells[gridFocus.col])headCells[gridFocus.col].focus()
+  }else{
+    const rowEl=GRID.rows.find(r=>r.dataset.di===String(gridFocus.rowPos)&&r.style.display!=='none');
+    if(rowEl&&rowEl.children[gridFocus.col])rowEl.children[gridFocus.col].focus()
+  }
+}
+function focusGridCell(rowPos,col){
+  gridFocus={rowPos,col};
+  clampGridFocus();
+  if(gridFocus.rowPos>=0){
+    const sc=$('#gscroll'),top=gridFocus.rowPos*ROW_H,bottom=top+ROW_H;
+    if(top<sc.scrollTop)sc.scrollTop=top;
+    else if(bottom>sc.scrollTop+sc.clientHeight)sc.scrollTop=bottom-sc.clientHeight
+  }
+  requestAnimationFrame(()=>{paint();focusActiveGridCell()})
+}
+function startEditFocusedCell(){
+  if(gridFocus.rowPos<0||gridFocus.col===0)return;
+  const rowEl=GRID.rows.find(r=>r.dataset.di===String(gridFocus.rowPos)&&r.style.display!=='none');
+  if(!rowEl||rowEl.classList.contains('sediment'))return;
+  const cellEl=rowEl.children[gridFocus.col];
+  const rIdx=+rowEl.dataset.row;
+  if(cellEl&&!isNaN(rIdx))startCellEdit(cellEl,gridFocus.col-1,rIdx)
+}
+$('#gbody').addEventListener('click',e=>{
+  const cell=e.target.closest('.gc');
+  const row=e.target.closest('.grow');
+  if(!cell||!row||row.dataset.di==null)return;
+  gridFocus={rowPos:+row.dataset.di,col:[...row.children].indexOf(cell)};
+  applyGridFocus()
+});
+$('#gscroll').addEventListener('keydown',e=>{
+  if(editingCell)return;
+  if(e.target.closest('.picon'))return;
+  const key=e.key,onHeader=gridFocus.rowPos===-1;
+  const lastRowPos=(GRID.displaySeq?GRID.displaySeq.length:1)-1;
+  if(key==='ArrowRight'){e.preventDefault();focusGridCell(gridFocus.rowPos,gridFocus.col+1)}
+  else if(key==='ArrowLeft'){e.preventDefault();focusGridCell(gridFocus.rowPos,gridFocus.col-1)}
+  else if(key==='ArrowDown'){e.preventDefault();focusGridCell(onHeader?0:Math.min(gridFocus.rowPos+1,lastRowPos),gridFocus.col)}
+  else if(key==='ArrowUp'){e.preventDefault();focusGridCell(gridFocus.rowPos-1,gridFocus.col)}
+  else if(key==='Home'){e.preventDefault();focusGridCell((e.ctrlKey||e.metaKey)?(onHeader?-1:0):gridFocus.rowPos,0)}
+  else if(key==='End'){e.preventDefault();focusGridCell((e.ctrlKey||e.metaKey)?lastRowPos:gridFocus.rowPos,GRID.cols)}
+  else if(key==='Enter'){
+    e.preventDefault();
+    if(onHeader){const ci=gridFocus.col-1;if(ci>=0)cycleSort(ci)}
+    else startEditFocusedCell()
+  }
+  else if(key===' '&&onHeader){e.preventDefault();const ci=gridFocus.col-1;if(ci>=0)cycleSort(ci)}
+  else if(key==='F2'&&!onHeader){e.preventDefault();startEditFocusedCell()}
+});
+stTest('grid keyboard nav: arrow keys move focus position and clamp at the grid edges',()=>{
+  const savedGrid=gridFocus,savedCols=GRID.cols,savedSeq=GRID.displaySeq;
+  GRID.cols=3;GRID.displaySeq=[{type:'row',rIdx:0},{type:'row',rIdx:1}];
+  gridFocus={rowPos:-1,col:0};
+  clampGridFocus();
+  stEqual(gridFocus,{rowPos:-1,col:0},'starts clamped at the header, first column');
+  gridFocus.col=99;clampGridFocus();
+  stEqual(gridFocus.col,GRID.cols,'column position clamps to the last real column');
+  gridFocus.rowPos=99;clampGridFocus();
+  stEqual(gridFocus.rowPos,1,'row position clamps to the last display row');
+  gridFocus=savedGrid;GRID.cols=savedCols;GRID.displaySeq=savedSeq
 });
 
 function computeProfile(ci){
@@ -1510,16 +1924,22 @@ function computeProfile(ci){
   let empty=0;const freq=new Map();
   let numMin=Infinity,numMax=-Infinity,numSum=0,numN=0;
   let dateMin=null,dateMax=null;
+  let numLocale='us';
+  if(type==='number'){
+    const sample=[];
+    for(let r=0;r<n&&sample.length<200;r++){const v=String(col[r]??'').trim();if(v!=='')sample.push(v)}
+    numLocale=detectNumberLocale(sample)
+  }
   for(let r=0;r<n;r++){
     const v=String(col[r]??'').trim();
     if(v===''){empty++;continue}
     freq.set(v,(freq.get(v)||0)+1);
     if(type==='number'){
-      const num=Number(v.replace(/[$,€£%\s]/g,''));
-      if(isFinite(num)){if(num<numMin)numMin=num;if(num>numMax)numMax=num;numSum+=num;numN++}
+      const parsed=parseNumericValue(v,{locale:numLocale});
+      if(parsed){const num=parsed.value;if(num<numMin)numMin=num;if(num>numMax)numMax=num;numSum+=num;numN++}
     }
     if(type==='date'){
-      const d=parseDate(v);
+      const d=parseDate(v,{order:DATE_ORDER,yearPivot:DATE_YEAR_PIVOT});
       if(d){
         const k=d.y*10000+d.mo*100+d.d;
         if(!dateMin||k<dateMin.k)dateMin={k,v:fmtDateShort(d)};
@@ -1528,7 +1948,7 @@ function computeProfile(ci){
     }
   }
   const top=[...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const result={empty,distinct:freq.size,type,numMin,numMax,numMean:numN?numSum/numN:null,dateMin,dateMax,top,nonEmpty:n-empty};
+  const result={empty,distinct:freq.size,type,numMin,numMax,numMean:numN?numSum/numN:null,dateMin,dateMax,top,nonEmpty:n-empty,numLocale};
   profileCache.set(ci,result);
   return result
 }
@@ -1689,6 +2109,7 @@ function commitCellEdit(){
   if(after===before)return;
   handleDemonstration(ci,rIdx,before,after,rect)
 }
+window.addEventListener('resize',()=>{if(editingCell)commitCellEdit()});
 let cellClickTimer=null;
 $('#gbody').addEventListener('click',e=>{
   const sedRow=e.target.closest('.grow.sediment');
@@ -2034,13 +2455,36 @@ $('#btnFilterToStep').addEventListener('click',()=>{
   toast('Added as a permanent filter step')
 });
 
+let currentDelimiterOverride=null;
 $('#hdrToggle').addEventListener('change',e=>{
   if(lastRawText==null)return;
-  if(steps.length)toast('Pipeline cleared — the header setting changed the columns');
-  requestParseText(lastRawText,T.sourceName,{headerRow:e.target.checked})
+  if(steps.length){
+    const ok=window.confirm('Changing "first row is headers" re-parses the file and will clear your current pipeline ('+steps.length+' step'+(steps.length>1?'s':'')+'), including sort, filter, and cell edits, and can change which column is which.\n\nContinue?');
+    if(!ok){e.target.checked=!e.target.checked;return}
+    toast('Pipeline cleared — the header setting changed the columns')
+  }
+  requestParseText(lastRawText,T.sourceName,{headerRow:e.target.checked,forceDelimiter:currentDelimiterOverride})
+});
+$('#delimSelect').addEventListener('change',e=>{
+  if(lastRawText==null)return;
+  const proceed=!steps.length||window.confirm('Changing the delimiter re-parses the file and will clear your current pipeline ('+steps.length+' step'+(steps.length>1?'s':'')+').\n\nContinue?');
+  if(!proceed){$('#delimSelect').value=currentDelimiterOverride||',';return}
+  if(steps.length)toast('Pipeline cleared — the delimiter change reparsed the file');
+  currentDelimiterOverride=e.target.value;
+  requestParseText(lastRawText,T.sourceName,{headerRow:$('#hdrToggle').checked,forceDelimiter:currentDelimiterOverride})
+});
+$('#dateOrderSelect').addEventListener('change',e=>{
+  DATE_ORDER=e.target.value;
+  if(T)setViewIdx(viewIdx)
+});
+$('#densitySelect').addEventListener('change',e=>{
+  ROW_H=DENSITY_HEIGHTS[e.target.value]||34;
+  document.documentElement.style.setProperty('--row-h',ROW_H+'px');
+  if(editingCell)cancelCellEdit();
+  if(T){layoutGrid();paint()}
 });
 $('#btnReplace').addEventListener('click',()=>{
-  T=null;lastRawText=null;
+  T=null;lastRawText=null;currentDelimiterOverride=null;
   resetPipeline();
   $('#workspace').classList.add('hidden');
   $('#emptyView').classList.remove('hidden');
@@ -2099,12 +2543,25 @@ stTest('checkFileSize: refuses a file over the safety cap and allows one under i
   stAssert(checkFileSize({size:MAX_FILE_BYTES})===true,'a file exactly at the cap should pass');
   stAssert(checkFileSize({size:MAX_FILE_BYTES+1})===false,'a file over the cap should be refused')
 });
-function readFile(f){
+async function decodeFileText(f){
+  const buf=await f.arrayBuffer();
+  const bytes=new Uint8Array(buf);
+  let encoding='utf-8',offset=0;
+  if(bytes.length>=3&&bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF){encoding='utf-8';offset=3}
+  else if(bytes.length>=2&&bytes[0]===0xFF&&bytes[1]===0xFE){encoding='utf-16le';offset=2}
+  else if(bytes.length>=2&&bytes[0]===0xFE&&bytes[1]===0xFF){encoding='utf-16be';offset=2}
+  const decoder=new TextDecoder(encoding);
+  const text=decoder.decode(bytes.subarray(offset));
+  const suspicious=offset===0&&text.indexOf('\uFFFD')!==-1;
+  return{text,encoding,suspicious}
+}
+async function readFile(f){
   if(!checkFileSize(f))return;
-  const rd=new FileReader();
-  rd.onload=()=>requestParseText(String(rd.result),f.name.replace(/\.[^.]+$/,''));
-  rd.onerror=()=>toast('Could not read that file',true);
-  rd.readAsText(f)
+  try{
+    const{text,suspicious}=await decodeFileText(f);
+    if(suspicious)toast('This file may not be UTF-8 — some characters looked wrong. Re-export as UTF-8 if the data looks garbled.',true);
+    requestParseText(text,f.name.replace(/\.[^.]+$/,''))
+  }catch(err){toast('Could not read that file',true)}
 }
 stTest('readFile: refuses an oversized file before ever touching FileReader',()=>{
   let toasted=false;
@@ -2143,14 +2600,42 @@ document.addEventListener('drop',e=>{
 });
 
 function exportBaseName(){return slug(T.sourceName||'sift')}
-function buildDelimited(delim,bom){
+function needsFormulaProtection(s){
+  let i=0;
+  while(i<s.length&&s[i]===' ')i++;
+  const c=s[i];
+  return c==='='||c==='+'||c==='-'||c==='@'||c==='\t'||c==='\r'
+}
+function protectFormulaCell(s){return needsFormulaProtection(s)?"'"+s:s}
+function buildDelimited(delim,bom,protect){
   const q=v=>{const s=String(v==null?'':v);return(s.indexOf(delim)!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1||s.indexOf('\r')!==-1)?'"'+s.replace(/"/g,'""')+'"':s};
-  const lines=[T.cols.map(q).join(delim)];
-  for(const r of VIEW.order)lines.push(T.cols.map((_,c)=>q(T.data[c][r])).join(delim));
+  const cell=v=>{const s=String(v==null?'':v);return q(protect?protectFormulaCell(s):s)};
+  const lines=[T.cols.map(cell).join(delim)];
+  for(const r of VIEW.order)lines.push(T.cols.map((_,c)=>cell(T.data[c][r])).join(delim));
   let text=lines.join('\r\n');
   if(bom)text='\uFEFF'+text;
   return text
 }
+stTest('buildDelimited: protects =, +, -, @, tab and CR-leading cells when protection is on',()=>{
+  const savedT=T,savedView=VIEW;
+  T={cols:['a','=SUM(A1)'],data:[['=cmd|/c calc','+1'],['-2','@x']],n:2};
+  VIEW={order:[0,1]};
+  const out=buildDelimited(',',false,true);
+  stAssert(out.indexOf("'=cmd")!==-1,'formula-leading cell should get a leading apostrophe');
+  stAssert(out.indexOf("'+1")!==-1,'+ leading cell protected');
+  stAssert(out.indexOf("'-2")!==-1,'- leading cell protected');
+  stAssert(out.indexOf("'@x")!==-1,'@ leading cell protected');
+  stAssert(out.indexOf("'=SUM")!==-1,'protection applies to header cells too');
+  T=savedT;VIEW=savedView
+});
+stTest('buildDelimited: raw/lossless export is unchanged when protection is off',()=>{
+  const savedT=T,savedView=VIEW;
+  T={cols:['a'],data:[['=cmd']],n:1};
+  VIEW={order:[0]};
+  const out=buildDelimited(',',false,false);
+  stAssert(out.indexOf("'=cmd")===-1,'no apostrophe should be injected when protection is disabled');
+  T=savedT;VIEW=savedView
+});
 function buildMarkdown(){
   const e2=v=>String(v==null?'':v).replace(/\|/g,'\\|');
   const lines=['| '+T.cols.map(e2).join(' | ')+' |','| '+T.cols.map(()=>'---').join(' | ')+' |'];
@@ -2166,9 +2651,10 @@ function buildLines(){
   return VIEW.order.map(r=>T.cols.map((_,c)=>T.data[c][r]??'').join(' ')).join('\n')
 }
 let excelSafe=true;
+let protectFormulas=true;
 const EXPORTS=[
-  {id:'csv',name:'CSV',sub:'comma-separated',ext:'csv',mime:'text/csv',build:()=>buildDelimited(',',excelSafe)},
-  {id:'tsv',name:'TSV',sub:'tab-separated',ext:'tsv',mime:'text/tab-separated-values',build:()=>buildDelimited('\t',false)},
+  {id:'csv',name:'CSV',sub:'comma-separated',ext:'csv',mime:'text/csv',build:()=>buildDelimited(',',excelSafe,protectFormulas)},
+  {id:'tsv',name:'TSV',sub:'tab-separated',ext:'tsv',mime:'text/tab-separated-values',build:()=>buildDelimited('\t',false,protectFormulas)},
   {id:'json',name:'JSON',sub:'array of records',ext:'json',mime:'application/json',build:buildJSONRecords},
   {id:'jsoncol',name:'JSON (columns)',sub:'column-oriented object',ext:'json',mime:'application/json',build:buildJSONColumns},
   {id:'ndjson',name:'NDJSON',sub:'one record per line',ext:'ndjson',mime:'application/x-ndjson',build:buildNDJSON},
@@ -2189,9 +2675,13 @@ function renderExportMenu(){
     '<button data-dl="'+x.id+'" title="Download" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg></button>'+
     '</div></div>').join('');
   h+='</div>';
-  h+='<label class="expopt"><span class="sw" style="transform:scale(.85)"><input type="checkbox" id="excelSafeToggle"'+(excelSafe?' checked':'')+'><i></i></span> Excel-safe CSV (BOM + CRLF)</label>';
+  h+='<div class="expopts">';
+  h+='<label class="expopt"><span class="sw" style="transform:scale(.85)"><input type="checkbox" id="protectFormulasToggle"'+(protectFormulas?' checked':'')+'><i></i></span> Protect against spreadsheet formulas <span class="expopthint">(CSV/TSV, recommended)</span></label>';
+  h+='<label class="expopt"><span class="sw" style="transform:scale(.85)"><input type="checkbox" id="excelSafeToggle"'+(excelSafe?' checked':'')+'><i></i></span> Excel-compatible encoding (BOM + CRLF)</label>';
+  h+='</div>';
   wrap.innerHTML=h;
   $('#excelSafeToggle').addEventListener('change',e=>{excelSafe=e.target.checked});
+  $('#protectFormulasToggle').addEventListener('change',e=>{protectFormulas=e.target.checked});
   const addBtn=$('#exportAddFilterStep');
   if(addBtn)addBtn.addEventListener('click',()=>{closeExportMenu();$('#btnFilterToStep').click()})
 }
@@ -2581,45 +3071,111 @@ function opWideToLong(t,cfg){
   }
   return{table:{cols,data,n,rowIds:null},stats:{cells:n}}
 }
+function keyPartsBlank(parts){return parts.every(v=>String(v??'').trim()==='')}
 function opLongToWide(t,cfg){
   const keyIdx=colIdx(t.cols,cfg.keyColumn),valIdx=colIdx(t.cols,cfg.valueColumn);
   if(keyIdx===-1||valIdx===-1)return{table:t,stats:{},warning:'Key or value column not found'};
   const idIdx=resolveCols(t,cfg.idColumns).filter(i=>i!==keyIdx&&i!==valIdx);
+  const policy=cfg.duplicatePolicy||null;
   const groups=new Map(),keyValues=[],seenKeys=new Set();
+  let emptyKeyRows=0;
   for(let r=0;r<t.n;r++){
-    const groupKey=idIdx.map(ci=>t.data[ci][r]).join('\u0001');
+    const groupKey=JSON.stringify(idIdx.map(ci=>t.data[ci][r]));
     if(!groups.has(groupKey))groups.set(groupKey,{idVals:idIdx.map(ci=>t.data[ci][r]),vals:{}});
-    const k=String(t.data[keyIdx][r]??'');
-    groups.get(groupKey).vals[k]=t.data[valIdx][r];
+    let k=String(t.data[keyIdx][r]??'');
+    if(k===''){emptyKeyRows++;k='(blank)'}
+    const bucket=groups.get(groupKey).vals;
+    if(!bucket[k])bucket[k]=[];
+    bucket[k].push(t.data[valIdx][r]);
     if(!seenKeys.has(k)){seenKeys.add(k);keyValues.push(k)}
   }
-  const cols=idIdx.map(i=>t.cols[i]).concat(keyValues);
+  let dupCells=0;const dupSample=[];
+  groups.forEach(g=>{for(const k in g.vals)if(g.vals[k].length>1){dupCells++;if(dupSample.length<5)dupSample.push(k)}});
+  if(dupCells&&(!policy||policy==='error')){
+    return{table:t,stats:{},warning:dupCells+' id/key combination'+(dupCells>1?'s':'')+' had more than one value (e.g. '+dupSample.join(', ')+') — choose how to combine duplicates (first, last, sum, count, concat, min, max, or average) before pivoting.'}
+  }
+  const reduce=vals=>{
+    if(vals.length===1)return vals[0];
+    if(policy==='first')return vals[0];
+    if(policy==='last')return vals[vals.length-1];
+    if(policy==='count')return String(vals.length);
+    if(policy==='concat')return vals.filter(v=>v!=null&&v!=='').join(', ');
+    if(policy==='sum'||policy==='min'||policy==='max'||policy==='average'){
+      const locale=detectNumberLocale(vals);
+      const nums=vals.map(v=>{const p=parseNumericValue(v,{locale});return p?p.value:null}).filter(n=>n!=null);
+      if(!nums.length)return'';
+      if(policy==='sum')return String(nums.reduce((a,b)=>a+b,0));
+      if(policy==='min')return String(Math.min(...nums));
+      if(policy==='max')return String(Math.max(...nums));
+      return String(nums.reduce((a,b)=>a+b,0)/nums.length)
+    }
+    return vals[0]
+  };
+  const genNames=idIdx.map(i=>t.cols[i]);
+  const usedNames=new Set(genNames);
+  const safeKeyValues=keyValues.map(k=>{
+    let name=k;
+    while(usedNames.has(name)||name==='')name=name+'_2';
+    usedNames.add(name);
+    return name
+  });
+  const cols=genNames.concat(safeKeyValues);
   const data=cols.map(()=>[]);
   for(const g of groups.values()){
     g.idVals.forEach((v,k)=>data[k].push(v));
-    keyValues.forEach((kv,k)=>data[idIdx.length+k].push(g.vals[kv]!==undefined?g.vals[kv]:''))
+    keyValues.forEach((kv,k)=>data[idIdx.length+k].push(g.vals[kv]!==undefined?reduce(g.vals[kv]):''))
   }
-  return{table:{cols,data,n:groups.size,rowIds:null},stats:{cells:groups.size*keyValues.length}}
+  const result={table:{cols,data,n:groups.size,rowIds:null},stats:{cells:groups.size*keyValues.length}};
+  const notes=[];
+  if(dupCells&&policy)notes.push(dupCells+' duplicate id/key combination'+(dupCells>1?'s':'')+' combined using "'+policy+'"');
+  if(emptyKeyRows)notes.push(emptyKeyRows+' row'+(emptyKeyRows>1?'s':'')+' had a blank pivot key, grouped under "(blank)"');
+  if(notes.length)result.warning=notes.join('; ');
+  return result
 }
+stTest('opLongToWide: duplicate id/key combinations block by default instead of silently overwriting',()=>{
+  const t={cols:['id','k','v'],data:[['1','1'],['a','a'],['x','y']],n:2};
+  const blocked=opLongToWide(t,{idColumns:['id'],keyColumn:'k',valueColumn:'v'});
+  stAssert(!!blocked.warning&&blocked.table===t,'without a duplicate policy, the pivot is blocked and the original table is returned unchanged');
+  const first=opLongToWide(t,{idColumns:['id'],keyColumn:'k',valueColumn:'v',duplicatePolicy:'first'});
+  stEqual(first.table.data[first.table.cols.indexOf('a')],['x'],'"first" policy keeps the first duplicate value')
+});
+stTest('opLongToWide: a numeric duplicate policy combines values instead of dropping them',()=>{
+  const t={cols:['id','k','v'],data:[['1','1','1'],['a','a','a'],['10','20','30']],n:3};
+  const res=opLongToWide(t,{idColumns:['id'],keyColumn:'k',valueColumn:'v',duplicatePolicy:'sum'});
+  stEqual(res.table.data[res.table.cols.indexOf('a')],['60'],'"sum" policy adds duplicate values for the same id/key');
+});
+stTest('opLongToWide: generated column names never collide with an id column or each other',()=>{
+  const t={cols:['id','k','v'],data:[['1','2'],['id','id'],['x','y']],n:2};
+  const res=opLongToWide(t,{idColumns:['id'],keyColumn:'k',valueColumn:'v'});
+  stAssert(res.table.cols[0]==='id'&&res.table.cols[1]!=='id','the pivot-generated column named "id" is renamed so it cannot collide with the id column');
+  stEqual(new Set(res.table.cols).size,res.table.cols.length,'no two output columns share a name')
+});
 function buildJoinKey(vals,normalize){
-  return vals.map(v=>{
+  const parts=vals.map(v=>{
     let s=String(v??'');
-    if(normalize&&normalize.numeric){
-      const n=Number(s.replace(/[$,€£%\s]/g,''));
-      if(isFinite(n)&&s.trim()!=='')return String(n)
+    if(normalize&&normalize.numeric&&s.trim()!==''){
+      const locale=normalize.locale||'us';
+      const parsed=parseNumericValue(s,{locale});
+      if(parsed)return String(parsed.value)
     }
     if(normalize&&normalize.trim)s=s.trim().replace(/\s+/g,' ');
     if(normalize&&normalize.caseFold)s=s.toLowerCase();
     return s
-  }).join('\u0001')
+  });
+  return JSON.stringify(parts)
 }
 stTest('buildJoinKey: normalizes composite keys according to the requested options',()=>{
-  stEqual(buildJoinKey(['  Ann  ','7'],{}),'  Ann  \u00017','with no normalization, values are used verbatim');
-  stEqual(buildJoinKey(['  Ann  ','X'],{trim:true}),'Ann\u0001X','trim collapses and strips whitespace');
-  stEqual(buildJoinKey(['ANN'],{caseFold:true}),'ann','caseFold lowercases');
-  stEqual(buildJoinKey(['$1,234.00'],{numeric:true}),'1234','numeric normalizes formatted numbers to a canonical form');
-  stEqual(buildJoinKey(['007'],{numeric:true}),'7','numeric normalization also canonicalizes leading zeros');
-  stEqual(buildJoinKey(['not a number'],{numeric:true}),'not a number','numeric normalization falls back to the raw string when it is not a number')
+  stEqual(buildJoinKey(['  Ann  ','7'],{}),JSON.stringify(['  Ann  ','7']),'with no normalization, values are used verbatim');
+  stEqual(buildJoinKey(['  Ann  ','X'],{trim:true}),JSON.stringify(['Ann','X']),'trim collapses and strips whitespace');
+  stEqual(buildJoinKey(['ANN'],{caseFold:true}),JSON.stringify(['ann']),'caseFold lowercases');
+  stEqual(buildJoinKey(['$1,234.00'],{numeric:true}),JSON.stringify(['1234']),'numeric normalizes formatted numbers to a canonical form');
+  stEqual(buildJoinKey(['007'],{numeric:true}),JSON.stringify(['7']),'numeric normalization also canonicalizes leading zeros');
+  stEqual(buildJoinKey(['not a number'],{numeric:true}),JSON.stringify(['not a number']),'numeric normalization falls back to the raw string when it is not a number')
+});
+stTest('buildJoinKey: a value containing the legacy separator cannot collide with two separate values',()=>{
+  const k1=buildJoinKey(['a\u0001b'],{});
+  const k2=buildJoinKey(['a','b'],{});
+  stAssert(k1!==k2,'length-prefixed/JSON encoding keeps these composite keys distinct')
 });
 function opJoin(t,cfg){
   const ref=REFS[cfg.refName];
@@ -2631,19 +3187,24 @@ function opJoin(t,cfg){
   const normalize={trim:!!cfg.normTrim,caseFold:!!cfg.normCaseFold,numeric:!!cfg.normNumeric};
   const type=cfg.type||'left';
   const onDuplicate=cfg.onDuplicate||'first';
+  const matchBlanks=!!cfg.matchBlanks;
   const refIndex=new Map();
   for(let r=0;r<ref.n;r++){
-    const key=buildJoinKey(rightIdx.map(ci=>ref.data[ci][r]),normalize);
+    const parts=rightIdx.map(ci=>ref.data[ci][r]);
+    if(!matchBlanks&&keyPartsBlank(parts))continue;
+    const key=buildJoinKey(parts,normalize);
     if(!refIndex.has(key))refIndex.set(key,[]);
     refIndex.get(key).push(r)
   }
   let duplicateKeys=0,duplicateRefRows=0;
   refIndex.forEach(rows=>{if(rows.length>1){duplicateKeys++;duplicateRefRows+=rows.length-1}});
+  const lookupRefRows=parts=>(!matchBlanks&&keyPartsBlank(parts))?undefined:refIndex.get(buildJoinKey(parts,normalize));
   if(type==='anti'||type==='semi'){
     const keep=[];
     for(let r=0;r<t.n;r++){
-      const key=buildJoinKey(leftIdx.map(ci=>t.data[ci][r]),normalize);
-      const hasMatch=refIndex.has(key);
+      const parts=leftIdx.map(ci=>t.data[ci][r]);
+      const refRows=lookupRefRows(parts);
+      const hasMatch=!!(refRows&&refRows.length);
       if((type==='semi'&&hasMatch)||(type==='anti'&&!hasMatch))keep.push(r)
     }
     const data=t.cols.map((_,ci)=>keep.map(r=>t.data[ci][r]));
@@ -2659,8 +3220,8 @@ function opJoin(t,cfg){
   const outRowIds=t.rowIds?[]:null;
   let matched=0,unmatched=0,didFanOut=false;
   for(let r=0;r<t.n;r++){
-    const key=buildJoinKey(leftIdx.map(ci=>t.data[ci][r]),normalize);
-    const refRows=refIndex.get(key);
+    const parts=leftIdx.map(ci=>t.data[ci][r]);
+    const refRows=lookupRefRows(parts);
     if(!refRows||!refRows.length){
       if(type==='left'){
         t.cols.forEach((c,ci)=>outData[ci].push(t.data[ci][r]));
@@ -2685,6 +3246,15 @@ function opJoin(t,cfg){
   else if(duplicateKeys&&onDuplicate==='fanout'&&didFanOut)result.warning=fmtInt(t.n)+' row'+(t.n===1?'':'s')+' became '+fmtInt(n)+' — '+duplicateKeys+' key'+(duplicateKeys>1?'s':'')+' matched more than one reference row';
   return result
 }
+stTest('opJoin: blank keys never match each other unless explicitly allowed',()=>{
+  const t={cols:['id'],data:[['','1']],n:2,rowIds:identityOrder(2)};
+  REFS.__testBlank__={cols:['id','name'],data:[['','1'],['Nobody','Ann']],n:2};
+  const res=opJoin(t,{refName:'__testBlank__',onLeft:['id'],onRight:['id'],type:'left',columns:['name']});
+  stEqual(res.table.data[res.table.cols.indexOf('name')],['','Ann'],'a blank left key does not match the blank reference key by default');
+  const withBlanks=opJoin(t,{refName:'__testBlank__',onLeft:['id'],onRight:['id'],type:'left',matchBlanks:true,columns:['name']});
+  stEqual(withBlanks.table.data[withBlanks.table.cols.indexOf('name')],['Nobody','Ann'],'matchBlanks:true opts back into blank-to-blank matching');
+  delete REFS.__testBlank__
+});
 stTest('opJoin: left join keeps every left row, matched or not',()=>{
   const t={cols:['id'],data:[['1','2','3']],n:3,rowIds:identityOrder(3)};
   REFS.__test1__={cols:['id','name'],data:[['1','2'],['Ann','Bo']],n:2};
@@ -2761,11 +3331,30 @@ function opDiff(t,cfg){
   const keyIdx=resolveCols(t,cfg.keyColumns);
   const refKeyIdx=cfg.keyColumns.map(c=>ref.cols.indexOf(c));
   if(!keyIdx.length||refKeyIdx.some(i=>i===-1))return{table:t,stats:{},warning:'Key column(s) not found in both tables'};
+  const matchBlanks=!!cfg.matchBlanks;
+  const onDuplicateRef=cfg.onDuplicateRef||null;
   const compareIdx=(!cfg.compareColumns||!cfg.compareColumns.length||cfg.compareColumns[0]==='*')
     ?t.cols.map((_,i)=>i).filter(i=>!keyIdx.includes(i)&&ref.cols.includes(t.cols[i]))
     :cfg.compareColumns.map(c=>colIdx(t.cols,c)).filter(i=>i!==-1);
   const refIndex=new Map();
-  for(let r=0;r<ref.n;r++){const key=refKeyIdx.map(ci=>ref.data[ci][r]).join('\u0001');refIndex.set(key,r)}
+  for(let r=0;r<ref.n;r++){
+    const parts=refKeyIdx.map(ci=>ref.data[ci][r]);
+    if(!matchBlanks&&keyPartsBlank(parts))continue;
+    const key=buildJoinKey(parts,{});
+    if(!refIndex.has(key))refIndex.set(key,[]);
+    refIndex.get(key).push(r)
+  }
+  let dupKeys=0,dupRows=0;const dupSample=[];
+  refIndex.forEach((rows,key)=>{
+    if(rows.length>1){
+      dupKeys++;dupRows+=rows.length-1;
+      if(dupSample.length<5){try{dupSample.push(JSON.parse(key).join(', '))}catch(e){}}
+    }
+  });
+  if(dupKeys&&!onDuplicateRef){
+    return{table:t,stats:{},warning:dupKeys+' reference key'+(dupKeys>1?'s':'')+' matched more than one row ('+dupRows+' extra row'+(dupRows>1?'s':'')+') — e.g. '+dupSample.join('; ')+'. Choose "first" or "last" before running the diff.'}
+  }
+  const pickRefRow=rows=>onDuplicateRef==='last'?rows[rows.length-1]:rows[0];
   const statusCol=cfg.statusColumn||'_diff';
   const existingStatusCol=t.cols.indexOf(statusCol);
   const cols=existingStatusCol!==-1?t.cols.slice():t.cols.concat([statusCol]);
@@ -2776,19 +3365,18 @@ function opDiff(t,cfg){
   let added=0,changed=0;
   const touchedRows=new Set();
   for(let r=0;r<t.n;r++){
-    const key=keyIdx.map(ci=>t.data[ci][r]).join('\u0001');
-    const refRow=refIndex.get(key);
-    if(refRow===undefined){data[statusIdx][r]='added';added++;touchedRows.add(r)}
-    else{
-      matchedRefRows.add(refRow);
-      let isChanged=false;
-      for(const ci of compareIdx){
-        const refCi=ref.cols.indexOf(t.cols[ci]);
-        if(refCi!==-1&&String(t.data[ci][r]??'')!==String(ref.data[refCi][refRow]??'')){isChanged=true;break}
-      }
-      data[statusIdx][r]=isChanged?'changed':'unchanged';
-      if(isChanged){changed++;touchedRows.add(r)}
+    const parts=keyIdx.map(ci=>t.data[ci][r]);
+    const rows=(!matchBlanks&&keyPartsBlank(parts))?undefined:refIndex.get(buildJoinKey(parts,{}));
+    if(!rows||!rows.length){data[statusIdx][r]='added';added++;touchedRows.add(r);continue}
+    rows.forEach(rr=>matchedRefRows.add(rr));
+    const refRow=pickRefRow(rows);
+    let isChanged=false;
+    for(const ci of compareIdx){
+      const refCi=ref.cols.indexOf(t.cols[ci]);
+      if(refCi!==-1&&String(t.data[ci][r]??'')!==String(ref.data[refCi][refRow]??'')){isChanged=true;break}
     }
+    data[statusIdx][r]=isChanged?'changed':'unchanged';
+    if(isChanged){changed++;touchedRows.add(r)}
   }
   let removedRows=[];
   if(cfg.includeRemoved){
@@ -2798,8 +3386,27 @@ function opDiff(t,cfg){
   }
   let n=t.n;
   if(removedRows.length){removedRows.forEach(row=>row.forEach((v,ci)=>data[ci].push(v)));n+=removedRows.length}
-  return{table:{cols,data,n,rowIds:removedRows.length?null:undefined},stats:{cells:added+changed,removed:removedRows.length},touchedRows}
+  const result={table:{cols,data,n,rowIds:removedRows.length?null:undefined},stats:{cells:added+changed,removed:removedRows.length},touchedRows};
+  if(dupKeys&&onDuplicateRef)result.warning=dupKeys+' reference key'+(dupKeys>1?'s':'')+' matched more than one row — used "'+onDuplicateRef+'"';
+  return result
 }
+stTest('opDiff: duplicate reference keys block the diff instead of silently keeping the last match',()=>{
+  const t={cols:['id','v'],data:[['1'],['x']],n:1};
+  REFS.__testDiffDup__={cols:['id','v'],data:[['1','1'],['a','b']],n:2};
+  const blocked=opDiff(t,{refName:'__testDiffDup__',keyColumns:['id']});
+  stAssert(!!blocked.warning&&/more than one row/.test(blocked.warning),'blocks with a message naming the duplicate-key problem');
+  const withPolicy=opDiff(t,{refName:'__testDiffDup__',keyColumns:['id'],onDuplicateRef:'first'});
+  stAssert(blocked.table===t,'blocked result returns the original table unchanged');
+  stAssert(withPolicy.table.n===1,'with a duplicate policy the diff proceeds');
+  delete REFS.__testDiffDup__
+});
+stTest('opDiff: blank keys never match each other unless explicitly allowed',()=>{
+  const t={cols:['id','v'],data:[['',''],['x','x']],n:2};
+  REFS.__testDiffBlank__={cols:['id','v'],data:[['',''],['y','y']],n:2};
+  const res=opDiff(t,{refName:'__testDiffBlank__',keyColumns:['id']});
+  stEqual(res.table.data[res.table.cols.indexOf('_diff')],['added','added'],'blank keys are never matched to each other by default, so both rows show as added');
+  delete REFS.__testDiffBlank__
+});
 function parseMetricSpec(spec){
   const s=String(spec||'').trim();
   if(s==='count'||s==='*:count')return{column:null,fn:'count'};
@@ -2825,10 +3432,11 @@ function opAggregate(t,cfg){
   if(metricSpecs.some((m,i)=>m.column&&metricIdx[i]===-1))return{table:t,stats:{},warning:'Metric column not found'};
   const order=[],groups=new Map();
   for(let r=0;r<t.n;r++){
-    const key=groupIdx.map(ci=>String(t.data[ci][r]??'')).join('\u0001');
+    const key=JSON.stringify(groupIdx.map(ci=>String(t.data[ci][r]??'')));
     if(!groups.has(key)){groups.set(key,[]);order.push(key)}
     groups.get(key).push(r)
   }
+  const numLocaleCache=new Map();
   const rawMetricNames=metricSpecs.map(m=>m.fn+'_'+(m.column||'rows'));
   const cols=dedupeColNames(cfg.groupBy.concat(rawMetricNames));
   const data=cols.map(()=>[]);
@@ -2844,7 +3452,9 @@ function opAggregate(t,cfg){
         if(m.fn==='first')val=vals[0];
         else if(m.fn==='concat')val=vals.filter(v=>v!=null&&v!=='').join(', ');
         else{
-          const nums=vals.map(v=>Number(String(v??'').replace(/[$,€£%\s]/g,''))).filter(n=>isFinite(n));
+          let locale=numLocaleCache.get(metricIdx[mi]);
+          if(!locale){locale=detectNumberLocale(vals);numLocaleCache.set(metricIdx[mi],locale)}
+          const nums=vals.map(v=>{const p=parseNumericValue(v,{locale});return p?p.value:null}).filter(n=>n!=null);
           if(m.fn==='sum')val=nums.reduce((a,b)=>a+b,0);
           else if(m.fn==='min')val=nums.length?Math.min(...nums):'';
           else if(m.fn==='max')val=nums.length?Math.max(...nums):'';
@@ -3281,7 +3891,9 @@ function recomputeFrom(k){
     result.table.cols=dedupeColNames(result.table.cols);
     states.push(result.table)
   }
-  renderSourcesPanel()
+  renderSourcesPanel();
+  const finalState=states[states.length-1];
+  if(finalState)announce('Pipeline updated — '+fmtInt(finalState.n)+' rows, '+finalState.cols.length+' columns')
 }
 
 function snapshotSteps(){return steps.map(s=>({id:s.id,opId:s.opId,cfg:JSON.parse(JSON.stringify(s.cfg)),muted:s.muted}))}
@@ -3363,7 +3975,8 @@ function renderRail(){
         if(step.stats.unparsed)chips+='<span class="schip warn">'+fmtInt(step.stats.unparsed)+' unparsed</span>'
       }
       return'<div class="stratum tone-'+tone+(active?' active':'')+(step.muted?' muted':'')+'" data-idx="'+i+'" draggable="true" style="min-height:'+h+'px">'+
-        '<div class="srow1"><span class="sname">'+(i+1)+'. '+esc(def.label)+'</span>'+
+        '<div class="srow1"><span class="stepnum">'+(i+1)+'</span><span class="sname">'+esc(def.label)+'</span>'+
+        (step.muted?'<span class="mutedtag">Muted</span>':'')+
         '<div class="sacts">'+
           '<button data-act="edit" title="Edit" type="button">'+ICON_EDIT+'</button>'+
           '<button data-act="mute" title="'+(step.muted?'Unmute':'Mute')+'" type="button">'+(step.muted?ICON_EYEOFF:ICON_EYE)+'</button>'+
@@ -3462,6 +4075,7 @@ function updateScrubBar(){
   bar.classList.remove('hidden');
   range.max=String(steps.length);
   range.value=String(viewIdx);
+  $('#scrubTicks').innerHTML=steps.map((_,i)=>'<option value="'+(i+1)+'"></option>').join('');
   if(viewIdx===0)label.textContent='Original input';
   else if(viewIdx===steps.length)label.innerHTML='<b>Current</b> — after all '+steps.length+' steps';
   else label.textContent='After step '+viewIdx+' of '+steps.length+' — '+OPS[steps[viewIdx-1].opId].label;
@@ -3498,6 +4112,46 @@ stTest('palette: paletteBaseState resolves to the step being edited, not the cur
   stEqual(paletteBaseState().cols,['a','b','c'],"adding a new step always targets the pipeline's last state");
   states=savedStates;paletteEditIndex=savedEditIndex
 });
+let focusTrapState=null;
+function getFocusableIn(container){
+  return[...container.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+    .filter(el=>el.getClientRects().length>0)
+}
+function setBackgroundInert(keepEls,on){
+  const keep=new Set(keepEls.concat([$('#toast'),$('#srAnnounce')]));
+  for(const child of document.body.children){
+    if(keep.has(child))continue;
+    if(on)child.setAttribute('inert','');else child.removeAttribute('inert')
+  }
+}
+function openFocusTrap(container,opts){
+  opts=opts||{};
+  closeFocusTrap(container);
+  const opener=document.activeElement;
+  const onKeydown=e=>{
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(opts.onEscape)opts.onEscape();return}
+    if(e.key!=='Tab')return;
+    const focusable=getFocusableIn(container);
+    if(!focusable.length){e.preventDefault();return}
+    const first=focusable[0],last=focusable[focusable.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+  };
+  container.addEventListener('keydown',onKeydown,true);
+  if(opts.scrim)setBackgroundInert([container,opts.scrim],true);
+  focusTrapState={container,opener,onKeydown,scrim:opts.scrim};
+  const focusable=getFocusableIn(container);
+  const toFocus=(opts.initialFocus&&opts.initialFocus())||focusable[0]||container;
+  setTimeout(()=>{if(toFocus&&toFocus.focus)toFocus.focus()},10)
+}
+function closeFocusTrap(container){
+  if(!focusTrapState||focusTrapState.container!==container)return;
+  container.removeEventListener('keydown',focusTrapState.onKeydown,true);
+  if(focusTrapState.scrim)setBackgroundInert([container,focusTrapState.scrim],false);
+  const opener=focusTrapState.opener;
+  focusTrapState=null;
+  if(opener&&opener.focus&&document.contains(opener))opener.focus()
+}
 function openPalette(editIndex){
   if(!T)return;
   paletteEditIndex=editIndex==null?-1:editIndex;
@@ -3515,11 +4169,16 @@ function openPalette(editIndex){
   $('#paletteScrim').classList.add('show');
   $('#palette').classList.add('open');
   renderPalette();
-  if(paletteMode==='pick')setTimeout(()=>$('#paletteSearch').focus(),10)
+  openFocusTrap($('#palette'),{
+    onEscape:closePalette,
+    initialFocus:()=>paletteMode==='pick'?$('#paletteSearch'):null,
+    scrim:$('#paletteScrim')
+  })
 }
 function closePalette(){
   $('#paletteScrim').classList.remove('show');
-  $('#palette').classList.remove('open')
+  $('#palette').classList.remove('open');
+  closeFocusTrap($('#palette'))
 }
 function renderPalette(){
   if(paletteMode==='pick'){
@@ -4190,12 +4849,15 @@ function computeShapeContract(table){
     const col=table.data[ci];
     let empty=0;const freq=new Map();
     let numMin=Infinity,numMax=-Infinity,numN=0;
+    const sample=[];
+    for(let r=0;r<n&&sample.length<200;r++){const v=String(col[r]??'').trim();if(v!=='')sample.push(v)}
+    const locale=detectNumberLocale(sample);
     for(let r=0;r<n;r++){
       const v=String(col[r]??'').trim();
       if(v===''){empty++;continue}
       freq.set(v,(freq.get(v)||0)+1);
-      const num=Number(v.replace(/[$,€£%\s]/g,''));
-      if(isFinite(num)){numN++;if(num<numMin)numMin=num;if(num>numMax)numMax=num}
+      const parsed=parseNumericValue(v,{locale});
+      if(parsed){numN++;const num=parsed.value;if(num<numMin)numMin=num;if(num>numMax)numMax=num}
     }
     const nonEmpty=n-empty,isNumeric=nonEmpty>0&&numN/nonEmpty>0.9,lowCard=freq.size<=20;
     return{name,nullRate:n?empty/n:0,distinct:freq.size,lowCardinality:lowCard,values:lowCard?[...freq.keys()].sort():null,numeric:isNumeric,numMin:isNumeric&&numN?numMin:null,numMax:isNumeric&&numN?numMax:null}
@@ -4265,15 +4927,38 @@ async function streamToBytes(readable){
   return out
 }
 async function compressToHash(text){
-  const cs=new CompressionStream('deflate-raw'),w=cs.writable.getWriter();
-  w.write(new TextEncoder().encode(text));w.close();
-  return b64urlEncode(await streamToBytes(cs.readable))
+  if(typeof CompressionStream==='function'){
+    try{
+      const cs=new CompressionStream('deflate-raw'),w=cs.writable.getWriter();
+      w.write(new TextEncoder().encode(text));w.close();
+      return'z'+b64urlEncode(await streamToBytes(cs.readable))
+    }catch(e){}
+  }
+  return'r'+b64urlEncode(new TextEncoder().encode(text))
 }
 async function decompressFromHash(hash){
-  const ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();
-  w.write(b64urlDecode(hash));w.close();
-  return new TextDecoder().decode(await streamToBytes(ds.readable))
+  if(!hash)throw new Error('the link is missing its recipe data');
+  const version=hash[0],payload=hash.slice(1);
+  if(version==='r')return new TextDecoder().decode(b64urlDecode(payload));
+  if(version==='z'){
+    if(typeof DecompressionStream!=='function')throw new Error('this link uses compression this browser can\'t decompress — try a newer browser');
+    const ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();
+    w.write(b64urlDecode(payload));w.close();
+    return new TextDecoder().decode(await streamToBytes(ds.readable))
+  }
+  throw new Error('unrecognized recipe link format')
 }
+stTest('compressToHash/decompressFromHash: round-trips through the uncompressed fallback',async()=>{
+  const text='trim: name\nfilter: age > 10';
+  const hash='r'+b64urlEncode(new TextEncoder().encode(text));
+  const back=await decompressFromHash(hash);
+  stEqual(back,text,'the "r" (raw/uncompressed) version round-trips without CompressionStream')
+});
+stTest('decompressFromHash: an unrecognized version prefix fails with a clear error instead of hanging silently',async()=>{
+  let threw=false;
+  try{await decompressFromHash('q_garbage')}catch(e){threw=/unrecognized/i.test(e.message)}
+  stAssert(threw,'an unknown version prefix should throw a descriptive error')
+});
 
 let pendingPipeline=null,compareMode=false,railView='cards';
 function setRailView(mode){
@@ -4396,10 +5081,11 @@ $('#refFileInput').addEventListener('change',e=>{
   const f=e.target.files[0];e.target.value='';
   if(!f)return;
   if(!checkFileSize(f))return;
-  const rd=new FileReader();
-  rd.onload=async()=>{
+  (async()=>{
     try{
-      const result=await workerCall('parse',{text:String(rd.result)});
+      const{text,suspicious}=await decodeFileText(f);
+      if(suspicious)toast('This file may not be UTF-8 — some characters looked wrong.',true);
+      const result=await workerCall('parse',{text});
       let name;
       const targeted=pendingRefLoadTarget;
       if(targeted){name=targeted}
@@ -4414,10 +5100,8 @@ $('#refFileInput').addEventListener('change',e=>{
       if(targeted){recomputeFrom(0);renderRail()}
       else renderSourcesPanel();
       toast('Loaded reference "'+name+'" ('+fmtInt(result.n)+' rows)')
-    }catch(err){toast('Could not parse that file',true)}
-  };
-  rd.onerror=()=>toast('Could not read that file',true);
-  rd.readAsText(f)
+    }catch(err){toast('Could not read or parse that file',true)}
+  })()
 });
 let pendingRefLoadTarget=null;
 $('#sourcesPanel').addEventListener('click',e=>{
@@ -4491,11 +5175,16 @@ function openRecipeReview(p){
   }
   $('#reviewStepCount').textContent=parsedSteps.length;
   $('#reviewScrim').classList.add('show');
-  $('#reviewModal').classList.add('open')
+  $('#reviewModal').classList.add('open');
+  openFocusTrap($('#reviewModal'),{
+    onEscape:()=>{closeRecipeReview();pendingPipeline=null},
+    scrim:$('#reviewScrim')
+  })
 }
 function closeRecipeReview(){
   $('#reviewScrim').classList.remove('show');
-  $('#reviewModal').classList.remove('open')
+  $('#reviewModal').classList.remove('open');
+  closeFocusTrap($('#reviewModal'))
 }
 $('#reviewScrim').addEventListener('click',()=>{closeRecipeReview();pendingPipeline=null});
 $('#reviewSkip').addEventListener('click',()=>{closeRecipeReview();pendingPipeline=null});
@@ -4555,18 +5244,17 @@ stTest('recipe review gate: a malformed recipe is shown as an error and Apply is
 
 function readFileForCompare(f){
   if(!checkFileSize(f))return;
-  const rd=new FileReader();
-  rd.onload=async()=>{
+  (async()=>{
     try{
-      const result=await workerCall('parse',{text:String(rd.result)});
+      const{text,suspicious}=await decodeFileText(f);
+      if(suspicious)toast('This file may not be UTF-8 — some characters looked wrong.',true);
+      const result=await workerCall('parse',{text});
       const otherContract=computeShapeContract({cols:result.cols,data:result.data,n:result.n});
       const myContract=computeShapeContract(states[states.length-1]);
       const drift=diffShapeContracts(myContract,otherContract);
       showDriftReport(drift,[],myContract.cols.length)
-    }catch(err){toast('Could not parse that file for comparison',true)}
-  };
-  rd.onerror=()=>toast('Could not read that file',true);
-  rd.readAsText(f)
+    }catch(err){toast('Could not read or parse that file for comparison',true)}
+  })()
 }
 $('#btnCompare').addEventListener('click',()=>{
   if(!T){toast('Load a file first',true);return}
@@ -4582,14 +5270,21 @@ document.addEventListener('click',e=>{
 (async function checkSharedHash(){
   const h=location.hash;
   if(!h||h.indexOf('#p=')!==0)return;
+  let dsl;
   try{
-    const dsl=await decompressFromHash(h.slice(3));
-    const{errors}=textToSteps(dsl);
-    if(errors.length)return;
-    pendingPipeline={dsl,contract:{n:0,cols:[]},trusted:false};
-    $('#sharedBannerText').textContent='A shared recipe is ready.';
-    $('#sharedBanner').classList.remove('hidden')
-  }catch(e){}
+    dsl=await decompressFromHash(h.slice(3))
+  }catch(e){
+    toast('This shared recipe link could not be read — '+e.message,true);
+    return
+  }
+  const{errors}=textToSteps(dsl);
+  if(errors.length){
+    toast('This shared recipe link is invalid or uses steps this version of Sift does not recognize.',true);
+    return
+  }
+  pendingPipeline={dsl,contract:{n:0,cols:[]},trusted:false};
+  $('#sharedBannerText').textContent='A shared recipe is ready.';
+  $('#sharedBanner').classList.remove('hidden')
 })();
 if(new URLSearchParams(location.search).get('selftest')==='1'){
   stRunAll().then(stRender)
