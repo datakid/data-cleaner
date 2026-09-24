@@ -5,7 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sift</title>
 <meta name="description" content="Paste a mess, get a table. CSV, TSV, JSON, NDJSON or plain text, parsed entirely in your browser. No accounts, no uploads, no network calls.">
+<meta name="theme-color" content="#F1ECE0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgcng9IjUuNSIgZmlsbD0iIzE3MTgxQSIvPgo8cGF0aCBkPSJNNiA2LjRIMThMMTIgMTQuNFoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0Y3RjdGNSIgc3Ryb2tlLXdpZHRoPSIxLjciIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTEyIDE0LjRWMTcuNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRjdGN0Y1IiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik04LjcgMTBIMTUuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRjdGN0Y1IiBzdHJva2Utd2lkdGg9IjEuMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNSIvPgo8cmVjdCB4PSI5LjgiIHk9IjE4IiB3aWR0aD0iNC40IiBoZWlnaHQ9IjMuOCIgcng9IjEiIGZpbGw9IiNDOTdBMzQiLz4KPC9zdmc+Cg==">
+<script>
+(function(){
+  var THEME_BG={light:'#F1ECE0',dark:'#171914'};
+  try{
+    var raw=localStorage.getItem('sift_prefs_v1');
+    var saved=raw?JSON.parse(raw):{};
+    var mode=(saved.theme==='light'||saved.theme==='dark')?saved.theme:'auto';
+    if(mode!=='auto')document.documentElement.setAttribute('data-theme',mode);
+    var dark=mode==='dark'||(mode==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+    var meta=document.querySelector('meta[name="theme-color"]');
+    if(meta)meta.setAttribute('content',THEME_BG[dark?'dark':'light'])
+  }catch(e){}
+})();
+</script>
 <style>
 :root{
   --bg:#F1ECE0; --surface:#FFFCF4; --surface-strong:#FFFDF8; --raised:#E8E0D1; --raised-2:#DDD3C1;
@@ -124,7 +139,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .sw:has(input:checked){background:var(--primary)}
 .warnline{color:var(--amber);display:flex;align-items:center;gap:6px}
 
-.gridwrap{flex:1;display:flex;flex-direction:column;min-height:0}
+.gridwrap{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .gscroll{flex:1;overflow:auto;position:relative;background:var(--surface)}
 .ghead{position:sticky;top:0;z-index:2;display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
 .ghead::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;opacity:0;pointer-events:none;z-index:3}
@@ -149,6 +164,16 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .grow{position:absolute;left:0;top:0;display:flex;border-bottom:1px solid var(--border)}
 .gc{flex:none;padding:0 12px;height:var(--row-h);display:flex;align-items:center;font:500 12.5px var(--mono);color:var(--ink);border-right:1px solid var(--border);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .gc.idx{color:var(--ink-mute);justify-content:flex-end;font:500 11.5px var(--mono)}
+.gc.idx .rowcheck,.gh.idx .rowcheck{display:none;width:14px;height:14px;cursor:pointer;accent-color:var(--primary)}
+.gc.idx:hover .rownum,.gh.idx:hover .rownum{display:none}
+.gc.idx:hover .rowcheck,.gh.idx:hover .rowcheck{display:block}
+#gscroll.selecting .gc.idx .rownum,#gscroll.selecting .gh.idx .rownum{display:none}
+#gscroll.selecting .gc.idx .rowcheck,#gscroll.selecting .gh.idx .rowcheck{display:block}
+.grow.sediment .gc.idx .rowcheck{display:none!important}
+.selbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:none;align-items:center;padding:10px 16px;background:var(--ink);color:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-lift);font:600 12.5px var(--sans);z-index:15;white-space:nowrap}
+.selbar.show{display:flex}
+.selbar button{color:#fff;opacity:.85;margin:0 3px;text-decoration:underline;text-underline-offset:2px}
+.selbar button:hover{opacity:1}
 .gc.num{justify-content:flex-end;font-variant-numeric:tabular-nums}
 .grow:hover .gc{background:var(--raised)}
 .gempty{position:absolute;inset:0;top:var(--row-h);display:flex;align-items:center;justify-content:center;color:var(--ink-mute);font:600 13px var(--sans)}
@@ -216,6 +241,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:var(--r-sm);font:600 12.5px var(--sans);opacity:0;pointer-events:none;transition:opacity .1s linear,transform .1s linear;z-index:60;box-shadow:var(--sh-lift);max-width:80vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.err{background:var(--rose)}
+#toast .toastundo{pointer-events:auto;margin-left:8px;color:#fff;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 
 .workspace{flex:1;display:flex;min-height:0}
 .rail{width:272px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface);min-height:0}
@@ -224,9 +250,11 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .railcount{font:600 10.5px var(--mono);color:var(--ink-mute);background:var(--raised);padding:2px 7px;border-radius:var(--r-sm)}
 .railadd{display:flex;align-items:center;gap:5px;padding:5px 9px;border-radius:var(--r-sm);background:var(--primary);color:#fff;font:600 11.5px var(--sans)}
 .railadd:hover{background:var(--primary-hi)}
+.railadd kbd{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.32);border-radius:var(--r-sm);padding:1px 5px;font:600 10px var(--mono);color:#fff;margin-left:1px}
 .raillist{flex:1;overflow:auto;padding:2px 10px 14px;display:flex;flex-direction:column;gap:0}
 .railempty{padding:18px 12px;color:var(--ink-mute);font:500 12px var(--sans);text-align:center;line-height:1.6}
 .railempty kbd{background:var(--raised);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 5px;font:600 10.5px var(--mono);color:var(--ink-dim)}
+.railempty b{color:var(--ink-dim);font-weight:700}
 .stratum{border-left:6px solid var(--border-hi);background:var(--surface);padding:7px 9px 7px 11px;cursor:grab;transition:border-color .1s linear,background .1s linear;border-bottom:1px solid var(--border);display:flex;flex-direction:column;justify-content:center}
 .stratum.tone-rewrite{border-left-color:var(--amber)}
 .stratum.tone-remove{border-left-color:var(--rose)}
@@ -275,12 +303,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .psearch svg{color:var(--ink-mute);flex:none}
 .psearch input{flex:1;border:none;background:none;font:600 14px var(--sans);color:var(--ink)}
 .psearch input::placeholder{color:var(--ink-mute);font-weight:500}
-.plist{overflow:auto;padding:8px}
+#paletteBody{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.plist{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:8px}
 .pitem{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-sm)}
 .pitem.sel{background:var(--primary-wash)}
 .pitem .pname{font:700 12.5px var(--sans);flex:1}
 .pitem .pkw{font:500 11px var(--sans);color:var(--ink-mute)}
-.pconfig{padding:14px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.pconfig{flex:1;min-height:0;padding:14px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto}
 .pconfig .pback{display:flex;align-items:center;gap:6px;font:600 11.5px var(--sans);color:var(--ink-mute);align-self:flex-start}
 .pconfig .pback:hover{color:var(--primary)}
 .pfield{display:flex;flex-direction:column;gap:5px}
@@ -409,6 +438,9 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
     <input id="searchInp" type="text" placeholder="Filter rows…" spellcheck="false" autocomplete="off">
     <button class="hbtn hidden" id="btnFilterToStep" type="button" title="Make this search a permanent step in the recipe" style="margin-left:6px;padding:5px 9px;font-size:11px">Add as step</button>
   </div>
+  <button class="hbtn" id="btnTheme" type="button" title="Theme: Auto (follows system)" aria-label="Theme: Auto (follows system)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.3"/><path d="M12 3.7a8.3 8.3 0 0 1 0 16.6z" fill="currentColor" stroke="none"/></svg>
+  </button>
   <div class="hactions hidden" id="headerActions">
     <button class="hbtn" id="btnExport" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="exportMenu">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10.5"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
@@ -470,6 +502,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
         <button class="railadd" id="btnAddStep" type="button">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           Add step
+          <kbd>&#8984;K</kbd>
         </button>
       </div>
       <div class="sourcespanel hidden" id="sourcesPanel"></div>
@@ -527,6 +560,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
         <div class="gbody" id="gbody" role="rowgroup"></div>
         <div class="gempty hidden" id="gempty"></div>
       </div>
+      <div class="selbar" id="selBar"></div>
       <div class="gfoot">
         <div class="footinfo"><span id="footLeft">—</span><span id="footRight"></span></div>
         <label class="densityctl">Density
@@ -1138,9 +1172,15 @@ function applyLandingMode(){
 landingVariant=applyLandingMode();
 
 let toastT;
-function toast(msg,err){
+function toast(msg,err,onUndo){
   const t=$('#toast');
-  t.textContent=msg;t.classList.toggle('err',!!err);t.classList.add('show');
+  if(onUndo){
+    t.innerHTML=esc(msg)+' <button type="button" class="toastundo">Undo</button>';
+    t.querySelector('.toastundo').addEventListener('click',()=>{onUndo();t.classList.remove('show')})
+  }else{
+    t.textContent=msg
+  }
+  t.classList.toggle('err',!!err);t.classList.add('show');
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3000)
 }
 function announce(msg){
@@ -1325,6 +1365,7 @@ let lastRawText=null;
 let DATE_ORDER='mdy',DATE_YEAR_PIVOT=69;
 const profileCache=new Map();
 const GRID={rows:[],cols:0,widths:[],w:0};
+let selection=new Set(),selectionAnchorPos=null;
 let paintPending=false;
 let BASE=null,steps=[],states=[],viewIdx=0,undoStack=[],redoStack=[],stepSeq=0;
 let REFS={};
@@ -1483,6 +1524,9 @@ function resetPipeline(){
 function setViewIdx(i){
   if(typeof halo!=='undefined'&&halo.open)closeHalo();
   if(editingCell)cancelCellEdit();
+  selection.clear();selectionAnchorPos=null;
+  $('#gscroll').classList.remove('selecting');
+  renderSelectionBar();
   viewIdx=Math.max(0,Math.min(i,states.length-1));
   const st=states[viewIdx];
   T={cols:st.cols,data:st.data,n:st.n,rowIds:st.rowIds,format:BASE.format,warnings:BASE.warnings,sourceName:BASE.sourceName};
@@ -1607,7 +1651,7 @@ function settleView(){
 
 function renderHead(){
   const wrap=$('#ghead');
-  let h='<div class="gh idx" role="columnheader" aria-colindex="1" tabindex="-1" style="width:52px">#</div>';
+  let h='<div class="gh idx" role="columnheader" aria-colindex="1" tabindex="-1" style="width:52px"><span class="rownum">#</span><input type="checkbox" class="rowcheck" tabindex="-1" aria-label="Select all visible rows"></div>';
   T.cols.forEach((c,i)=>{
     const type=T.types[i],num=type==='number';
     const sorted=VIEW.sortCol===i;
@@ -1621,8 +1665,67 @@ function renderHead(){
   });
   wrap.setAttribute('aria-rowindex','1');
   wrap.innerHTML=h;
+  syncSelectAllCheckbox();
   applyGridFocus()
 }
+function allVisibleSelected(){
+  if(!T||!T.rowIds||!VIEW.order.length)return false;
+  for(const rIdx of VIEW.order)if(!selection.has(T.rowIds[rIdx]))return false;
+  return true
+}
+function someVisibleSelected(){
+  if(!T||!T.rowIds)return false;
+  for(const rIdx of VIEW.order)if(selection.has(T.rowIds[rIdx]))return true;
+  return false
+}
+function syncSelectAllCheckbox(){
+  const cb=$('#ghead .gh.idx .rowcheck');
+  if(!cb||!T)return;
+  const all=allVisibleSelected();
+  cb.checked=all;
+  cb.indeterminate=!all&&someVisibleSelected()
+}
+function toggleSelectAllVisible(){
+  if(!T||!T.rowIds)return;
+  const all=allVisibleSelected();
+  VIEW.order.forEach(rIdx=>{
+    const rid=T.rowIds[rIdx];
+    if(all)selection.delete(rid);else selection.add(rid)
+  });
+  updateSelectionUI()
+}
+function renderSelectionBar(){
+  const bar=$('#selBar');
+  if(!bar)return;
+  if(!selection.size){bar.classList.remove('show');bar.innerHTML='';return}
+  bar.innerHTML=fmtInt(selection.size)+' row'+(selection.size===1?'':'s')+' selected — '+
+    '<button type="button" data-selact="delete">Delete</button> · '+
+    '<button type="button" data-selact="keep">Keep only these</button> · '+
+    '<button type="button" data-selact="copy">Copy</button> · '+
+    '<button type="button" data-selact="clear">Clear</button>';
+  bar.classList.add('show')
+}
+function updateSelectionUI(){
+  $('#gscroll').classList.toggle('selecting',selection.size>0);
+  paint();
+  syncSelectAllCheckbox();
+  renderSelectionBar()
+}
+function copySelectedRowsAsTSV(){
+  if(!T||!T.rowIds||!selection.size)return;
+  const rows=[];
+  for(let r=0;r<T.n;r++)if(selection.has(T.rowIds[r]))rows.push(T.cols.map((_,c)=>T.data[c][r]??'').join('\t'));
+  copyText(rows.join('\n'),'Copied '+fmtInt(rows.length)+' row'+(rows.length===1?'':'s'))
+}
+$('#selBar').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-selact]');
+  if(!btn)return;
+  const ids=Array.from(selection);
+  if(btn.dataset.selact==='delete')addDropRowsStep(ids);
+  else if(btn.dataset.selact==='keep')addKeepRowsStep(ids);
+  else if(btn.dataset.selact==='copy')copySelectedRowsAsTSV();
+  else if(btn.dataset.selact==='clear'){selection.clear();updateSelectionUI()}
+});
 let sedimentCache=new Map();
 function computeSedimentMap(){
   if(viewIdx===0||VIEW.sortCol>=0||VIEW.filterQuery)return null;
@@ -1701,7 +1804,7 @@ function layoutGrid(){
 function makeRow(){
   const r=document.createElement('div');
   r.className='grow';r.style.width=GRID.w+'px';r.setAttribute('role','row');
-  let h='<div class="gc idx" role="gridcell" aria-colindex="1" tabindex="-1" style="width:52px"></div>';
+  let h='<div class="gc idx" role="gridcell" aria-colindex="1" tabindex="-1" style="width:52px"><span class="rownum"></span><input type="checkbox" class="rowcheck" tabindex="-1" aria-label="Select row"></div>';
   for(let i=0;i<GRID.cols;i++)h+='<div class="gc'+(T.types[i]==='number'?' num':'')+'" data-ci="'+i+'" role="gridcell" aria-colindex="'+(i+2)+'" tabindex="-1" style="width:'+GRID.widths[i]+'px"></div>';
   r.innerHTML=h;
   $('#gbody').appendChild(r);GRID.rows.push(r)
@@ -1730,7 +1833,7 @@ function paint(){
       el.dataset.sediment=JSON.stringify(entry.ids);
       delete el.dataset.row;
       kids[0].style.width='52px';
-      kids[0].textContent='';
+      kids[0].firstElementChild.textContent='';
       const msg=entry.ids.length+' row'+(entry.ids.length>1?'s':'')+' folded here';
       kids[1].style.width=(GRID.w-52)+'px';
       kids[1].textContent=msg;
@@ -1746,7 +1849,8 @@ function paint(){
     }
     const rIdx=entry.rIdx,kids2=el.children;
     el.dataset.row=rIdx;
-    kids2[0].textContent=fmtInt(realRankAt(di));
+    kids2[0].firstElementChild.textContent=fmtInt(realRankAt(di));
+    kids2[0].lastElementChild.checked=T.rowIds?selection.has(T.rowIds[rIdx]):false;
     for(let c=0;c<GRID.cols;c++)kids2[c+1].textContent=T.data[c][rIdx]??'';
     el.classList.toggle('wash',washSet?washSet.has(rIdx):false);
     if(previewSet){
@@ -1819,6 +1923,7 @@ function cycleSort(ci){
   }
 }
 $('#ghead').addEventListener('click',e=>{
+  if(e.target.closest('.rowcheck')){toggleSelectAllVisible();return}
   const pbtn=e.target.closest('.picon');
   if(pbtn){openProfile(+pbtn.dataset.profile,pbtn);return}
   const gh=e.target.closest('.gh[data-ci]');
@@ -1884,7 +1989,22 @@ $('#gbody').addEventListener('click',e=>{
   const row=e.target.closest('.grow');
   if(!cell||!row||row.dataset.di==null)return;
   gridFocus={rowPos:+row.dataset.di,col:[...row.children].indexOf(cell)};
-  applyGridFocus()
+  applyGridFocus();
+  if(cell.classList.contains('idx')&&row.dataset.row!=null&&T&&T.rowIds){
+    const rIdx=+row.dataset.row,rid=T.rowIds[rIdx],pos=VIEW.order.indexOf(rIdx);
+    if(e.shiftKey&&selectionAnchorPos!=null){
+      const lo=Math.min(selectionAnchorPos,pos),hi=Math.max(selectionAnchorPos,pos);
+      selection=new Set();
+      for(let p=lo;p<=hi;p++)selection.add(T.rowIds[VIEW.order[p]])
+    }else if(e.metaKey||e.ctrlKey){
+      if(selection.has(rid))selection.delete(rid);else selection.add(rid);
+      selectionAnchorPos=pos
+    }else{
+      selection=new Set([rid]);
+      selectionAnchorPos=pos
+    }
+    updateSelectionUI()
+  }
 });
 $('#gscroll').addEventListener('keydown',e=>{
   if(editingCell)return;
@@ -1904,6 +2024,7 @@ $('#gscroll').addEventListener('keydown',e=>{
   }
   else if(key===' '&&onHeader){e.preventDefault();const ci=gridFocus.col-1;if(ci>=0)cycleSort(ci)}
   else if(key==='F2'&&!onHeader){e.preventDefault();startEditFocusedCell()}
+  else if((key==='Delete'||key==='Backspace')&&!onHeader&&selection.size){e.preventDefault();addDropRowsStep(Array.from(selection))}
 });
 stTest('grid keyboard nav: arrow keys move focus position and clamp at the grid edges',()=>{
   const savedGrid=gridFocus,savedCols=GRID.cols,savedSeq=GRID.displaySeq;
@@ -1991,6 +2112,32 @@ function addSuggestedStep(opId,cfg){
   renderRail();
   closeProfile();
   toast('Added: '+OPS[opId].describe(cfg))
+}
+function addDropRowsStep(rowIdsArr){
+  if(!rowIdsArr.length)return;
+  pushUndo();
+  const last=steps[steps.length-1];
+  if(last&&last.opId==='dropRows'&&!last.muted){
+    const merged=new Set(last.cfg.rowIds);
+    rowIdsArr.forEach(id=>merged.add(id));
+    last.cfg.rowIds=Array.from(merged);
+    recomputeFrom(steps.length-1)
+  }else{
+    steps.push({id:'s'+(++stepSeq),opId:'dropRows',cfg:{rowIds:rowIdsArr.slice()},muted:false,stats:null,warning:null,touchedRows:null});
+    recomputeFrom(steps.length-1)
+  }
+  setViewIdx(states.length-1);
+  renderRail();
+  toast(fmtInt(rowIdsArr.length)+' row'+(rowIdsArr.length===1?'':'s')+' deleted',false,doUndo)
+}
+function addKeepRowsStep(rowIdsArr){
+  if(!rowIdsArr.length)return;
+  pushUndo();
+  steps.push({id:'s'+(++stepSeq),opId:'keepRows',cfg:{rowIds:rowIdsArr.slice()},muted:false,stats:null,warning:null,touchedRows:null});
+  recomputeFrom(steps.length-1);
+  setViewIdx(states.length-1);
+  renderRail();
+  toast('Kept '+fmtInt(rowIdsArr.length)+' row'+(rowIdsArr.length===1?'':'s'),false,doUndo)
 }
 let currentSuggestions=[];
 $('#profilePop').addEventListener('click',e=>{
@@ -2475,10 +2622,12 @@ $('#delimSelect').addEventListener('change',e=>{
 });
 $('#dateOrderSelect').addEventListener('change',e=>{
   DATE_ORDER=e.target.value;
+  prefs.dateOrder=e.target.value;savePrefs();
   if(T)setViewIdx(viewIdx)
 });
 $('#densitySelect').addEventListener('change',e=>{
   ROW_H=DENSITY_HEIGHTS[e.target.value]||34;
+  prefs.density=e.target.value;savePrefs();
   document.documentElement.style.setProperty('--row-h',ROW_H+'px');
   if(editingCell)cancelCellEdit();
   if(T){layoutGrid();paint()}
@@ -2680,7 +2829,7 @@ function renderExportMenu(){
   h+='<label class="expopt"><span class="sw" style="transform:scale(.85)"><input type="checkbox" id="excelSafeToggle"'+(excelSafe?' checked':'')+'><i></i></span> Excel-compatible encoding (BOM + CRLF)</label>';
   h+='</div>';
   wrap.innerHTML=h;
-  $('#excelSafeToggle').addEventListener('change',e=>{excelSafe=e.target.checked});
+  $('#excelSafeToggle').addEventListener('change',e=>{excelSafe=e.target.checked;prefs.excelSafe=excelSafe;savePrefs()});
   $('#protectFormulasToggle').addEventListener('change',e=>{protectFormulas=e.target.checked});
   const addBtn=$('#exportAddFilterStep');
   if(addBtn)addBtn.addEventListener('click',()=>{closeExportMenu();$('#btnFilterToStep').click()})
@@ -2952,34 +3101,192 @@ stTest('opExtract: a catastrophic custom pattern is refused rather than run',()=
   stAssert(!!res.warning,'should refuse the unsafe pattern rather than evaluate it');
   stAssert(res.stats.cells===0,'nothing extracted when the pattern is refused')
 });
+function evalOneCell(raw,m){
+  const cond=m.cond,s=String(raw??'');
+  switch(cond.op){
+    case'contains':case'notContains':case'equals':case'notEquals':case'startsWith':case'endsWith':{
+      const sc=cond.caseSensitive?s:s.toLowerCase();
+      const vc=cond.caseSensitive?String(cond.value||''):String(cond.value||'').toLowerCase();
+      if(cond.op==='contains')return sc.indexOf(vc)!==-1;
+      if(cond.op==='notContains')return sc.indexOf(vc)===-1;
+      if(cond.op==='equals')return sc===vc;
+      if(cond.op==='notEquals')return sc!==vc;
+      if(cond.op==='startsWith')return sc.indexOf(vc)===0;
+      return vc===''?true:sc.slice(-vc.length)===vc
+    }
+    case'regex':return m.re.test(s);
+    case'isEmpty':return s.trim()==='';
+    case'isNotEmpty':return s.trim()!=='';
+    case'inList':{
+      const sc=cond.caseSensitive?s.trim():s.trim().toLowerCase();
+      return m.listItems.some(it=>it===sc)
+    }
+    case'gt':case'gte':case'lt':case'lte':{
+      const p=parseNumericValue(raw,{locale:m.locale});
+      if(!p||isNaN(m.numA))return false;
+      if(cond.op==='gt')return p.value>m.numA;
+      if(cond.op==='gte')return p.value>=m.numA;
+      if(cond.op==='lt')return p.value<m.numA;
+      return p.value<=m.numA
+    }
+    case'between':{
+      const p=parseNumericValue(raw,{locale:m.locale});
+      if(!p||isNaN(m.numA)||isNaN(m.numB))return false;
+      return p.value>=m.numA&&p.value<=m.numB
+    }
+    case'before':case'after':{
+      const d=parseDate(s,{order:DATE_ORDER,yearPivot:DATE_YEAR_PIVOT});
+      if(!d||isNaN(m.dateA))return false;
+      const key=d.y*10000+d.mo*100+d.d;
+      return cond.op==='before'?key<m.dateA:key>m.dateA
+    }
+    default:return false
+  }
+}
+function rowAnyColumnHit(t,r,m){
+  for(let c=0;c<t.cols.length;c++)if(evalOneCell(t.data[c][r],m))return true;
+  return false
+}
 function opFilter(t,cfg){
-  const q=String(cfg.query||'').trim().toLowerCase();
-  if(!q)return{table:t,stats:{removed:0}};
+  const fc=normalizeFilterCfg(cfg);
+  if(!fc.conditions.length)return{table:t,stats:{removed:0}};
+  const numLocaleCache=new Map();
+  const getNumLocale=ci=>{
+    if(ci===-1)return'us';
+    if(!numLocaleCache.has(ci)){
+      const sample=[];
+      for(let r=0;r<t.n&&sample.length<250;r++){const v=t.data[ci][r];if(v!=null&&v!=='')sample.push(v)}
+      numLocaleCache.set(ci,detectNumberLocale(sample))
+    }
+    return numLocaleCache.get(ci)
+  };
+  const matchers=[];
+  for(const cond of fc.conditions){
+    let ci=-1;
+    if(cond.column!=='*'){
+      ci=colIdx(t.cols,cond.column);
+      if(ci===-1)return{table:t,stats:{removed:0},warning:'Column "'+cond.column+'" not found'}
+    }
+    const m={ci,cond,re:null,numA:NaN,numB:NaN,dateA:NaN,locale:'us',listItems:null};
+    if(cond.op==='regex'){
+      if(isUnsafeRegexSource(cond.value))return{table:t,stats:{removed:0},warning:'The pattern for "'+cond.column+'" is too long or risks hanging the browser (nested repetition) — simplify it'};
+      try{m.re=new RegExp(cond.value,cond.caseSensitive?'':'i')}
+      catch(e){return{table:t,stats:{removed:0},warning:'Bad pattern for "'+cond.column+'": '+e.message}}
+    }else if(cond.op==='gt'||cond.op==='gte'||cond.op==='lt'||cond.op==='lte'||cond.op==='between'){
+      m.locale=getNumLocale(ci);
+      const pa=parseNumericValue(cond.value,{locale:m.locale});
+      m.numA=pa?pa.value:NaN;
+      if(cond.op==='between'){const pb=parseNumericValue(cond.value2,{locale:m.locale});m.numB=pb?pb.value:NaN}
+    }else if(cond.op==='before'||cond.op==='after'){
+      const d=parseDate(cond.value,{order:DATE_ORDER,yearPivot:DATE_YEAR_PIVOT});
+      m.dateA=d?d.y*10000+d.mo*100+d.d:NaN
+    }else if(cond.op==='inList'){
+      m.listItems=String(cond.value||'').split(',').map(s=>cond.caseSensitive?s.trim():s.trim().toLowerCase())
+    }
+    matchers.push(m)
+  }
+  const testRow=r=>{
+    let anyTrue=false,allTrue=true;
+    for(const m of matchers){
+      const hit=m.ci===-1?rowAnyColumnHit(t,r,m):evalOneCell(t.data[m.ci][r],m);
+      if(hit)anyTrue=true;else allTrue=false
+    }
+    return fc.match==='all'?allTrue:anyTrue
+  };
   const keep=[];
   for(let r=0;r<t.n;r++){
-    let hit=false;
-    for(let c=0;c<t.cols.length;c++){
-      const v=t.data[c][r];
-      if(v!=null&&String(v).toLowerCase().indexOf(q)!==-1){hit=true;break}
-    }
-    if(hit)keep.push(r)
+    const hit=testRow(r);
+    if(fc.mode==='drop'?!hit:hit)keep.push(r)
   }
   const data=t.cols.map((_,ci)=>keep.map(r=>t.data[ci][r]));
   const rowIds=t.rowIds?keep.map(r=>t.rowIds[r]):null;
   return{table:{cols:t.cols,data,n:keep.length,rowIds},stats:{removed:t.n-keep.length}}
 }
-stTest('opFilter: keeps only rows matching the query, case-insensitively, across all columns',()=>{
+stTest('opFilter: legacy {query} shape keeps only rows matching, case-insensitively, across all columns',()=>{
   const t={cols:['name','note'],data:[['Ann','Bo','Cy'],['likes CATS','likes dogs','no pets']],n:3,rowIds:identityOrder(3)};
   const res=opFilter(t,{query:'cats'});
   stEqual(res.table.data,[['Ann'],['likes CATS']],'only the matching row survives, original casing preserved');
   stAssert(res.stats.removed===2,'reports how many rows were removed');
   stEqual(res.table.rowIds,[0],'row identity is preserved for the kept row')
 });
-stTest('opFilter: an empty query is a no-op',()=>{
+stTest('opFilter: legacy {query:\'\'} is still a no-op returning the same table reference',()=>{
   const t={cols:['a'],data:[['x','y']],n:2,rowIds:identityOrder(2)};
   const res=opFilter(t,{query:''});
   stAssert(res.table===t,'empty query returns the table unchanged');
   stAssert(res.stats.removed===0,'nothing removed')
+});
+stTest('opFilter: equals on a named column, drop mode',()=>{
+  const t={cols:['status'],data:[['PENDING','OK','PENDING','FAILED']],n:4,rowIds:identityOrder(4)};
+  const res=opFilter(t,{mode:'drop',match:'any',conditions:[{column:'status',op:'equals',value:'PENDING',caseSensitive:false}]});
+  stEqual(res.table.data[0],['OK','FAILED'],'both PENDING rows should be dropped');
+  stEqual(res.table.rowIds,[1,3])
+});
+stTest('opFilter: numeric gt reuses parseNumericValue with detected locale (EU thousands/decimal)',()=>{
+  const t={cols:['amount'],data:[['1.234,50','999,00','2.000,00']],n:3,rowIds:identityOrder(3)};
+  const res=opFilter(t,{mode:'keep',match:'any',conditions:[{column:'amount',op:'gt',value:'1000',caseSensitive:false}]});
+  stEqual(res.table.data[0],['1.234,50','2.000,00'],'EU-formatted values above 1000 should survive despite the thousands separator')
+});
+stTest('opFilter: between is inclusive on both bounds',()=>{
+  const t={cols:['n'],data:[['5','10','15','20']],n:4,rowIds:identityOrder(4)};
+  const res=opFilter(t,{mode:'keep',match:'any',conditions:[{column:'n',op:'between',value:'10',value2:'15',caseSensitive:false}]});
+  stEqual(res.table.data[0],['10','15'])
+});
+stTest('opFilter: before/after reuse parseDate2 with the current dateOrder',()=>{
+  const savedOrder=DATE_ORDER;DATE_ORDER='mdy';
+  const t={cols:['d'],data:[['1/15/2024','3/1/2024','12/31/2023']],n:3,rowIds:identityOrder(3)};
+  const res=opFilter(t,{mode:'keep',match:'any',conditions:[{column:'d',op:'after',value:'2/1/2024',caseSensitive:false}]});
+  DATE_ORDER=savedOrder;
+  stEqual(res.table.data[0],['3/1/2024'])
+});
+stTest('opFilter: inList matches any of a comma-separated set',()=>{
+  const t={cols:['region'],data:[['West','East','North','South']],n:4,rowIds:identityOrder(4)};
+  const res=opFilter(t,{mode:'keep',match:'any',conditions:[{column:'region',op:'inList',value:'West, North',caseSensitive:false}]});
+  stEqual(res.table.data[0],['West','North'])
+});
+stTest('opFilter: match "all" requires every condition, "any" requires just one',()=>{
+  const t={cols:['a','b'],data:[['x','x','y'],['1','2','1']],n:3,rowIds:identityOrder(3)};
+  const conds=[{column:'a',op:'equals',value:'x',caseSensitive:false},{column:'b',op:'equals',value:'1',caseSensitive:false}];
+  const all=opFilter(t,{mode:'keep',match:'all',conditions:conds});
+  stEqual(all.table.rowIds,[0],'only row 0 matches both conditions');
+  const any=opFilter(t,{mode:'keep',match:'any',conditions:conds});
+  stEqual(any.table.rowIds,[0,1,2],'every row matches at least one condition')
+});
+stTest('opFilter: an unsafe regex warns and leaves the table unchanged instead of hanging',()=>{
+  const t={cols:['x'],data:[['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!']],n:1,rowIds:identityOrder(1)};
+  const res=opFilter(t,{mode:'keep',match:'any',conditions:[{column:'x',op:'regex',value:'(a+)+',caseSensitive:false}]});
+  stAssert(!!res.warning,'should refuse the unsafe pattern rather than evaluate it');
+  stAssert(res.table===t,'table should be returned unchanged')
+});
+stTest('opFilter: a condition on a missing column warns instead of throwing',()=>{
+  const t={cols:['a'],data:[['x']],n:1,rowIds:identityOrder(1)};
+  const res=opFilter(t,{mode:'keep',match:'any',conditions:[{column:'nope',op:'contains',value:'x',caseSensitive:false}]});
+  stAssert(!!res.warning,'should warn about the missing column')
+});
+stTest('filter DSL: legacy "filter contains" shorthand still parses and round-trips exactly',()=>{
+  const line='filter contains "cats"';
+  const parsed=textToSteps(line);
+  stAssert(!parsed.errors.length);
+  stEqual(parsed.steps[0].cfg.conditions,[{column:'*',op:'contains',value:'cats',caseSensitive:false}]);
+  stEqual(stepsToText(parsed.steps),line,'should re-serialize back to the short legacy form')
+});
+stTest('filter DSL: new grammar parses multi-condition "and"/"between"/"matchcase" and round-trips',()=>{
+  const line='filter keep where "Amount" > "500" and "Region" contains "West"';
+  const parsed=textToSteps(line);
+  stAssert(!parsed.errors.length,'should parse without error: '+JSON.stringify(parsed.errors));
+  stEqual(parsed.steps[0].cfg.mode,'keep');
+  stEqual(parsed.steps[0].cfg.match,'all');
+  stEqual(parsed.steps[0].cfg.conditions[0],{column:'Amount',op:'gt',value:'500',value2:undefined,caseSensitive:false});
+  stEqual(stepsToText(parsed.steps),line);
+  const line2='filter drop where "Notes" is empty or "Code" between "10" to "20" matchcase';
+  const parsed2=textToSteps(line2);
+  stAssert(!parsed2.errors.length,'should parse a mix of a no-value op and a between op: '+JSON.stringify(parsed2.errors));
+  stEqual(parsed2.steps[0].cfg.match,'any');
+  stEqual(stepsToText(parsed2.steps),line2)
+});
+stTest('filter DSL: mixing "and" and "or" in one line is rejected rather than silently misparsed',()=>{
+  const line='filter keep where "a" = "1" and "b" = "2" or "c" = "3"';
+  const parsed=textToSteps(line);
+  stAssert(parsed.errors.length>0,'mixed joiners should be a parse error, not a guess')
 });
 function opDropEmptyRows(t,cfg){
   const idx=resolveCols(t,cfg.columns||['*']);
@@ -3002,6 +3309,53 @@ function opDropEmptyCols(t){
   }
   return{table:{cols:keep.map(i=>t.cols[i]),data:keep.map(i=>t.data[i]),n:t.n,rowIds:t.rowIds},stats:{removed:t.cols.length-keep.length}}
 }
+function opDropRows(t,cfg){
+  if(!t.rowIds)return{table:t,stats:{},warning:'Row identity lost upstream — this step can\'t run'};
+  const dropSet=new Set(cfg.rowIds||[]);
+  const keep=[];
+  for(let r=0;r<t.n;r++){if(!dropSet.has(t.rowIds[r]))keep.push(r)}
+  const data=t.cols.map((_,ci)=>keep.map(r=>t.data[ci][r]));
+  return{table:{cols:t.cols,data,n:keep.length,rowIds:keep.map(r=>t.rowIds[r])},stats:{removed:t.n-keep.length}}
+}
+function opKeepRows(t,cfg){
+  if(!t.rowIds)return{table:t,stats:{},warning:'Row identity lost upstream — this step can\'t run'};
+  const keepSet=new Set(cfg.rowIds||[]);
+  const keep=[];
+  for(let r=0;r<t.n;r++){if(keepSet.has(t.rowIds[r]))keep.push(r)}
+  const data=t.cols.map((_,ci)=>keep.map(r=>t.data[ci][r]));
+  return{table:{cols:t.cols,data,n:keep.length,rowIds:keep.map(r=>t.rowIds[r])},stats:{removed:t.n-keep.length}}
+}
+stTest('opDropRows: removes only the targeted row ids and survives a prior filter',()=>{
+  const t0={cols:['name'],data:[['A','B','C','D']],n:4,rowIds:identityOrder(4)};
+  const filtered=opDropEmptyRows(t0,{columns:['*']}).table;
+  const t1=opDropRows(filtered,{rowIds:[1,3]});
+  stEqual(t1.table.data[0],['A','C'],'rows with ids 1 and 3 should be gone, ids 0 and 2 should remain');
+  stEqual(t1.table.rowIds,[0,2],'row identity should be preserved for what remains')
+});
+stTest('opKeepRows: keeps only the targeted row ids',()=>{
+  const t0={cols:['name'],data:[['A','B','C']],n:3,rowIds:identityOrder(3)};
+  const t1=opKeepRows(t0,{rowIds:[0,2]});
+  stEqual(t1.table.data[0],['A','C'],'only ids 0 and 2 should survive')
+});
+stTest('opDropRows / opKeepRows: warn instead of throwing when row identity is lost upstream',()=>{
+  const t0={cols:['g','v'],data:[['x','y'],[1,2]],n:2,rowIds:identityOrder(2)};
+  const agg=opAggregate(t0,{groupBy:['g'],metrics:['v:sum']}).table;
+  stAssert(!agg.rowIds,'aggregate output should have no row identity, setting up the test');
+  const drop=opDropRows(agg,{rowIds:[0]});
+  stAssert(!!drop.warning,'dropRows should warn rather than throw when rowIds is missing');
+  const keep=opKeepRows(agg,{rowIds:[0]});
+  stAssert(!!keep.warning,'keepRows should warn rather than throw when rowIds is missing')
+});
+stTest('dropRows / keepRows: DSL serialization round-trips the exact row id list',()=>{
+  const text='drop rows 12, 44, 91\nkeep rows 3, 7';
+  const parsed=textToSteps(text);
+  stAssert(!parsed.errors.length,'both lines should parse without error');
+  stEqual(parsed.steps[0].opId,'dropRows');
+  stEqual(parsed.steps[0].cfg.rowIds,[12,44,91]);
+  stEqual(parsed.steps[1].opId,'keepRows');
+  stEqual(parsed.steps[1].cfg.rowIds,[3,7]);
+  stEqual(stepsToText(parsed.steps),text,'re-serializing should reproduce the exact original text')
+});
 function opDedupe(t,cfg){
   const idx=resolveCols(t,cfg.on||['*']);
   const seen=new Set();const keep=[];
@@ -3534,7 +3888,14 @@ const OPS={
     describe:cfg=>'Drop rows blank across '+(cfg.columns[0]==='*'?'all columns':cfg.columns.join(', ')),apply:opDropEmptyRows},
   filter:{label:'Filter rows',keywords:'filter search contains query find keep',
     fields:[{key:'query',type:'text',label:'Keep rows containing',placeholder:'text to search for, across all columns',default:()=>''}],
-    describe:cfg=>cfg.query?'Keep rows containing "'+cfg.query+'"':'Keep all rows',apply:opFilter},
+    describe:cfg=>{
+      const fc=normalizeFilterCfg(cfg);
+      if(!fc.conditions.length)return'Keep all rows';
+      const verb=fc.mode==='drop'?'Drop':'Keep';
+      if(fc.conditions.length===1&&fc.conditions[0].column==='*'&&fc.conditions[0].op==='contains'&&!fc.conditions[0].caseSensitive)
+        return verb+' rows containing "'+fc.conditions[0].value+'"';
+      return verb+' rows where '+fc.conditions.map(dslCondToText).join(fc.match==='all'?' and ':' or ')
+    },apply:opFilter},
   dropEmptyCols:{label:'Drop empty columns',keywords:'drop empty blank columns',fields:[],
     describe:()=>'Drop columns that are entirely empty',apply:opDropEmptyCols},
   dedupe:{label:'Dedupe rows',keywords:'dedupe duplicate unique distinct',
@@ -3813,6 +4174,8 @@ function opCellOverride(t,cfg){
 }
 OPS.infer={hidden:true,label:'Inferred rule',fields:[],describe:cfg=>describeCandidate(cfg.candidate)+' — "'+cfg.column+'"',apply:opInferred};
 OPS.cellOverride={hidden:true,label:'Cell override',fields:[],describe:cfg=>'Override '+cfg.overrides.length+' cell'+(cfg.overrides.length>1?'s':'')+' in "'+cfg.column+'"',apply:opCellOverride};
+OPS.dropRows={hidden:true,label:'Drop specific rows',fields:[],describe:cfg=>'Drop '+fmtInt(cfg.rowIds.length)+' specific row'+(cfg.rowIds.length===1?'':'s'),apply:opDropRows};
+OPS.keepRows={hidden:true,label:'Keep specific rows',fields:[],describe:cfg=>'Keep '+fmtInt(cfg.rowIds.length)+' specific row'+(cfg.rowIds.length===1?'':'s'),apply:opKeepRows};
 stTest('cellOverride: keyed by stable row id survives an upstream row-removing step',()=>{
   const t0={cols:['name'],data:[['A','','B','C']],n:4,rowIds:identityOrder(4)};
   const dropped=opDropEmptyRows(t0,{columns:['*']});
@@ -3924,7 +4287,7 @@ const ICON_X='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke
 
 const STEP_TONE={
   trim:'rewrite',case:'rewrite',replace:'rewrite',dateNormalize:'rewrite',fillDown:'rewrite',fillBlank:'rewrite',cellOverride:'rewrite',infer:'rewrite',
-  dropEmptyRows:'remove',dropEmptyCols:'remove',dedupe:'remove',dropColumn:'remove',filter:'remove',
+  dropEmptyRows:'remove',dropEmptyCols:'remove',dedupe:'remove',dropColumn:'remove',filter:'remove',dropRows:'remove',keepRows:'remove',
   split:'add',merge:'add',extract:'add',aggregate:'add',wideToLong:'add',longToWide:'add',diff:'add'
 };
 function categorizeStep(step){
@@ -3957,7 +4320,7 @@ function renderRail(){
   const list=$('#railList');
   $('#railCount').textContent=steps.length+' step'+(steps.length===1?'':'s');
   if(!steps.length){
-    list.innerHTML='<div class="railempty">No steps yet.<br>Press <kbd>&#8984;K</kbd> or "Add step" to start cleaning.</div>'
+    list.innerHTML='<div class="railempty">No steps yet.<br>Try <b>Trim whitespace</b>, <b>Filter rows</b>, or <b>Dedupe rows</b> — press <kbd>&#8984;K</kbd> to browse all 20.</div>'
   }else{
     const impacts=steps.map(stepImpact);
     const maxImpact=Math.max(1,...impacts);
@@ -4454,6 +4817,97 @@ stTest('responsive rail: toggle button opens and closes the off-canvas pipeline 
 
 function dslQ(s){return'"'+String(s??'').replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"'}
 function dslColsToText(columns){return columns[0]==='*'?'*':columns.map(dslQ).join(', ')}
+function normalizeFilterCfg(cfg){
+  if(cfg&&Array.isArray(cfg.conditions))return{mode:cfg.mode==='drop'?'drop':'keep',match:cfg.match==='all'?'all':'any',conditions:cfg.conditions};
+  if(cfg&&typeof cfg.query==='string'){
+    const q=cfg.query.trim();
+    return{mode:'keep',match:'any',conditions:q?[{column:'*',op:'contains',value:q,caseSensitive:false}]:[]}
+  }
+  return{mode:'keep',match:'any',conditions:[]}
+}
+const FILTER_OPS=[
+  ['>=','gte'],['<=','lte'],['!=','notEquals'],['>','gt'],['<','lt'],['=','equals'],
+  ['is not empty','isNotEmpty'],['is empty','isEmpty'],
+  ['not contains','notContains'],['starts with','startsWith'],['ends with','endsWith'],
+  ['in list','inList'],['contains','contains'],['matches','regex'],
+  ['between','between'],['before','before'],['after','after']
+];
+const FILTER_OP_TEXT={gte:'>=',lte:'<=',notEquals:'!=',gt:'>',lt:'<',equals:'=',
+  isNotEmpty:'is not empty',isEmpty:'is empty',notContains:'not contains',startsWith:'starts with',
+  endsWith:'ends with',inList:'in list',contains:'contains',regex:'matches',between:'between',before:'before',after:'after'};
+const FILTER_NO_VALUE_OPS=new Set(['isEmpty','isNotEmpty']);
+function dslCondToText(c){
+  let s=dslQ(c.column)+' '+FILTER_OP_TEXT[c.op];
+  if(c.op==='between')s+=' '+dslQ(c.value)+' to '+dslQ(c.value2);
+  else if(!FILTER_NO_VALUE_OPS.has(c.op))s+=' '+dslQ(c.value);
+  if(c.caseSensitive)s+=' matchcase';
+  return s
+}
+function tokenizeFilterConditions(s){
+  let i=0;
+  const skipWs=()=>{while(i<s.length&&/\s/.test(s[i]))i++};
+  const expectToken=token=>{
+    skipWs();
+    if(s.slice(i,i+token.length).toLowerCase()!==token)return false;
+    if(/[a-z]$/i.test(token)){
+      const next=s[i+token.length];
+      if(next!==undefined&&/[a-zA-Z0-9_]/.test(next))return false
+    }
+    i+=token.length;
+    return true
+  };
+  const readQuoted=()=>{
+    skipWs();
+    if(s[i]!=='"')return null;
+    let j=i+1,buf='';
+    while(j<s.length&&s[j]!=='"'){if(s[j]==='\\'&&s[j+1]==='"'){buf+='"';j+=2}else{buf+=s[j];j++}}
+    if(s[j]!=='"')return null;
+    i=j+1;
+    return buf
+  };
+  const conditions=[];
+  let joiner=null;
+  while(true){
+    const col=readQuoted();
+    if(col===null)return null;
+    let matchedOp=null;
+    for(const pair of FILTER_OPS){if(expectToken(pair[0])){matchedOp=pair[1];break}}
+    if(!matchedOp)return null;
+    let value='',value2;
+    if(matchedOp==='between'){
+      value=readQuoted();
+      if(value===null)return null;
+      if(!expectToken('to'))return null;
+      value2=readQuoted();
+      if(value2===null)return null
+    }else if(!FILTER_NO_VALUE_OPS.has(matchedOp)){
+      value=readQuoted();
+      if(value===null)return null
+    }
+    let caseSensitive=false;
+    if(expectToken('matchcase'))caseSensitive=true;
+    conditions.push({column:col,op:matchedOp,value:value||'',value2,caseSensitive});
+    skipWs();
+    if(i>=s.length)break;
+    let thisJoiner=null;
+    if(expectToken('and'))thisJoiner='all';
+    else if(expectToken('or'))thisJoiner='any';
+    else return null;
+    if(joiner&&joiner!==thisJoiner)return null;
+    joiner=thisJoiner
+  }
+  return{conditions,match:joiner||'any'}
+}
+function dslParseRowIds(s){
+  const parts=s.split(',').map(x=>x.trim()).filter(x=>x!=='');
+  if(!parts.length)return null;
+  const ids=[];
+  for(const p of parts){
+    if(!/^\d+$/.test(p))return null;
+    ids.push(Number(p))
+  }
+  return ids
+}
 function dslParseColsArg(s){
   s=s.trim();
   if(s==='*')return['*'];
@@ -4639,7 +5093,15 @@ function stepToLine(st){
   if(st.opId==='dateNormalize')return pre+'dates '+dslQ(cfg.column)+' -> '+cfg.format;
   if(st.opId==='extract')return pre+'extract '+(cfg.preset||('/'+cfg.pattern+'/'))+' from '+dslQ(cfg.column)+' into '+dslQ(cfg.into);
   if(st.opId==='dropEmptyRows')return pre+'drop empty rows in '+dslColsToText(cfg.columns);
-  if(st.opId==='filter')return pre+'filter contains '+dslQ(cfg.query);
+  if(st.opId==='dropRows')return pre+'drop rows '+cfg.rowIds.join(', ');
+  if(st.opId==='keepRows')return pre+'keep rows '+cfg.rowIds.join(', ');
+  if(st.opId==='filter'){
+    const fc=normalizeFilterCfg(cfg);
+    if(!fc.conditions.length)return pre+'filter contains '+dslQ('');
+    if(fc.mode==='keep'&&fc.conditions.length===1&&fc.conditions[0].column==='*'&&fc.conditions[0].op==='contains'&&!fc.conditions[0].caseSensitive)
+      return pre+'filter contains '+dslQ(fc.conditions[0].value);
+    return pre+'filter '+fc.mode+' where '+fc.conditions.map(dslCondToText).join(fc.match==='all'?' and ':' or ')
+  }
   if(st.opId==='dropEmptyCols')return pre+'drop empty columns';
   if(st.opId==='dedupe')return pre+'dedupe on '+dslColsToText(cfg.on);
   if(st.opId==='rename')return pre+'rename '+dslQ(cfg.from)+' -> '+dslQ(cfg.to);
@@ -4719,10 +5181,25 @@ function parseDslLine(raw,lineNo){
     if(!cols)return dslErrAt(lineNo,'drop empty rows needs a column list or *');
     return dslMkStep('dropEmptyRows',{columns:cols},muted)
   }
+  if(m=line.match(/^drop\s+rows\s+(.+)$/)){
+    const ids=dslParseRowIds(m[1]);
+    if(!ids)return dslErrAt(lineNo,'drop rows needs a comma-separated list of row ids');
+    return dslMkStep('dropRows',{rowIds:ids},muted)
+  }
+  if(m=line.match(/^keep\s+rows\s+(.+)$/)){
+    const ids=dslParseRowIds(m[1]);
+    if(!ids)return dslErrAt(lineNo,'keep rows needs a comma-separated list of row ids');
+    return dslMkStep('keepRows',{rowIds:ids},muted)
+  }
   if(m=line.match(/^filter\s+contains\s+(.+)$/)){
     const q=dslMatchQuoted(m[1]);
     if(!q)return dslErrAt(lineNo,'filter needs quoted text to search for');
-    return dslMkStep('filter',{query:q.value},muted)
+    return dslMkStep('filter',{mode:'keep',match:'any',conditions:q.value?[{column:'*',op:'contains',value:q.value,caseSensitive:false}]:[]},muted)
+  }
+  if(m=line.match(/^filter\s+(keep|drop)\s+where\s+(.+)$/)){
+    const parsed=tokenizeFilterConditions(m[2]);
+    if(!parsed)return dslErrAt(lineNo,'filter '+m[1]+' where needs conditions like "Column" op "value", joined only by "and" or only by "or"');
+    return dslMkStep('filter',{mode:m[1],match:parsed.match,conditions:parsed.conditions},muted)
   }
   if(line==='drop empty columns')return dslMkStep('dropEmptyCols',{},muted);
   if(m=line.match(/^dedupe\s+on\s+(.+)$/)){
@@ -4809,7 +5286,7 @@ stTest('dsl: muted steps round-trip for every op type, not just the old verb whi
     ['dateNormalize',{column:'d',format:'iso'}],
     ['extract',{preset:'email',pattern:'',column:'x',into:'y'}],
     ['dropEmptyRows',{columns:['*']}],
-    ['filter',{query:'needle'}],
+    ['filter',{mode:'keep',match:'any',conditions:[{column:'*',op:'contains',value:'needle',caseSensitive:false}]}],
     ['dropEmptyCols',{}],
     ['dedupe',{on:['*']}],
     ['rename',{from:'x',to:'y'}],
@@ -4963,6 +5440,7 @@ stTest('decompressFromHash: an unrecognized version prefix fails with a clear er
 let pendingPipeline=null,compareMode=false,railView='cards';
 function setRailView(mode){
   railView=mode;
+  prefs.railView=mode;savePrefs();
   $('#railTabCards').classList.toggle('on',mode==='cards');
   $('#railTabText').classList.toggle('on',mode==='text');
   $('#railList').classList.toggle('hidden',mode!=='cards');
@@ -4993,6 +5471,19 @@ $('#dslLink').addEventListener('click',async()=>{
   const url=location.origin+location.pathname+'#p='+hash;
   copyText(url,'Link copied — recipe only, no data')
 });
+
+const PREFS_DEFAULTS={theme:'auto',density:'standard',dateOrder:'mdy',excelSafe:true,railView:'cards',showRowNumbers:true};
+function loadPrefs(){
+  try{
+    const raw=localStorage.getItem('sift_prefs_v1');
+    const saved=raw?JSON.parse(raw):{};
+    return Object.assign({},PREFS_DEFAULTS,saved&&typeof saved==='object'?saved:{})
+  }catch(e){return Object.assign({},PREFS_DEFAULTS)}
+}
+function savePrefs(){
+  try{localStorage.setItem('sift_prefs_v1',JSON.stringify(prefs))}catch(e){}
+}
+let prefs=loadPrefs();
 
 function loadLibrary(){
   try{const raw=localStorage.getItem('sift_library_v1');return raw?JSON.parse(raw):[]}
@@ -5286,6 +5777,56 @@ document.addEventListener('click',e=>{
   $('#sharedBannerText').textContent='A shared recipe is ready.';
   $('#sharedBanner').classList.remove('hidden')
 })();
+const THEME_BG={light:'#F1ECE0',dark:'#171914'};
+const THEME_ICONS={
+  auto:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.3"/><path d="M12 3.7a8.3 8.3 0 0 1 0 16.6z" fill="currentColor" stroke="none"/></svg>',
+  light:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.3"/><path d="M12 2.8v2.6M12 18.6v2.6M4.2 12H1.6M22.4 12h-2.6M5.7 5.7l1.8 1.8M16.5 16.5l1.8 1.8M18.3 5.7l-1.8 1.8M7.5 16.5l-1.8 1.8"/></svg>',
+  dark:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>'
+};
+const THEME_LABELS={auto:'Theme: Auto (follows system)',light:'Theme: Light',dark:'Theme: Dark'};
+function systemPrefersDark(){return!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)}
+function activeThemeMode(){return prefs.theme==='auto'?(systemPrefersDark()?'dark':'light'):prefs.theme}
+function renderThemeButton(){
+  const btn=$('#btnTheme');
+  if(!btn)return;
+  btn.innerHTML=THEME_ICONS[prefs.theme];
+  btn.title=THEME_LABELS[prefs.theme];
+  btn.setAttribute('aria-label',THEME_LABELS[prefs.theme])
+}
+function applyThemeColorMeta(){
+  let meta=$('meta[name="theme-color"]');
+  if(!meta){meta=document.createElement('meta');meta.setAttribute('name','theme-color');document.head.appendChild(meta)}
+  meta.setAttribute('content',THEME_BG[activeThemeMode()])
+}
+function setTheme(mode){
+  prefs.theme=mode;
+  if(mode==='auto')document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme',mode);
+  renderThemeButton();
+  applyThemeColorMeta();
+  savePrefs()
+}
+$('#btnTheme').addEventListener('click',()=>{
+  const order=['auto','light','dark'];
+  setTheme(order[(order.indexOf(prefs.theme)+1)%order.length])
+});
+if(window.matchMedia){
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{
+    if(prefs.theme==='auto')applyThemeColorMeta()
+  })
+}
+function applyPrefsOnBoot(){
+  renderThemeButton();
+  applyThemeColorMeta();
+  DATE_ORDER=prefs.dateOrder;
+  $('#dateOrderSelect').value=prefs.dateOrder;
+  ROW_H=DENSITY_HEIGHTS[prefs.density]||34;
+  document.documentElement.style.setProperty('--row-h',ROW_H+'px');
+  $('#densitySelect').value=prefs.density;
+  excelSafe=prefs.excelSafe;
+  setRailView(prefs.railView==='text'?'text':'cards')
+}
+applyPrefsOnBoot();
 if(new URLSearchParams(location.search).get('selftest')==='1'){
   stRunAll().then(stRender)
 }
