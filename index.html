@@ -145,7 +145,16 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .ghead::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;opacity:0;pointer-events:none;z-index:3}
 .ghead.sweep::before{animation:headsweep .3s linear forwards}
 @keyframes headsweep{0%{transform:scaleX(0);opacity:1}85%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
-.gh{flex:none;padding:0 6px 0 12px;height:var(--row-h);display:flex;align-items:center;gap:4px;font:700 11px var(--sans);color:var(--ink-dim);letter-spacing:.01em;border-right:1px solid var(--border);cursor:pointer;user-select:none;background:var(--surface)}
+.gh{flex:none;padding:0 6px 0 12px;height:var(--row-h);display:flex;align-items:center;gap:4px;font:700 11px var(--sans);color:var(--ink-dim);letter-spacing:.01em;border-right:1px solid var(--border);cursor:pointer;user-select:none;background:var(--surface);position:relative}
+.gresize{position:absolute;top:0;right:0;bottom:0;width:7px;cursor:col-resize;z-index:2}
+.gresize:hover,.gresize.resizing{background:var(--primary)}
+.gh.dragover{box-shadow:-2px 0 0 var(--ink) inset}
+.stickyfirst .gh.idx,.stickyfirst .gc.idx{position:sticky;left:0;z-index:3;background:var(--surface)}
+.stickyfirst .gc.idx{background:var(--surface-strong)}
+.stickyfirst .gh[data-ci="0"],.stickyfirst .gc[data-ci="0"]{position:sticky;left:52px;z-index:1;background:var(--surface-strong)}
+.stickyfirst .gh[data-ci="0"]{background:var(--surface)}
+.stickyfirst .grow:hover .gc.idx,.stickyfirst .grow:hover .gc[data-ci="0"]{background:var(--raised)}
+.stickyfirst .grow.wash .gc.idx,.stickyfirst .grow.wash .gc[data-ci="0"]{background:var(--rose-wash)}
 .gh:focus,.gc:focus{outline:2px solid var(--focus,#1E6C78);outline-offset:-2px;z-index:1}
 .gh:focus-visible,.gc:focus-visible{outline:2px solid var(--focus,#1E6C78);outline-offset:-2px;z-index:1}
 .gh:hover{background:var(--raised)}
@@ -1420,12 +1429,16 @@ stTest('buildSortKeys: accounting-negative parentheses sort as negative numbers,
   const res=await workerCall('sort',{values,indices:[0,1,2],colType:'number',dir:1});
   stEqual(res.order,[1,2,0],'(50.00) sorts as -50, before 25.00 and 100.00 in ascending order')
 });
-function computeWidths(t){
+function computeColWidth(t,ci){
   const sampleN=Math.min(t.n,250);
+  let max=String(t.cols[ci]).length;const col=t.data[ci];
+  for(let r=0;r<sampleN;r++){const v=String(col[r]??'');if(v.length>max)max=v.length}
+  return Math.ceil(Math.min(320,Math.max(70,max*7.2+28)))
+}
+function computeWidths(t){
   return t.cols.map((name,ci)=>{
-    let max=String(name).length;const col=t.data[ci];
-    for(let r=0;r<sampleN;r++){const v=String(col[r]??'');if(v.length>max)max=v.length}
-    return Math.ceil(Math.min(320,Math.max(70,max*7.2+28)))
+    const override=prefs.colWidths&&prefs.colWidths[name];
+    return override!=null?override:computeColWidth(t,ci)
   })
 }
 function setLoading(on,label){
@@ -1665,10 +1678,11 @@ function renderHead(){
     const sorted=VIEW.sortCol===i;
     const sortCls=sorted?(VIEW.sortDir===1?' s-asc':' s-desc'):'';
     const ariaSort=sorted?(VIEW.sortDir===1?'ascending':'descending'):'none';
-    h+='<div class="gh'+(num?' num':'')+' type-'+type+sortCls+'" data-ci="'+i+'" role="columnheader" aria-colindex="'+(i+2)+'" aria-sort="'+ariaSort+'" tabindex="-1" style="width:'+T.widths[i]+'px" title="'+esc(c)+'">'+
+    h+='<div class="gh'+(num?' num':'')+' type-'+type+sortCls+'" data-ci="'+i+'" draggable="true" role="columnheader" aria-colindex="'+(i+2)+'" aria-sort="'+ariaSort+'" tabindex="-1" style="width:'+T.widths[i]+'px" title="'+esc(c)+'">'+
        '<span class="lbl">'+esc(c)+'</span>'+
        '<svg class="sicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'+
        '<button class="picon" data-profile="'+i+'" title="Profile this column" aria-label="Profile column '+esc(c)+'" type="button" tabindex="-1"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="13" width="4" height="7" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="16" y="4" width="4" height="16" rx="1"/></svg></button>'+
+       '<div class="gresize" data-ci="'+i+'" draggable="false"></div>'+
        '</div>'
   });
   wrap.setAttribute('aria-rowindex','1');
@@ -1794,6 +1808,28 @@ function openPaletteForNewStep(opId,overrides){
   renderPalette();
   openFocusTrap($('#palette'),{onEscape:closePalette,initialFocus:()=>null,scrim:$('#paletteScrim')})
 }
+function toggleStickyFirstCol(){
+  prefs.stickyFirstCol=!prefs.stickyFirstCol;
+  savePrefs();
+  $('#gscroll').classList.toggle('stickyfirst',prefs.stickyFirstCol)
+}
+function setColumnWidthLive(ci,w){
+  GRID.widths[ci]=w;
+  const headerCell=$('.gh[data-ci="'+ci+'"]');
+  if(headerCell)headerCell.style.width=w+'px';
+  GRID.rows.forEach(r=>{const cell=r.children[ci+1];if(cell)cell.style.width=w+'px'});
+  const sc=$('#gscroll');
+  GRID.w=Math.max(52+GRID.widths.reduce((a,b)=>a+b,0),sc.clientWidth);
+  $('#ghead').style.width=GRID.w+'px';
+  $('#gbody').style.width=GRID.w+'px';
+  GRID.rows.forEach(r=>{r.style.width=GRID.w+'px'})
+}
+function commitColumnWidth(ci){
+  const colName=T.cols[ci];
+  prefs.colWidths=prefs.colWidths||{};
+  prefs.colWidths[colName]=GRID.widths[ci];
+  savePrefs()
+}
 function buildHeaderContextMenuItems(ci){
   const colName=T.cols[ci],isSorted=VIEW.sortCol===ci;
   return[
@@ -1803,6 +1839,8 @@ function buildHeaderContextMenuItems(ci){
     null,
     {label:'Rename…',action:()=>openPaletteForNewStep('rename',{from:colName,to:colName})},
     {label:'Duplicate column',action:()=>addSuggestedStep('duplicateColumn',{column:colName})},
+    {label:'Auto-fit width',action:()=>{const w=computeColWidth(T,ci);setColumnWidthLive(ci,w);commitColumnWidth(ci)}},
+    ci===0?{label:prefs.stickyFirstCol?'Unfreeze first column':'Freeze first column',action:toggleStickyFirstCol}:null,
     null,
     {label:'Trim this column',action:()=>addSuggestedStep('trim',{columns:[colName]})},
     {label:'Change case…',action:()=>openPaletteForNewStep('case',{columns:[colName]})},
@@ -1819,6 +1857,68 @@ $('#ghead').addEventListener('contextmenu',e=>{
   e.preventDefault();
   openContextMenu(e.clientX,e.clientY,buildHeaderContextMenuItems(+gh.dataset.ci))
 });
+let resizeState=null;
+$('#ghead').addEventListener('mousedown',e=>{
+  const handle=e.target.closest('.gresize');
+  if(!handle||!T)return;
+  e.preventDefault();
+  const ci=+handle.dataset.ci;
+  resizeState={ci,startX:e.clientX,startW:GRID.widths[ci]};
+  handle.classList.add('resizing')
+});
+document.addEventListener('mousemove',e=>{
+  if(!resizeState)return;
+  const w=Math.max(60,resizeState.startW+(e.clientX-resizeState.startX));
+  setColumnWidthLive(resizeState.ci,w)
+});
+document.addEventListener('mouseup',()=>{
+  if(!resizeState)return;
+  commitColumnWidth(resizeState.ci);
+  $$('.gresize.resizing').forEach(h=>h.classList.remove('resizing'));
+  resizeState=null
+});
+$('#ghead').addEventListener('dblclick',e=>{
+  const handle=e.target.closest('.gresize');
+  if(!handle||!T)return;
+  e.preventDefault();
+  const ci=+handle.dataset.ci;
+  setColumnWidthLive(ci,computeColWidth(T,ci));
+  commitColumnWidth(ci)
+});
+let dragFromCi=null;
+$('#ghead').addEventListener('dragstart',e=>{
+  const gh=e.target.closest('.gh[data-ci]');
+  if(!gh){e.preventDefault();return}
+  dragFromCi=+gh.dataset.ci;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',String(dragFromCi))
+});
+$('#ghead').addEventListener('dragover',e=>{
+  const gh=e.target.closest('.gh[data-ci]');
+  if(!gh||dragFromCi==null)return;
+  e.preventDefault();
+  $$('.gh.dragover').forEach(c=>c.classList.remove('dragover'));
+  gh.classList.add('dragover')
+});
+$('#ghead').addEventListener('dragleave',e=>{
+  const gh=e.target.closest('.gh[data-ci]');
+  if(gh)gh.classList.remove('dragover')
+});
+$('#ghead').addEventListener('drop',e=>{
+  const gh=e.target.closest('.gh[data-ci]');
+  if(!gh||dragFromCi==null)return;
+  e.preventDefault();
+  const toCi=+gh.dataset.ci;
+  $$('.gh.dragover').forEach(c=>c.classList.remove('dragover'));
+  if(toCi!==dragFromCi&&T){
+    const order=T.cols.slice();
+    const moved=order.splice(dragFromCi,1)[0];
+    order.splice(toCi,0,moved);
+    addSuggestedStep('reorderColumns',{order})
+  }
+  dragFromCi=null
+});
+$('#ghead').addEventListener('dragend',()=>{$$('.gh.dragover').forEach(c=>c.classList.remove('dragover'));dragFromCi=null});
 $('#gbody').addEventListener('contextmenu',e=>{
   const cell=e.target.closest('.gc');
   const row=e.target.closest('.grow');
@@ -2056,6 +2156,7 @@ function cycleSort(ci){
   else setSort(ci,0)
 }
 $('#ghead').addEventListener('click',e=>{
+  if(e.target.closest('.gresize'))return;
   if(e.target.closest('.rowcheck')){toggleSelectAllVisible();return}
   const pbtn=e.target.closest('.picon');
   if(pbtn){openProfile(+pbtn.dataset.profile,pbtn);return}
@@ -3519,6 +3620,31 @@ function opDuplicateColumn(t,cfg){
   while(t.cols.includes(name)){name=t.cols[ci]+' copy '+n;n++}
   return{table:{cols:[...t.cols,name],data:[...t.data,t.data[ci].slice()],n:t.n},stats:{}}
 }
+function opReorderColumns(t,cfg){
+  const wanted=(cfg.order||[]).filter(name=>t.cols.includes(name));
+  const rest=t.cols.filter(name=>!wanted.includes(name));
+  const finalOrder=[...wanted,...rest];
+  const idxMap=finalOrder.map(name=>t.cols.indexOf(name));
+  return{table:{cols:idxMap.map(i=>t.cols[i]),data:idxMap.map(i=>t.data[i]),n:t.n},stats:{}}
+}
+stTest('opReorderColumns: reorders columns to the given order',()=>{
+  const t={cols:['a','b','c'],data:[[1],[2],[3]],n:1,rowIds:identityOrder(1)};
+  const res=opReorderColumns(t,{order:['c','a','b']});
+  stEqual(res.table.cols,['c','a','b']);
+  stEqual(res.table.data,[[3],[1],[2]])
+});
+stTest('opReorderColumns: gracefully drops stale names and appends unlisted columns instead of throwing',()=>{
+  const t={cols:['a','b','c'],data:[[1],[2],[3]],n:1,rowIds:identityOrder(1)};
+  const res=opReorderColumns(t,{order:['c','zzz','a']});
+  stEqual(res.table.cols,['c','a','b'],'stale "zzz" dropped, unlisted "b" appended at the end')
+});
+stTest('reorderColumns DSL: round-trips exactly',()=>{
+  const line='reorder columns "c", "a", "b"';
+  const parsed=textToSteps(line);
+  stAssert(!parsed.errors.length);
+  stEqual(parsed.steps[0].cfg,{order:['c','a','b']});
+  stEqual(stepsToText(parsed.steps),line)
+});
 stTest('opDuplicateColumn: appends a copy with a unique auto-generated name',()=>{
   const t={cols:['name','name copy'],data:[['A','B'],['x','y']],n:2,rowIds:identityOrder(2)};
   const res=opDuplicateColumn(t,{column:'name'});
@@ -4337,6 +4463,7 @@ OPS.infer={hidden:true,label:'Inferred rule',fields:[],describe:cfg=>describeCan
 OPS.cellOverride={hidden:true,label:'Cell override',fields:[],describe:cfg=>'Override '+cfg.overrides.length+' cell'+(cfg.overrides.length>1?'s':'')+' in "'+cfg.column+'"',apply:opCellOverride};
 OPS.dropRows={hidden:true,label:'Drop specific rows',fields:[],describe:cfg=>'Drop '+fmtInt(cfg.rowIds.length)+' specific row'+(cfg.rowIds.length===1?'':'s'),apply:opDropRows};
 OPS.keepRows={hidden:true,label:'Keep specific rows',fields:[],describe:cfg=>'Keep '+fmtInt(cfg.rowIds.length)+' specific row'+(cfg.rowIds.length===1?'':'s'),apply:opKeepRows};
+OPS.reorderColumns={hidden:true,label:'Reorder columns',fields:[],describe:()=>'Reorder columns',apply:opReorderColumns};
 stTest('cellOverride: keyed by stable row id survives an upstream row-removing step',()=>{
   const t0={cols:['name'],data:[['A','','B','C']],n:4,rowIds:identityOrder(4)};
   const dropped=opDropEmptyRows(t0,{columns:['*']});
@@ -5267,6 +5394,7 @@ function stepToLine(st){
   if(st.opId==='dedupe')return pre+'dedupe on '+dslColsToText(cfg.on);
   if(st.opId==='rename')return pre+'rename '+dslQ(cfg.from)+' -> '+dslQ(cfg.to);
   if(st.opId==='duplicateColumn')return pre+'duplicate column '+dslQ(cfg.column);
+  if(st.opId==='reorderColumns')return pre+'reorder columns '+cfg.order.map(dslQ).join(', ');
   if(st.opId==='dropColumn')return pre+'drop columns '+cfg.columns.map(dslQ).join(', ');
   if(st.opId==='fillDown')return pre+'fill down '+dslColsToText(cfg.columns);
   if(st.opId==='fillBlank')return pre+'fill blank '+dslColsToText(cfg.columns)+' with '+dslQ(cfg.value);
@@ -5378,6 +5506,11 @@ function parseDslLine(raw,lineNo){
     const q=dslMatchQuoted(m[1]);
     if(!q)return dslErrAt(lineNo,'duplicate column needs a quoted column name');
     return dslMkStep('duplicateColumn',{column:q.value},muted)
+  }
+  if(m=line.match(/^reorder\s+columns\s+(.+)$/)){
+    const cols=dslParseColsArg(m[1]);
+    if(!cols||cols[0]==='*')return dslErrAt(lineNo,'reorder columns needs an explicit column list, not *');
+    return dslMkStep('reorderColumns',{order:cols},muted)
   }
   if(m=line.match(/^drop\s+columns\s+(.+)$/)){
     const cols=dslParseColsArg(m[1]);
@@ -5639,7 +5772,7 @@ $('#dslLink').addEventListener('click',async()=>{
   copyText(url,'Link copied — recipe only, no data')
 });
 
-const PREFS_DEFAULTS={theme:'auto',density:'standard',dateOrder:'mdy',excelSafe:true,railView:'cards',showRowNumbers:true};
+const PREFS_DEFAULTS={theme:'auto',density:'standard',dateOrder:'mdy',excelSafe:true,railView:'cards',showRowNumbers:true,colWidths:{},stickyFirstCol:false};
 function loadPrefs(){
   try{
     const raw=localStorage.getItem('sift_prefs_v1');
@@ -5991,6 +6124,7 @@ function applyPrefsOnBoot(){
   document.documentElement.style.setProperty('--row-h',ROW_H+'px');
   $('#densitySelect').value=prefs.density;
   excelSafe=prefs.excelSafe;
+  $('#gscroll').classList.toggle('stickyfirst',!!prefs.stickyFirstCol);
   setRailView(prefs.railView==='text'?'text':'cards')
 }
 applyPrefsOnBoot();
