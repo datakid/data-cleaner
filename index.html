@@ -174,6 +174,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .selbar.show{display:flex}
 .selbar button{color:#fff;opacity:.85;margin:0 3px;text-decoration:underline;text-underline-offset:2px}
 .selbar button:hover{opacity:1}
+.ctxmenu{position:fixed;z-index:45;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-paper);padding:6px;min-width:220px;max-width:300px}
+.ctxmenu.hidden{display:none}
+.ctxitem{display:block;width:100%;text-align:left;padding:7px 10px;border:0;background:none;border-radius:var(--r-sm);font:500 12.5px var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctxitem:hover:not(:disabled){background:var(--raised)}
+.ctxitem.danger{color:var(--rose)}
+.ctxitem:disabled{color:var(--ink-mute);cursor:default;opacity:.5}
+.ctxdiv{height:1px;background:var(--border);margin:5px 2px}
 .gc.num{justify-content:flex-end;font-variant-numeric:tabular-nums}
 .grow:hover .gc{background:var(--raised)}
 .gempty{position:absolute;inset:0;top:var(--row-h);display:flex;align-items:center;justify-content:center;color:var(--ink-mute);font:600 13px var(--sans)}
@@ -596,6 +603,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 </div>
 <div class="pop sedpop" id="sedPop"></div>
 <div class="subhalo" id="subhalo"></div>
+<div class="ctxmenu hidden" id="ctxMenu" role="menu"></div>
 <div id="toast" aria-live="polite"></div>
 <div id="srAnnounce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <input type="file" id="fileInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,text/csv,text/plain,application/json">
@@ -1726,6 +1734,125 @@ $('#selBar').addEventListener('click',e=>{
   else if(btn.dataset.selact==='copy')copySelectedRowsAsTSV();
   else if(btn.dataset.selact==='clear'){selection.clear();updateSelectionUI()}
 });
+function copyRowAsTSV(rIdx){
+  if(!T)return;
+  copyText(T.cols.map((_,c)=>T.data[c][rIdx]??'').join('\t'),'Copied row')
+}
+let ctxMenuItems=[];
+function closeContextMenu(){
+  const m=$('#ctxMenu');
+  m.classList.add('hidden');
+  m.innerHTML='';
+  ctxMenuItems=[]
+}
+function openContextMenu(x,y,items){
+  closeContextMenu();
+  const m=$('#ctxMenu');
+  m.innerHTML=items.map((it,i)=>it===null?'<div class="ctxdiv"></div>':
+    '<button type="button" class="ctxitem'+(it.danger?' danger':'')+'" data-idx="'+i+'"'+(it.disabled?' disabled':'')+'>'+esc(it.label)+'</button>'
+  ).join('');
+  ctxMenuItems=items;
+  m.classList.remove('hidden');
+  m.style.left='0px';m.style.top='0px';
+  const rect=m.getBoundingClientRect();
+  const vw=window.innerWidth,vh=window.innerHeight;
+  const left=Math.max(8,Math.min(x,vw-rect.width-8));
+  const top=Math.max(8,Math.min(y,vh-rect.height-8));
+  m.style.left=left+'px';m.style.top=top+'px'
+}
+$('#ctxMenu').addEventListener('click',e=>{
+  e.stopPropagation();
+  const btn=e.target.closest('.ctxitem');
+  if(!btn||btn.disabled)return;
+  const it=ctxMenuItems[+btn.dataset.idx];
+  closeContextMenu();
+  if(it&&it.action)it.action()
+});
+document.addEventListener('click',e=>{
+  if(!$('#ctxMenu').classList.contains('hidden')&&!e.target.closest('#ctxMenu'))closeContextMenu()
+});
+document.addEventListener('contextmenu',e=>{
+  if(!$('#ctxMenu').classList.contains('hidden')&&!e.target.closest('.gc')&&!e.target.closest('.gh'))closeContextMenu()
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!$('#ctxMenu').classList.contains('hidden'))closeContextMenu()
+});
+function openPaletteForNewStep(opId,overrides){
+  if(!T)return;
+  paletteEditIndex=-1;
+  paletteSelIndex=0;
+  paletteOpId=opId;
+  const def=OPS[opId];
+  paletteCfg={};
+  def.fields.forEach(f=>{paletteCfg[f.key]=typeof f.default==='function'?f.default(paletteBaseState()):f.default});
+  Object.assign(paletteCfg,overrides);
+  paletteMode='config';
+  $('#paletteSearch').value='';
+  $('.psearch').classList.add('hidden');
+  $('#paletteScrim').classList.add('show');
+  $('#palette').classList.add('open');
+  renderPalette();
+  openFocusTrap($('#palette'),{onEscape:closePalette,initialFocus:()=>null,scrim:$('#paletteScrim')})
+}
+function buildHeaderContextMenuItems(ci){
+  const colName=T.cols[ci],isSorted=VIEW.sortCol===ci;
+  return[
+    {label:'Sort ascending',disabled:isSorted&&VIEW.sortDir===1,action:()=>setSort(ci,1)},
+    {label:'Sort descending',disabled:isSorted&&VIEW.sortDir===-1,action:()=>setSort(ci,-1)},
+    isSorted?{label:'Clear sort',action:()=>setSort(ci,0)}:null,
+    null,
+    {label:'Rename…',action:()=>openPaletteForNewStep('rename',{from:colName,to:colName})},
+    {label:'Duplicate column',action:()=>addSuggestedStep('duplicateColumn',{column:colName})},
+    null,
+    {label:'Trim this column',action:()=>addSuggestedStep('trim',{columns:[colName]})},
+    {label:'Change case…',action:()=>openPaletteForNewStep('case',{columns:[colName]})},
+    {label:'Normalize dates…',action:()=>openPaletteForNewStep('dateNormalize',{column:colName})},
+    null,
+    {label:'Profile',action:()=>openProfile(ci,$('.gh[data-ci="'+ci+'"]'))},
+    null,
+    {label:'Drop column',danger:true,action:()=>addSuggestedStep('dropColumn',{columns:[colName]})}
+  ].filter(x=>x!==undefined)
+}
+$('#ghead').addEventListener('contextmenu',e=>{
+  const gh=e.target.closest('.gh[data-ci]');
+  if(!gh||!T){closeContextMenu();return}
+  e.preventDefault();
+  openContextMenu(e.clientX,e.clientY,buildHeaderContextMenuItems(+gh.dataset.ci))
+});
+$('#gbody').addEventListener('contextmenu',e=>{
+  const cell=e.target.closest('.gc');
+  const row=e.target.closest('.grow');
+  if(!cell||!row||row.dataset.row==null||!T){closeContextMenu();return}
+  e.preventDefault();
+  const rIdx=+row.dataset.row,rid=T.rowIds?T.rowIds[rIdx]:null;
+  if(rid!=null&&!selection.has(rid)){
+    selection=new Set([rid]);
+    selectionAnchorPos=VIEW.order.indexOf(rIdx);
+    updateSelectionUI()
+  }
+  const items=[
+    {label:'Delete row',disabled:rid==null,action:()=>{if(rid!=null)addDropRowsStep([rid])}}
+  ];
+  if(selection.size>1){
+    items.push({label:'Delete '+fmtInt(selection.size)+' selected rows',action:()=>addDropRowsStep(Array.from(selection))});
+    items.push({label:'Keep only '+fmtInt(selection.size)+' selected rows',action:()=>addKeepRowsStep(Array.from(selection))})
+  }
+  items.push(null);
+  items.push({label:'Copy row as TSV',action:()=>copyRowAsTSV(rIdx)});
+  if(!cell.classList.contains('idx')){
+    const ci=+cell.dataset.ci,colName=T.cols[ci],valText=String(T.data[ci][rIdx]??'');
+    items.push({label:'Copy cell',action:()=>copyText(valText,'Copied cell')});
+    items.push(null);
+    items.push({label:'Filter: keep rows where "'+trunc(colName,18)+'" is "'+trunc(valText,18)+'"',
+      action:()=>addSuggestedStep('filter',{mode:'keep',match:'any',conditions:[{column:colName,op:'equals',value:valText,caseSensitive:false}]})});
+    items.push({label:'Filter: drop rows where "'+trunc(colName,18)+'" is "'+trunc(valText,18)+'"',
+      action:()=>addSuggestedStep('filter',{mode:'drop',match:'any',conditions:[{column:colName,op:'equals',value:valText,caseSensitive:false}]})});
+    items.push(null);
+    items.push({label:'Show cell history',action:()=>openLineage(cell,ci,rIdx)});
+    items.push({label:'Profile this column',action:()=>openProfile(ci,cell)})
+  }
+  openContextMenu(e.clientX,e.clientY,items)
+});
 let sedimentCache=new Map();
 function computeSedimentMap(){
   if(viewIdx===0||VIEW.sortCol>=0||VIEW.filterQuery)return null;
@@ -1912,15 +2039,21 @@ stTest('beforeunload: warns when there are unsaved pipeline steps, stays quiet w
   steps=savedSteps
 });
 
-function cycleSort(ci){
-  if(VIEW.sortCol!==ci){VIEW.sortCol=ci;VIEW.sortDir=1;renderHead();performSort()}
-  else if(VIEW.sortDir===1){VIEW.sortDir=-1;renderHead();performSort()}
-  else{
+function setSort(ci,dir){
+  if(dir===0){
     VIEW.sortCol=-1;
     VIEW.order=VIEW.filteredBase.slice();
     renderHead();
     settleView()
+  }else{
+    VIEW.sortCol=ci;VIEW.sortDir=dir;
+    renderHead();performSort()
   }
+}
+function cycleSort(ci){
+  if(VIEW.sortCol!==ci)setSort(ci,1);
+  else if(VIEW.sortDir===1)setSort(ci,-1);
+  else setSort(ci,0)
 }
 $('#ghead').addEventListener('click',e=>{
   if(e.target.closest('.rowcheck')){toggleSelectAllVisible();return}
@@ -3379,6 +3512,31 @@ function opDropColumn(t,cfg){
   t.cols.forEach((c,i)=>{if(!drop.has(i)){cols.push(c);data.push(t.data[i])}});
   return{table:{cols,data,n:t.n},stats:{removed:drop.size}}
 }
+function opDuplicateColumn(t,cfg){
+  const ci=colIdx(t.cols,cfg.column);
+  if(ci===-1)return{table:t,stats:{},warning:'Column "'+cfg.column+'" not found'};
+  let name=t.cols[ci]+' copy',n=2;
+  while(t.cols.includes(name)){name=t.cols[ci]+' copy '+n;n++}
+  return{table:{cols:[...t.cols,name],data:[...t.data,t.data[ci].slice()],n:t.n},stats:{}}
+}
+stTest('opDuplicateColumn: appends a copy with a unique auto-generated name',()=>{
+  const t={cols:['name','name copy'],data:[['A','B'],['x','y']],n:2,rowIds:identityOrder(2)};
+  const res=opDuplicateColumn(t,{column:'name'});
+  stEqual(res.table.cols,['name','name copy','name copy 2'],'should avoid colliding with the existing "name copy" column');
+  stEqual(res.table.data[2],['A','B'],'the new column should be an exact copy of the source data')
+});
+stTest('opDuplicateColumn: missing column warns instead of throwing',()=>{
+  const t={cols:['a'],data:[['x']],n:1,rowIds:identityOrder(1)};
+  const res=opDuplicateColumn(t,{column:'nope'});
+  stAssert(!!res.warning)
+});
+stTest('duplicateColumn DSL: round-trips exactly',()=>{
+  const line='duplicate column "name"';
+  const parsed=textToSteps(line);
+  stAssert(!parsed.errors.length);
+  stEqual(parsed.steps[0].cfg,{column:'name'});
+  stEqual(stepsToText(parsed.steps),line)
+});
 function opFillDown(t,cfg){
   const cols=resolveCols(t,cfg.columns);
   const data=cowColumns(t,cols);
@@ -3906,6 +4064,9 @@ const OPS={
       {key:'to',type:'text',label:'New name',default:t=>t.cols[0]}],
     describe:cfg=>'Rename "'+cfg.from+'" → "'+cfg.to+'"',apply:opRename,
     validate:cfg=>cfg.to?null:'Enter a new name'},
+  duplicateColumn:{label:'Duplicate column',keywords:'duplicate copy column clone',
+    fields:[{key:'column',type:'column',label:'Column',default:t=>t.cols[0]}],
+    describe:cfg=>'Duplicate "'+cfg.column+'"',apply:opDuplicateColumn},
   dropColumn:{label:'Drop columns',keywords:'drop remove delete column',
     fields:[{key:'columns',type:'columns',label:'Columns',allowAll:false,default:t=>[t.cols[0]]}],
     describe:cfg=>'Drop '+cfg.columns.join(', '),apply:opDropColumn,
@@ -4288,7 +4449,7 @@ const ICON_X='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke
 const STEP_TONE={
   trim:'rewrite',case:'rewrite',replace:'rewrite',dateNormalize:'rewrite',fillDown:'rewrite',fillBlank:'rewrite',cellOverride:'rewrite',infer:'rewrite',
   dropEmptyRows:'remove',dropEmptyCols:'remove',dedupe:'remove',dropColumn:'remove',filter:'remove',dropRows:'remove',keepRows:'remove',
-  split:'add',merge:'add',extract:'add',aggregate:'add',wideToLong:'add',longToWide:'add',diff:'add'
+  split:'add',merge:'add',extract:'add',aggregate:'add',wideToLong:'add',longToWide:'add',diff:'add',duplicateColumn:'add'
 };
 function categorizeStep(step){
   if(step.opId==='join')return step.cfg.type==='anti'?'remove':'add';
@@ -5105,6 +5266,7 @@ function stepToLine(st){
   if(st.opId==='dropEmptyCols')return pre+'drop empty columns';
   if(st.opId==='dedupe')return pre+'dedupe on '+dslColsToText(cfg.on);
   if(st.opId==='rename')return pre+'rename '+dslQ(cfg.from)+' -> '+dslQ(cfg.to);
+  if(st.opId==='duplicateColumn')return pre+'duplicate column '+dslQ(cfg.column);
   if(st.opId==='dropColumn')return pre+'drop columns '+cfg.columns.map(dslQ).join(', ');
   if(st.opId==='fillDown')return pre+'fill down '+dslColsToText(cfg.columns);
   if(st.opId==='fillBlank')return pre+'fill blank '+dslColsToText(cfg.columns)+' with '+dslQ(cfg.value);
@@ -5211,6 +5373,11 @@ function parseDslLine(raw,lineNo){
     const from=dslMatchQuoted(m[1]),to=dslMatchQuoted(m[2]);
     if(!from||!to)return dslErrAt(lineNo,'rename needs two quoted names');
     return dslMkStep('rename',{from:from.value,to:to.value},muted)
+  }
+  if(m=line.match(/^duplicate\s+column\s+(.+)$/)){
+    const q=dslMatchQuoted(m[1]);
+    if(!q)return dslErrAt(lineNo,'duplicate column needs a quoted column name');
+    return dslMkStep('duplicateColumn',{column:q.value},muted)
   }
   if(m=line.match(/^drop\s+columns\s+(.+)$/)){
     const cols=dslParseColsArg(m[1]);
