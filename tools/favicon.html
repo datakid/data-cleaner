@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weft favicon builder</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../css/weft.css">
+<style>
+body{overflow:auto}
+.wrap{max-width:760px;margin:48px auto;padding:0 20px;display:flex;flex-direction:column;gap:24px}
+h1{font:500 34px/1.1 var(--serif);letter-spacing:-.02em}
+.row{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-2)}
+.row figure{display:flex;flex-direction:column;align-items:center;gap:8px;font:600 11px var(--mono);color:var(--ink-mute)}
+.row canvas{image-rendering:pixelated;background:repeating-conic-gradient(var(--raised) 0 25%,transparent 0 50%) 0 0/8px 8px;border-radius:4px}
+.tab{display:flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:10px 10px 0 0;background:var(--raised);font:500 12.5px var(--sans);width:max-content}
+.dark .tab{background:#35332F;color:#EEE}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Weft favicon</h1>
+  <p class="lede" style="text-align:left">Each size is drawn separately and snapped to the pixel grid, then packed into one real <code>favicon.ico</code> (16, 32, 48 and 256 px).</p>
+  <div class="row" id="previews"></div>
+  <div class="row"><div class="tab"><img id="tabIcon" width="16" height="16" alt="">Weft: clean tables</div><div class="dark" style="padding:8px;border-radius:12px;background:#1F1E1C"><div class="tab"><img id="tabIcon2" width="16" height="16" alt="">Weft</div></div></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" id="dl" type="button">Download favicon.ico</button><button class="btn btn-secondary" id="dlpng" type="button">Download 180 px PNG (Apple touch)</button></div>
+  <p class="dlg-note" id="info"></p>
+</main>
+<script src="../js/tools/favicon-gen.js"></script>
+</body>
+</html>

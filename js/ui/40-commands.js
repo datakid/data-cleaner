@@ -1,0 +1,140 @@
+'use strict';
+const GROUPS=['File','Rows','Columns','Text','Structure','Reshape','Combine','View','Recipe','Help'];
+const Commands={
+  list:[],map:new Map(),
+  register(c){c.contexts=c.contexts||[];c.keywords=c.keywords||[];this.list.push(c);this.map.set(c.id,c)},
+  get(id){return this.map.get(id)},
+  ctx(){return{hasData:S.loaded,sel:{kind:Sel.kind,rowCount:Sel.rowCount(),colCount:Sel.colCount(),cellCount:Sel.cellCount()}}},
+  when(c,ctx){if(c.hidden&&c.hidden())return'hidden';if(!c.when)return true;try{return c.when(ctx||this.ctx())}catch(e){return e.message}},
+  visible(c){return!(c.hidden&&c.hidden())},
+  async run(id,arg){
+    const c=typeof id==='string'?this.get(id):id;if(!c)return;
+    const w=this.when(c);
+    if(w!==true){Toast.show(w);return}
+    S.recent=[c.id].concat(S.recent.filter(x=>x!==c.id)).slice(0,5);lsSet('weft.recentCommands',S.recent);
+    S.lastCmds=[c.id].concat(S.lastCmds).slice(0,5);
+    try{await c.run(arg)}catch(e){console.error(e);Toast.err('Something went wrong: '+e.message)}
+  },
+  byGroup(g){return this.list.filter(c=>c.group===g&&this.visible(c)&&!c.paletteOnly)},
+  byContext(ctx){return this.list.filter(c=>c.contexts.indexOf(ctx)!==-1&&this.visible(c))},
+  byPrefix(p){return this.list.filter(c=>c.id.indexOf(p)===0&&this.visible(c))}
+};
+const needData=ctx=>ctx.hasData?true:'Load some data first.';
+const needRows=ctx=>!ctx.hasData?'Load some data first.':ctx.sel.rowCount>0?true:'Select one or more rows first (click a row number).';
+const needCols=ctx=>!ctx.hasData?'Load some data first.':ctx.sel.colCount>0?true:'Select one or more columns first (click a column header).';
+const needOneCol=ctx=>!ctx.hasData?'Load some data first.':(Sel.focusCol()?true:'Click a column header or a cell first.');
+const needSteps=()=>S.loaded&&S.steps.length?true:'Add a step first.';
+const selStep=()=>{const i=S.viewIdx-1;return i>=0&&i<S.steps.length?i:-1};
+const needSelStep=()=>!S.loaded?'Load some data first.':selStep()>=0?true:'View a step first (click it in the recipe list).';
+const colOrSel=()=>Sel.kind==='cols'&&Sel.cols.size?Sel.selectedCols():(Sel.focusCol()?[Sel.focusCol()]:[]);
+const cfgCols=()=>{const c=colOrSel();return c.length?c:['*']};
+const R=c=>Commands.register(c);
+function opCmd(id,title,group,opId,extra){
+  R(Object.assign({id,title,group,keywords:W.OPS[opId].keywords,icon:null,when:needData,run:()=>openStepConfig(opId,extra&&extra.over?extra.over():{})},extra||{}))
+}
+
+R({id:'file.new',title:'Start over',group:'File',icon:'file',keywords:['new','clear','reset','start','blank'],description:'Clear the data and recipe and go back to the start screen.',when:()=>true,contexts:['palette'],run:async()=>{if(S.steps.length&&!(await Dialog.confirm('Start over?','This clears the data and '+plural(S.steps.length,'step')+'. Your recipe stays in autosave until you load something new.','Start over',true)))return;App.reset()}});
+R({id:'file.open',title:'Open a file…',group:'File',icon:'upload',keywords:['open','file','upload','load','import','csv'],shortcut:'Mod+O',description:'Read a CSV, TSV, JSON, log or text file from your computer.',when:()=>true,run:()=>$('#fileInput').click()});
+R({id:'file.paste',title:'Paste from clipboard',group:'File',icon:'clipboard',keywords:['paste','clipboard'],description:'Read what is on your clipboard, including copied web tables.',hidden:()=>!(navigator.clipboard&&(navigator.clipboard.read||navigator.clipboard.readText)),when:()=>true,run:()=>Input.pasteFromClipboard()});
+Object.keys(W.SAMPLES).forEach(k=>{if(k==='stress')return;const s=W.SAMPLES[k];R({id:'file.example.'+k,title:'Load example: '+s.title,group:'File',icon:'sparkle',keywords:['example','sample','demo','try',s.badge.toLowerCase()],description:s.sub,when:()=>true,run:()=>Input.loadSample(k)})});
+R({id:'file.compare',title:'Compare with another file…',group:'File',icon:'compare',keywords:['compare','diff','changes','second file'],description:'Load a second file and add a step that shows added, changed and removed rows.',when:needData,run:()=>loadReference(ref=>openStepConfig('diff',{refName:ref,cfg:{refName:ref}}))});
+
+R({id:'rows.selectAll',title:'Select all rows',group:'Rows',icon:'rows',keywords:['select','all','rows'],shortcut:'Mod+A',when:needData,contexts:['rowHeader','toolbar:Rows'],run:()=>Sel.selectAllRows()});
+R({id:'rows.clearSel',title:'Clear selection',group:'Rows',keywords:['deselect','clear','selection','none'],shortcut:'Escape',when:c=>c.hasData&&c.sel.kind!=='none'?true:'Nothing is selected.',contexts:['rowHeader','toolbar:Rows','cell'],run:()=>Sel.clear()});
+R({id:'rows.invert',title:'Invert selection',group:'Rows',keywords:['invert','swap','opposite','other rows'],when:needData,contexts:['rowHeader','toolbar:Rows'],run:()=>Sel.invertRows()});
+R({id:'rows.deleteSelected',title:'Delete selected rows',group:'Rows',icon:'trash',danger:true,keywords:['remove','drop','erase','delete','rows'],shortcut:'Delete',description:'Adds a step that removes exactly these rows.',when:needRows,contexts:['rowHeader','cell','toolbar:Rows'],run:()=>deleteSelection()});
+R({id:'rows.keepSelected',title:'Keep only selected rows',group:'Rows',icon:'rows',keywords:['keep','only','rows','isolate'],when:needRows,contexts:['rowHeader','toolbar:Rows'],run:()=>keepSelection()});
+R({id:'rows.like',title:'Remove rows like the selected ones…',group:'Rows',icon:'wand',keywords:['like','similar','these','pattern','rule','remove'],description:'Finds a rule that matches your selected rows, so it works on future files too.',when:needRows,contexts:['rowHeader','toolbar:Rows'],run:()=>likeTheseDialog()});
+R({id:'rows.removeWhere',title:'Remove rows where…',group:'Rows',icon:'filter',keywords:['remove','delete','filter','where','condition','drop'],description:'Build conditions, with a live preview of what goes.',when:needData,contexts:['toolbar:Rows','colHeader','cell'],run:()=>openStepConfig('filterRows',{mode:'remove',col:Sel.focusCol()||undefined})});
+R({id:'rows.keepWhere',title:'Keep rows where…',group:'Rows',icon:'filter',keywords:['keep','filter','where','condition','only'],when:needData,contexts:['toolbar:Rows','colHeader'],run:()=>openStepConfig('filterRows',{mode:'keep',col:Sel.focusCol()||undefined,op:'contains'})});
+R({id:'rows.removeValue',title:'Remove rows with this value',group:'Rows',icon:'filter',keywords:['remove','value','equal','same'],when:ctx=>ctx.hasData&&ctx.sel.kind==='cells'?true:'Click a cell first.',contexts:['cell'],paletteOnly:false,run:async()=>{const c=Sel.cursor;const col=curCols()[c.col];const d=Grid.rowAt(c.pos);if(!d)return;const v=d.row[c.col];await addStep('filterRows',{mode:'remove',match:'all',conditions:[v.trim()===''?{col,op:'isEmpty',caseSensitive:false}:{col,op:'equals',value:v,caseSensitive:false}]})}});
+R({id:'rows.keepValue',title:'Keep only rows with this value',group:'Rows',keywords:['keep','value','equal','same'],when:ctx=>ctx.hasData&&ctx.sel.kind==='cells'?true:'Click a cell first.',contexts:['cell'],run:async()=>{const c=Sel.cursor;const col=curCols()[c.col];const d=Grid.rowAt(c.pos);if(!d)return;const v=d.row[c.col];await addStep('filterRows',{mode:'keep',match:'all',conditions:[v.trim()===''?{col,op:'isEmpty',caseSensitive:false}:{col,op:'equals',value:v,caseSensitive:false}]})}});
+opCmd('rows.dedupe','Remove duplicate rows…','Rows','dedupe',{icon:'rows',contexts:['toolbar:Rows','colHeader'],over:()=>({cols:Sel.kind==='cols'?Sel.selectedCols():null})});
+R({id:'rows.dropEmpty',title:'Remove empty rows',group:'Rows',keywords:W.OPS.dropEmptyRows.keywords,when:needData,contexts:['toolbar:Rows'],run:()=>addStep('dropEmptyRows',{columns:['*']})});
+opCmd('rows.skip','Remove top or bottom rows…','Rows','skipRows',{contexts:['toolbar:Rows']});
+R({id:'rows.promote',title:'Use selected row as header',group:'Rows',keywords:['header','promote','names','first row'],when:ctx=>!ctx.hasData?'Load some data first.':(Sel.kind==='rows'&&Sel.rowCount()===1)||Sel.kind==='cells'?true:'Select one row first.',contexts:['rowHeader','toolbar:Rows'],run:async()=>{let pos=Sel.cursor.pos;if(Sel.kind==='rows'){const ids=Sel.rowIdsArray();const r=await Engine.call('positionOfRow',{viewKey:S.view.key,rowId:ids[0]});pos=r.pos}if(S.sort.length||S.search||S.vfilter){Toast.err('Clear the view sort and search first, so the row position is clear.');return}Sel.clear(true);await addStep('promoteHeader',{rowIndex:pos})}});
+R({id:'rows.repeatedHeaders',title:'Remove repeated header rows',group:'Rows',keywords:W.OPS.removeRepeatedHeaders.keywords,when:needData,contexts:['toolbar:Rows'],run:()=>addStep('removeRepeatedHeaders',{})});
+opCmd('rows.sort','Sort rows…','Rows','sortRows',{icon:'sortAsc',contexts:['toolbar:Rows'],over:()=>({col:Sel.focusCol()||undefined})});
+opCmd('rows.splitToRows','Split cell values into rows…','Rows','splitToRows',{contexts:['toolbar:Rows','colHeader'],over:()=>({col:Sel.focusCol()||undefined})});
+R({id:'rows.copy',title:'Copy selection',group:'Rows',icon:'copy',keywords:['copy','clipboard','tsv'],shortcut:'Mod+C',when:c=>c.hasData&&c.sel.kind!=='none'?true:'Select rows, columns or cells first.',contexts:['rowHeader','cell','colHeader'],run:()=>copySelection()});
+
+R({id:'columns.rename',title:'Rename column…',group:'Columns',icon:'pencil',keywords:['rename','header','name','title'],description:'Or double-click a column header.',when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>openStepConfig('rename',{col:Sel.focusCol()})});
+R({id:'columns.deleteSelected',title:'Delete selected columns',group:'Columns',icon:'trash',danger:true,keywords:['delete','remove','drop','columns'],shortcut:'Delete',when:needCols,contexts:['colHeader','toolbar:Columns'],run:()=>deleteSelection()});
+R({id:'columns.keepSelected',title:'Keep only selected columns',group:'Columns',keywords:['keep','only','columns','select'],when:needCols,contexts:['colHeader','toolbar:Columns'],run:()=>keepSelection()});
+R({id:'columns.duplicate',title:'Duplicate column',group:'Columns',icon:'copy',keywords:W.OPS.duplicateColumn.keywords,when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>{const c=Sel.focusCol();addStep('duplicateColumn',{column:c,as:c+'_copy'})}});
+const moveCol=async d=>{const cols=curCols();const c=Sel.focusCol();const i=cols.indexOf(c);const j=d==='left'?i-1:i+1;if(i<0||j<0||j>=cols.length){Toast.show('The column is already at the '+(d==='left'?'start':'end')+'.');return}const o=cols.slice();o.splice(i,1);o.splice(j,0,c);await addStep('reorderColumns',{order:o},{msg:'Moved "'+c+'" '+d});Sel.cursor.col=j;Sel.selectCol(c)};
+R({id:'columns.moveLeft',title:'Move column left',group:'Columns',keywords:['move','left','reorder'],shortcut:'Alt+ArrowLeft',when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>moveCol('left')});
+R({id:'columns.moveRight',title:'Move column right',group:'Columns',keywords:['move','right','reorder'],shortcut:'Alt+ArrowRight',when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>moveCol('right')});
+opCmd('columns.reorder','Move columns to…','Columns','reorderColumns',{keywords:['order','reorder','arrange','move','columns'],contexts:['toolbar:Columns']});
+['text','number','date'].forEach(t=>R({id:'columns.type.'+t,title:'Change type to '+(t==='text'?'Text':t==='number'?'Number':'Date'),group:'Columns',keywords:['type','convert',t,'format'],when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>{const c=Sel.focusCol();if(t==='text'){Toast.show('"'+c+'" is kept as text. Values are not changed.');return}openStepConfig('convertType',{col:c,to:t})}}));
+R({id:'columns.dropEmpty',title:'Remove empty columns',group:'Columns',keywords:W.OPS.dropEmptyCols.keywords,when:needData,contexts:['toolbar:Columns'],run:()=>addStep('dropEmptyCols',{})});
+opCmd('columns.fillBlank','Fill blanks…','Columns','fillBlank',{contexts:['colHeader','toolbar:Columns'],over:()=>({cols:colOrSel()})});
+R({id:'columns.fillDown',title:'Fill down',group:'Columns',keywords:W.OPS.fillDown.keywords,description:'Copy the value above into empty cells.',when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>addStep('fillDown',{columns:cfgCols()})});
+opCmd('columns.merge','Merge columns…','Columns','merge',{icon:'merge',contexts:['colHeader','toolbar:Columns'],over:()=>({cols:Sel.kind==='cols'?Sel.selectedCols():null})});
+opCmd('columns.split','Split column…','Columns','split',{icon:'split',contexts:['colHeader','toolbar:Columns'],over:()=>({col:Sel.focusCol()||undefined})});
+opCmd('columns.extract','Extract into new column…','Columns','extract',{icon:'sparkle',contexts:['colHeader','toolbar:Columns'],over:()=>({col:Sel.focusCol()||undefined})});
+R({id:'columns.parseJson',title:'Parse JSON in column',group:'Columns',keywords:['json','parse','nested','flatten'],when:needOneCol,contexts:['colHeader','toolbar:Columns'],run:()=>addStep('structureColumn',{column:Sel.focusCol(),kind:'json',params:{},into:[],keepOriginal:false})});
+R({id:'columns.profile',title:'Show column details',group:'Columns',icon:'eye',keywords:['profile','stats','details','summary','distribution'],when:needOneCol,contexts:['colHeader'],run:()=>{Inspector.show('column');Inspector.onColumn(Sel.focusCol())}});
+
+R({id:'text.trim',title:'Trim whitespace',group:'Text',icon:'text',keywords:W.OPS.trim.keywords,description:'Remove spaces at the start and end, and collapse doubled spaces.',when:needData,contexts:['colHeader','toolbar:Text'],run:()=>addStep('trim',{columns:cfgCols(),collapse:true})});
+R({id:'text.clean',title:'Clean invisible characters',group:'Text',keywords:W.OPS.cleanText.keywords,when:needData,contexts:['toolbar:Text','colHeader'],run:()=>addStep('cleanText',{columns:cfgCols(),nbsp:true,zeroWidth:true,smartQuotes:true,nfc:true,controlChars:true})});
+[['lower','lowercase'],['upper','UPPERCASE'],['title','Title Case']].forEach(m=>R({id:'text.case.'+m[0],title:'Change case to '+m[1],group:'Text',keywords:['case',m[0],'capital','letters'],when:needData,contexts:['colHeader','toolbar:Text'],run:()=>addStep('case',{columns:cfgCols(),mode:m[0]})}));
+opCmd('text.replace','Find and replace…','Text','replace',{icon:'search',shortcut:'Mod+H',contexts:['toolbar:Text','colHeader','cell'],over:()=>({cfg:{columns:cfgCols(),find:Sel.kind==='cells'&&Grid.rowAt(Sel.cursor.pos)?Grid.rowAt(Sel.cursor.pos).row[Sel.cursor.col]||'':''}})});
+R({id:'text.numbers',title:'Clean number formatting',group:'Text',keywords:['number','currency','dollar','thousands','comma','convert','clean'],description:'Turn values like $1,204.50 into 1204.5.',when:needOneCol,contexts:['toolbar:Text','colHeader'],run:()=>openStepConfig('convertType',{col:Sel.focusCol(),to:'number'})});
+opCmd('text.dates','Normalize dates…','Text','dateNormalize',{contexts:['toolbar:Text','colHeader'],over:()=>({col:Sel.focusCol()||undefined})});
+
+R({id:'structure.reading',title:'Change how the input is read…',group:'Structure',icon:'structure',keywords:['reading','parse','read as','delimiter','format','interpret','header'],description:'See every way Weft could read your text, and adjust it.',when:()=>S.loaded&&S.readings.length?true:'Load some data first.',contexts:['toolbar:Structure'],run:()=>ReadingDialog.open()});
+[['fixed-width','Split column by fixed widths…'],['whitespace-runs','Split by runs of spaces'],['key-value','Split key: value text'],['pattern','Split by pattern…'],['logfmt','Split key=value pairs']].forEach(([k,t])=>R({id:'structure.'+k,title:t,group:'Structure',keywords:W.OPS.structureColumn.keywords.concat([k]),when:needOneCol,contexts:['toolbar:Structure','colHeader'],run:()=>openStepConfig('structureColumn',{col:Sel.focusCol(),kind:k,params:k==='key-value'?{sep:':'}:{}})}));
+
+opCmd('reshape.wideToLong','Wide to long…','Reshape','wideToLong',{keywords:['wide','long','unpivot','melt','columns to rows'],contexts:['toolbar:Reshape'],over:()=>({cols:Sel.kind==='cols'?Sel.selectedCols():null})});
+opCmd('reshape.longToWide','Long to wide…','Reshape','longToWide',{keywords:['long','wide','pivot','rows to columns'],contexts:['toolbar:Reshape']});
+opCmd('reshape.aggregate','Group and summarize…','Reshape','aggregate',{icon:'reshape',contexts:['toolbar:Reshape','colHeader'],over:()=>({cols:colOrSel()})});
+
+R({id:'combine.loadRef',title:'Load reference file…',group:'Combine',icon:'upload',keywords:['reference','lookup','second file','load'],description:'Load a second file to join with or compare against.',when:needData,contexts:['toolbar:Combine'],run:()=>loadReference()});
+R({id:'combine.join',title:'Join with reference…',group:'Combine',icon:'combine',keywords:W.OPS.join.keywords,when:ctx=>!ctx.hasData?'Load some data first.':S.refs.length?true:'Load a reference file first.',contexts:['toolbar:Combine'],run:()=>openStepConfig('join',{refName:S.refs[S.refs.length-1].name,cfg:{refName:S.refs[S.refs.length-1].name}})});
+R({id:'combine.diff',title:'Compare with reference (diff)…',group:'Combine',icon:'compare',keywords:W.OPS.diff.keywords,when:ctx=>!ctx.hasData?'Load some data first.':S.refs.length?true:'Load a reference file first.',contexts:['toolbar:Combine'],run:()=>openStepConfig('diff',{refName:S.refs[S.refs.length-1].name,cfg:{refName:S.refs[S.refs.length-1].name}})});
+R({id:'combine.checkDrift',title:'Check this file against the saved shape',group:'Combine',keywords:['drift','contract','shape','check','schema'],description:'Compare this data with the shape saved alongside a recipe.',when:()=>!S.loaded?'Load some data first.':S.contract?true:'Save or open a recipe that includes a data shape first.',contexts:['toolbar:Combine'],run:()=>checkDrift()});
+
+R({id:'view.search',title:'Search rows',group:'View',icon:'search',keywords:['search','find','filter','look'],shortcut:'Mod+F',when:needData,contexts:['toolbar:View'],run:()=>{const i=$('#searchInput');i.focus();i.select()}});
+R({id:'view.sortAsc',title:'Sort view by this column, ascending',group:'View',icon:'sortAsc',keywords:['sort','ascending','view','order'],when:needOneCol,contexts:['colHeader','toolbar:View'],run:()=>setViewSort(Sel.focusCol(),'asc')});
+R({id:'view.sortDesc',title:'Sort view by this column, descending',group:'View',icon:'sortDesc',keywords:['sort','descending','view','order'],when:needOneCol,contexts:['colHeader','toolbar:View'],run:()=>setViewSort(Sel.focusCol(),'desc')});
+R({id:'view.sortClear',title:'Clear view sort',group:'View',keywords:['sort','clear','unsort','original order'],when:()=>S.loaded&&S.sort.length?true:'The view is not sorted.',contexts:['colHeader','toolbar:View'],run:()=>setViewSort(null,null)});
+R({id:'view.sortToStep',title:'Make view sort a step',group:'View',keywords:['sort','step','permanent','save sort'],when:()=>S.loaded&&S.sort.length?true:'Sort the view first (column menu ▸ Sort).',contexts:['toolbar:View','colHeader'],run:async()=>{const keys=S.sort.map(k=>({col:k.col,dir:k.dir,type:'auto'}));S.sort=[];await addStep('sortRows',{keys})}});
+R({id:'view.searchToStep',title:'Make search a step',group:'View',keywords:['search','filter','step','keep'],when:()=>S.loaded&&S.search.trim()?true:'Type in the search box first.',contexts:['toolbar:View'],run:async()=>{const q=S.search.trim();S.search='';$('#searchInput').value='';await addStep('filterRows',{mode:'keep',match:'all',conditions:q.split(/\s+/).map(t=>({col:'*',op:'contains',value:t,caseSensitive:false}))})}});
+R({id:'view.whitespace',title:'Show whitespace',group:'View',icon:'eye',keywords:['whitespace','spaces','invisible','show','tabs'],checked:()=>S.showWs,when:needData,contexts:['toolbar:View'],run:()=>{S.showWs=!S.showWs;Prefs.set('showWs',S.showWs);$('#wsToggle').checked=S.showWs;Grid.pool.forEach(r=>r.key='');Grid.paint()}});
+[['comfortable','Comfortable'],['standard','Standard'],['compact','Compact']].forEach(d=>R({id:'view.density.'+d[0],title:'Row density: '+d[1],group:'View',keywords:['density','row height','compact','spacing'],checked:()=>(Prefs.get('density','standard'))===d[0],when:()=>true,contexts:['toolbar:View'],run:()=>{Prefs.set('density',d[0]);document.documentElement.setAttribute('data-density',d[0]);if(S.loaded)Grid.reset(true)}}));
+R({id:'view.rail',title:'Show or hide the recipe panel',group:'View',icon:'panelLeft',keywords:['recipe','panel','steps','sidebar','toggle'],when:needData,contexts:['toolbar:View'],run:()=>Panels.toggle('rail')});
+R({id:'view.inspector',title:'Show or hide the inspector',group:'View',icon:'panelRight',keywords:['inspector','suggestions','panel','details','toggle'],when:needData,contexts:['toolbar:View'],run:()=>Panels.toggle('inspector')});
+[['system','System'],['light','Light'],['dark','Dark']].forEach(t=>R({id:'view.theme.'+t[0],title:'Theme: '+t[1],group:'View',icon:'sun',keywords:['theme','dark','light','mode','appearance'],checked:()=>Prefs.get('theme','system')===t[0],when:()=>true,contexts:['toolbar:View'],run:()=>{Prefs.set('theme',t[0]);if(t[0]==='system')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t[0])}}));
+[['mdy','Month/day (3/4 = March 4)'],['dmy','Day/month (3/4 = 3 April)']].forEach(d=>R({id:'view.dates.'+d[0],title:'Date order: '+d[1],group:'View',keywords:['date','order','day','month','ambiguous','dmy','mdy'],checked:()=>S.dateOrder===d[0],when:()=>true,contexts:['toolbar:View'],run:async()=>{S.dateOrder=d[0];Prefs.set('dateOrder',d[0]);const r=await Engine.call('setCtx',{dateOrder:d[0]});if(S.loaded&&r.stepsMeta){S.meta=r.stepsMeta;S.states=r.states;await refreshView(true);Rail.render();Inspector.refresh(true)}Toast.show('Ambiguous dates are now read as '+(d[0]==='dmy'?'day/month':'month/day')+'.')}}));
+
+R({id:'recipe.undo',title:'Undo',group:'Recipe',icon:'undo',keywords:['undo','back','revert'],shortcut:'Mod+Z',when:()=>S.undo.length?true:'Nothing to undo.',contexts:['toolbar'],run:()=>doUndo()});
+R({id:'recipe.redo',title:'Redo',group:'Recipe',icon:'redo',keywords:['redo','again'],shortcut:'Mod+Shift+Z',when:()=>S.redo.length?true:'Nothing to redo.',contexts:['toolbar'],run:()=>doRedo()});
+R({id:'recipe.add',title:'Add step…',group:'Recipe',icon:'plus',keywords:['add','step','new','operation'],when:needData,run:()=>Palette.open('')});
+R({id:'recipe.edit',title:'Edit selected step',group:'Recipe',icon:'pencil',keywords:['edit','change','step','settings'],when:needSelStep,run:()=>editStep(selStep())});
+R({id:'recipe.mute',title:'Mute or unmute step',group:'Recipe',icon:'eyeOff',keywords:['mute','disable','skip','toggle','step'],when:needSelStep,run:()=>Rail.toggleMute(selStep())});
+R({id:'recipe.delete',title:'Delete step',group:'Recipe',icon:'trash',danger:true,keywords:['delete','remove','step'],when:needSelStep,run:()=>Rail.remove(selStep())});
+R({id:'recipe.up',title:'Move step up',group:'Recipe',keywords:['move','up','reorder','step'],shortcut:'Alt+ArrowUp',when:()=>selStep()>0?true:'View a step that is not first.',run:()=>Rail.move(selStep(),-1)});
+R({id:'recipe.down',title:'Move step down',group:'Recipe',keywords:['move','down','reorder','step'],shortcut:'Alt+ArrowDown',when:()=>selStep()>=0&&selStep()<S.steps.length-1?true:'View a step that is not last.',run:()=>Rail.move(selStep(),1)});
+R({id:'recipe.viewOriginal',title:'View original data',group:'Recipe',keywords:['original','source','before','raw'],when:needData,run:()=>setViewIdx(0)});
+R({id:'recipe.viewFinal',title:'View final result',group:'Recipe',keywords:['final','result','end','after'],when:needData,run:()=>setViewIdx(S.steps.length)});
+R({id:'recipe.save',title:'Save recipe…',group:'Recipe',icon:'save',keywords:['save','recipe','pipeline','library','store'],shortcut:'Mod+S',description:'Keep this recipe in your library to reuse on the next file.',when:needSteps,run:()=>Recipes.saveDialog()});
+R({id:'recipe.library',title:'Recipe library…',group:'Recipe',icon:'library',keywords:['library','saved','recipes','pipelines','open'],description:'Apply, rename or delete saved recipes.',when:()=>true,run:()=>Recipes.libraryDialog()});
+R({id:'recipe.share',title:'Copy share link',group:'Recipe',icon:'link',keywords:['share','link','url','send'],description:'The link carries only the steps, never your data.',when:needSteps,run:()=>Recipes.share()});
+R({id:'recipe.download',title:'Download recipe file',group:'Recipe',icon:'download',keywords:['download','recipe','file','export','save'],when:needSteps,run:()=>Recipes.download()});
+R({id:'recipe.import',title:'Import recipe file…',group:'Recipe',icon:'upload',keywords:['import','recipe','file','open','load'],when:()=>true,run:()=>$('#recipeInput').click()});
+R({id:'recipe.text',title:'Edit recipe as text',group:'Recipe',icon:'recipe',keywords:['text','dsl','code','edit','recipe','script'],when:needData,run:()=>openRecipeText()});
+R({id:'recipe.remember',title:'Remember my data in this browser',group:'Recipe',keywords:['remember','store','persist','keep data','save data'],checked:()=>!!Prefs.get('rememberData',false),description:'Keeps the last file in this browser (up to 50 MB) so it is still here after a reload.',when:()=>true,run:()=>{const v=!Prefs.get('rememberData',false);Prefs.set('rememberData',v);if(v){Session.saveData();Toast.show('Your data will be kept in this browser until you choose Forget stored data.')}else{DataStore.clear();Toast.show('Your data will no longer be kept in this browser.')}}});
+R({id:'recipe.forget',title:'Forget stored data',group:'Recipe',danger:true,keywords:['forget','delete','stored','clear','privacy'],when:()=>true,run:async()=>{await DataStore.clear();Prefs.set('rememberData',false);Toast.show('Stored data removed from this browser.')}});
+
+R({id:'file.export',title:'Export…',group:'File',icon:'download',keywords:['export','download','save','csv','json','excel','copy'],shortcut:'Mod+E',description:'Download or copy the result as CSV, TSV, JSON, Markdown and more.',when:needData,run:()=>ExportDialog.open()});
+R({id:'file.copyAll',title:'Copy result for a spreadsheet',group:'File',icon:'copy',keywords:['copy','spreadsheet','excel','sheets','tsv','clipboard'],shortcut:'Mod+Shift+C',when:needData,run:async()=>{const r=await Engine.call('export',{scope:'final',format:'tsv',options:{header:true}});copyText(r.text,'Copied '+plural(r.rows,'row')+'. Paste into any spreadsheet.')}});
+
+R({id:'help.keys',title:'Keyboard shortcuts',group:'Help',icon:'keyboard',keywords:['keyboard','shortcuts','keys','hotkeys','help'],shortcut:'?',when:()=>true,run:()=>HelpSheet.open()});
+R({id:'help.what',title:'What can Weft do?',group:'Help',icon:'help',keywords:['help','features','capabilities','what','guide'],when:()=>true,run:()=>HelpSheet.open(true)});
+R({id:'help.tips',title:'Show the getting-started tips',group:'Help',keywords:['tips','tutorial','onboarding','intro'],when:needData,run:()=>{lsSet('weft.tips.v1',false);Coach.show()}});
+R({id:'help.stress',title:'Load performance test (200,000 rows)',group:'Help',keywords:['performance','stress','big','large','test'],when:()=>true,run:()=>Input.loadSample('stress')});
+R({id:'help.selftest',title:'Run self-test',group:'Help',keywords:['test','self-test','check','diagnostics'],when:()=>true,run:()=>{location.href='tests.html'}});
+R({id:'palette.open',title:'Open commands',group:'Help',icon:'command',keywords:['commands','palette','search','actions'],shortcut:'Mod+K',when:()=>true,paletteOnly:true,run:()=>Palette.open()});
+
+function fmtShortcut(s){if(!s)return'';return s.replace('Mod+',isMac?'⌘':'Ctrl ').replace('Shift+',isMac?'⇧':'Shift ').replace('Alt+',isMac?'⌥':'Alt ').replace('ArrowLeft','←').replace('ArrowRight','→').replace('ArrowUp','↑').replace('ArrowDown','↓').replace('Escape','Esc').replace('Delete','Del')}
