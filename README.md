@@ -52,8 +52,17 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 - **Recipe as text:** edit the recipe as text, one step per line, with error messages per line.
 - **Autosave:** the recipe autosaves. Keeping the data itself in the browser (IndexedDB, up to 50 MB) is optional and off by default.
 
+### Excel
+- Opens .xlsx, .xlsm, .xlsb, .xls and .ods files using SheetJS 0.20.3 (`vendor/xlsx.full.min.js`). The library loads only when an Excel file is opened or exported, so startup is unaffected.
+- Multi-sheet workbooks ask which sheet to clean. Merged cells are reported.
+- "Download as Excel workbook" (and the Excel option in Export) writes numbers and ISO dates as real Excel values, freezes the header row, turns on filters and sizes the columns. Text that starts with = + - @ is stored as text, so no formulas are ever created.
+- Reference files for join and compare can also be Excel files.
+
+### Performance
+Help ▸ Measure performance times reading, trimming, sorting, filtering, searching, scrolling and undo on 200,000 generated rows, checks each against its budget, and reports page freezes (long tasks). "Copy report" gives a text summary.
+
 ### Output
-Export as CSV, TSV, JSON records, JSON columns, NDJSON, Markdown or plain lines. You choose the rows (final result, current view, or selected rows) and the columns. Options include formula-injection protection, an Excel-friendly mode (BOM and Windows line endings), and "Copy for spreadsheet".
+Export as Excel (.xlsx), CSV, TSV, JSON records, JSON columns, NDJSON, Markdown or plain lines. You choose the rows (final result, current view, or selected rows) and the columns. Options include formula-injection protection, an Excel-friendly mode (BOM and Windows line endings), and "Copy for spreadsheet".
 
 ### Interface
 - **Commands:** a palette (Ctrl/⌘K) with search that allows typos and understands synonyms ("delete" finds "remove", "unpivot" finds "wide to long"). It lists every command, and disabled ones show the reason.
@@ -72,6 +81,9 @@ Warm ivory paper with clay as the accent, and ochre, sage, slate and rose as sec
 ## Project structure
 ```
 index.html  tests.html  ui-test.html  favicon.svg
+vendor/xlsx.full.min.js      SheetJS 0.20.3, loaded only when needed
+tools/favicon.html           builds favicon.ico and the Apple touch PNG
+fonts/                       Instrument Serif (to be added)
 css/weft.css                 design tokens + components
 js/theme.js                  applies the saved theme before first paint
 js/worker.js                 Web Worker host (importScripts core)
@@ -88,3 +100,28 @@ js/tests/*.js                fixtures, engine tests, UI drive test
   - `weft.prefs.v1`: settings.
   - `weft.recentCommands`, `weft.tips.v1`.
 - **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data".
+
+## Measured performance
+Run in the preview browser with the background engine on, 50,000 rows (4.6 MB):
+
+| Action | Time | Budget |
+|---|---|---|
+| Read and detect | 2.5 s | 3 s |
+| Trim all columns | 0.37–0.46 s | 0.6 s |
+| Sort as a step | 0.25–0.32 s | 0.9 s |
+| Filter rows | 0.29–0.36 s | 0.9 s |
+| Search | 0.15–0.21 s | 0.25 s |
+| Fetch a page while scrolling | 12–16 ms | 100 ms |
+| Undo | 0.15–0.23 s | 0.6 s |
+
+Open issue: the page registered several 100–285 ms freezes. Weft's own main-thread code accounts for at most 52 ms of that (the grid reset); the rest could not be traced in this shared test browser. Run Help ▸ Measure performance on a real machine to confirm. The full 200,000-row run could not complete in the preview browser.
+
+## Not yet done
+`index.html` already links these files; they just need to be copied in:
+- `favicon.ico` in the project root: generate it with `tools/favicon.html` (or decode `tools/ico.b64.txt`).
+- `fonts/InstrumentSerif-Regular.ttf` and `fonts/InstrumentSerif-Italic.ttf`.
+
+## Next steps
+1. Try it with your own messy files and tune the detectors on any that are misread.
+2. More sample-paste tests (bank statements, PDF invoices).
+3. An optional build step that bundles everything into one HTML file.

@@ -152,6 +152,11 @@ function buildExport(p){
   }else if(fmt==='lines'){
     if(header&&cols.length>1)push(cols.join(' ')+eol);
     for(let i=0;i<pos.length;i++)push(row(pos[i]).join(cols.length>1?' ':'')+eol)
+  }else if(fmt==='xlsx'){
+    const types=W.typesOf(t,E.ctx);
+    const loc=ci.map(c=>{const sm=[];for(let r=0;r<t.n&&sm.length<300;r++){const v=t.data[c][r];if(v)sm.push(v)}return W.detectNumberLocale(sm)});
+    const rows=new Array(pos.length);for(let i=0;i<pos.length;i++)rows[i]=row(pos[i]);
+    push(JSON.stringify({cols,rows,types:ci.map(c=>types[c]),locales:loc}))
   }else throw new Error('Unknown format "'+fmt+'".');
   chunks.push(buf);
   const text=chunks.join('');

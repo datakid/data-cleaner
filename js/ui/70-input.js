@@ -60,7 +60,14 @@ const Input={
     if(!f)return;
     if(f.size>300e6){this.showErr('That file is '+fmtBytes(f.size)+'. Weft cannot open files over 300 MB in a browser tab.');return}
     if(f.size>50e6&&!(await Dialog.confirm('Open a large file?','"'+f.name+'" is '+fmtBytes(f.size)+'. Reading it may take a while and use a lot of memory.','Open it')))return;
-    if(/\.(xlsx|xls|numbers|pdf|docx|zip|png|jpe?g)$/i.test(f.name)){this.showErr('Weft reads text files (CSV, TSV, JSON, logs, plain text). For '+f.name.split('.').pop().toUpperCase()+' files, copy the table and paste it here instead.');return}
+    if(Xlsx.isExcel(f.name)){
+      let r;try{r=await Xlsx.readFile(f)}catch(e){this.showErr(e.message);return}
+      if(!r)return;
+      await this.loadText(r.text,f.name+(r.sheets>1?' ▸ '+r.sheet:''));
+      if(r.merges)Toast.show('The sheet had '+plural(r.merges,'merged cell')+'. Only the top-left cell of each keeps its value; use Fill down to repeat it.');
+      return
+    }
+    if(/\.(pdf|docx|zip|png|jpe?g|gif)$/i.test(f.name)){this.showErr('Weft reads spreadsheets and text files (Excel, CSV, TSV, JSON, logs, plain text). For '+f.name.split('.').pop().toUpperCase()+' files, copy the table and paste it here instead.');return}
     let text;try{text=await f.text()}catch(e){this.showErr('Could not read the file: '+e.message);return}
     if(/\.weft\.txt$/i.test(f.name)||/^#\s*(weft|sift) recipe v\d/i.test(text.slice(0,40))){applyRecipeText(text,{name:f.name});return}
     if(/\.html?$/i.test(f.name))return this.loadText('',f.name,text);

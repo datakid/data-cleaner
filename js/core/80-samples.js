@@ -123,5 +123,6 @@ W.SAMPLES={
   json:{title:'API JSON',badge:'JSON',tone:'reshape',sub:'26 orders · nested customers and items',file:'orders.json',make:()=>({text:nested()})},
   stress:{title:'Performance test (200,000 rows)',badge:'CSV',tone:'rewrite',sub:'200,000 invoices',file:'stress-200k.csv',make:()=>({text:vendor(200000,990001,false)})}
 };
+W.makeStress=function(n){return{text:vendor(n,990001,false),fileName:'stress-'+n+'.csv'}};
 W.makeSample=function(kind){const s=W.SAMPLES[kind];if(!s)throw new Error('Unknown example "'+kind+'".');const r=s.make();r.fileName=s.file;r.title=s.title;return r};
 })(typeof self!=='undefined'?self:globalThis);

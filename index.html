@@ -8,7 +8,10 @@
 <meta name="description" content="Paste CSV, logs, copied web tables, contact lists or JSON. Weft detects the columns, shows how it read them, and lets you clean rows and columns step by step. Runs entirely in your browser.">
 <meta name="theme-color" content="#F5F2EA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1F1E1C" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preload" href="fonts/InstrumentSerif-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="fonts/InstrumentSerif-Italic.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="css/weft.css">
 <script src="js/theme.js"></script>
 </head>
@@ -123,8 +126,8 @@
 <div class="drop-overlay" id="dropOverlay" aria-hidden="true"><img src="favicon.svg" alt=""><b>Drop to read this file</b><span id="dropName" style="font:500 13px var(--mono);color:var(--ink-dim)"></span></div>
 <div class="toast-root" id="toastRoot" aria-live="polite"></div>
 <div id="srAnnounce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-<input type="file" id="fileInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,.log,.md,.html,.htm,.tab,.dat,text/*,application/json">
-<input type="file" id="refInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,.log,text/*,application/json">
+<input type="file" id="fileInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,.log,.md,.html,.htm,.tab,.dat,.xlsx,.xlsm,.xlsb,.xls,.ods,text/*,application/json">
+<input type="file" id="refInput" hidden accept=".csv,.tsv,.txt,.json,.ndjson,.log,.xlsx,.xls,.ods,text/*,application/json">
 <input type="file" id="recipeInput" hidden accept=".txt,.weft,text/plain">
 
 <script src="js/core/00-util.js"></script>
@@ -154,6 +157,8 @@
 <script src="js/ui/55-inspector.js"></script>
 <script src="js/ui/60-reading.js"></script>
 <script src="js/ui/65-export-recipes.js"></script>
+<script src="js/ui/68-xlsx.js"></script>
+<script src="js/ui/75-perf.js"></script>
 <script src="js/ui/70-input.js"></script>
 <script src="js/ui/90-app.js"></script>
 </body>

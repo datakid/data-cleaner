@@ -49,10 +49,45 @@ async function run(){
     if(curCols().indexOf('level')!==-1){await addStep('filterRows',{mode:'remove',match:'all',conditions:[{col:'level',op:'equals',value:'DEBUG',caseSensitive:false}]});await addStep('sortRows',{keys:[{col:'timestamp',dir:'desc',type:'auto'}]});ok('log steps',S.steps.length===2&&!S.meta.some(m=>m.error))}
     await Input.loadSample('web');ok('web table',S.reading.kind==='html-table',curCols().join('|')+' '+S.baseSchema.n);
     await Input.loadSample('json');ok('json',S.reading.kind==='json',S.baseSchema.n+' rows');
+    try{
+      const X=await Xlsx.load();ok('xlsx library loads under CSP',!!X.utils,X.version);
+      await Input.loadSample('vendor');
+      const r=await Engine.call('export',{scope:'final',format:'xlsx',options:{header:true}});
+      const d=JSON.parse(r.text);
+      const ws=X.utils.aoa_to_sheet([d.cols].concat(d.rows));const wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,'T');
+      const bin=X.write(wb,{type:'array',bookType:'xlsx'});
+      ok('xlsx write',bin.byteLength>1000,bin.byteLength+' bytes');
+      const f=new File([bin],'roundtrip.xlsx');
+      const back=await Xlsx.readFile(f);
+      await Input.loadText(back.text,'roundtrip.xlsx');
+      ok('xlsx round-trip',S.baseSchema.n===d.rows.length+1||S.baseSchema.n===d.rows.length,S.reading.label+' '+S.baseSchema.n+' vs '+d.rows.length+' '+curCols().slice(0,3).join('|'));
+      const types=d.types;ok('xlsx typed export info',types.length===d.cols.length,types.join(','))
+    }catch(e){ok('xlsx',false,e.message)}
     let blocked=false;try{await fetch('data:,x')}catch(e){blocked=true}ok('csp blocks fetch',blocked);
   }catch(e){log('ERROR '+e.message+' '+e.stack)}
   const f=results.filter(r=>!r[1]);log('DONE '+(results.length-f.length)+'/'+results.length);
   if(mode==='shot'){}
 }
-if(mode!=='none')setTimeout(run,300);
+const PROF={};
+function wrap(obj,name,label){const f=obj[name];if(typeof f!=='function')return;obj[name]=function(){const t=performance.now();const r=f.apply(this,arguments);const done=()=>{const d=performance.now()-t;const p=PROF[label]||(PROF[label]={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d};if(r&&typeof r.then==='function'){const t2=performance.now()-t;const p=PROF[label+' (sync part)']||(PROF[label+' (sync part)']={n:0,max:0,sum:0});p.n++;p.sum+=t2;if(t2>p.max)p.max=t2}else done();return r}}
+async function perf(){
+  [[Grid,'reset','Grid.reset'],[Grid,'paint','Grid.paint'],[Grid,'autoFit','Grid.autoFit'],[Grid,'renderHead','Grid.renderHead'],[Rail,'render','Rail.render'],[Inspector,'renderIssues','Inspector.renderIssues'],[Status,'render','Status.render'],[ReadingBar,'render','ReadingBar.render'],[Scrub,'render','Scrub.render'],[Toolbar,'render','Toolbar.render'],[window,'cleanSteps','cleanSteps'],[Session,'save','Session.save'],[App,'showWorkspace','App.showWorkspace'],[W,'makeStress','makeStress'],[JSON,'parse','JSON.parse'],[JSON,'stringify','JSON.stringify']].forEach(a=>wrap(a[0],a[1],a[2]));
+  const om=Engine.worker&&Engine.worker.onmessage;
+  for(let i=0;i<200&&Engine.mode==='none';i++)await wait(50);
+  if(Engine.worker){const orig=Engine.worker.onmessage;Engine.worker.onmessage=function(e){const t=performance.now();orig.call(this,e);const d=performance.now()-t;const p=PROF['worker message handler']||(PROF['worker message handler']={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d}}
+  const po=Engine.worker&&Engine.worker.postMessage.bind(Engine.worker);
+  if(po)Engine.worker.postMessage=function(m){const t=performance.now();po(m);const d=performance.now()-t;const p=PROF['postMessage '+m.type]||(PROF['postMessage '+m.type]={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d};
+  log('PERF engine '+Engine.mode);
+  const t0=performance.now();
+  const n=+(document.title.match(/\[perf(\d+)?\]/)[1]||200000);
+  try{await Perf.run(n)}catch(e){log('PERF ERROR '+e.message);return}
+  const p=window.WEFT_PERF;if(!p){log('PERF no result');return}
+  p.rows.forEach(r=>log('PERF '+(r.ms<=r.budget?'OK   ':'OVER ')+Math.round(r.ms)+'ms / '+r.budget+'ms  '+r.label));
+  (Perf.longTasks||[]).forEach(t=>log('PERF long task '+t.d+'ms during: '+t.phase));
+  log('PERF longest freeze '+Math.round(p.info.worst)+'ms, long tasks '+p.info.longCount+', supported '+p.info.supported);
+  log('PERF total '+Math.round(performance.now()-t0)+'ms, final rows '+finalN());
+  Object.keys(PROF).map(k=>[k,PROF[k]]).sort((a,b)=>b[1].max-a[1].max).slice(0,14).forEach(([k,p])=>log('PROF '+k+': max '+Math.round(p.max)+'ms, total '+Math.round(p.sum)+'ms, calls '+p.n))
+}
+if(/\[perf\d*\]/.test(document.title))setTimeout(perf,4000);
+else if(mode!=='none')setTimeout(run,300);
 })();

@@ -5,7 +5,7 @@ const ExportDialog={
     const rowSel=Sel.kind==='rows'&&Sel.rowCount()>0;const colSel=Sel.kind==='cols'&&Sel.cols.size>0;
     const st={format:'csv',scope:rowSel?'selected':'final',cols:colSel?'selected':'all',header:true,guard:true,excel:false,name:''};
     const base=(S.file||'').replace(/\.[^.]+$/,'')||'weft-export';
-    const EXT={csv:'csv',tsv:'tsv',json:'json',jsoncols:'json',ndjson:'ndjson',md:'md',lines:'txt'};
+    const EXT={xlsx:'xlsx',csv:'csv',tsv:'tsv',json:'json',jsoncols:'json',ndjson:'ndjson',md:'md',lines:'txt'};
     const fname=h('input',{class:'input',style:{width:'100%'}});
     const setName=()=>{if(!st.nameTouched)fname.value=(S.file?base+'-clean':'weft-export')+'.'+EXT[st.format]};
     fname.addEventListener('input',()=>{st.nameTouched=true});
@@ -20,22 +20,26 @@ const ExportDialog={
       scopeBox.append(radio('scope','final','Final result ('+plural(fin,'row')+')',null,st.scope==='final',v=>st.scope=v));
       if(viewDiffers){const bits=[];if(!atEnd())bits.push(S.viewIdx===0?'original data':'at step '+S.viewIdx);if(S.search)bits.push('filtered by search');if(S.vfilter)bits.push('showing '+S.vfilter.label);if(S.sort.length)bits.push('sorted by '+S.sort[0].col);scopeBox.append(radio('scope','view','Current view ('+plural(S.view.n,'row')+')',bits.join(', '),st.scope==='view',v=>st.scope=v))}
       if(rowSel)scopeBox.append(radio('scope','selected','Selected rows ('+fmtInt(Sel.rowCount())+')',null,st.scope==='selected',v=>st.scope=v));
-      guardBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));excelBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
+      guardBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
+      xlNote.classList.toggle('hidden',st.format!=='xlsx');excelBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
       setName();
       const n=st.scope==='final'?finalN():st.scope==='view'?S.view.n:Sel.rowCount();
       summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?Sel.cols.size:(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
     };
-    const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;refresh()}},[['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0]},o[1])));
+    const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;refresh()}},[['xlsx','Excel workbook (.xlsx)'],['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0]},o[1])));
+    const xlNote=h('p',{class:'hint hidden',style:{marginTop:'-6px'}},'Numbers and ISO dates are stored as real Excel values. The header row is frozen with filters turned on. Formulas are never created.');
     const body=h('div',{class:'dlg-body'},
-      h('div',{class:'field'},h('label',{},'Format'),fmtSel),
+      h('div',{class:'field'},h('label',{},'Format'),fmtSel,xlNote),
       h('div',{class:'field'},h('span',{class:'flabel'},'Rows'),scopeBox),
       colSel?h('div',{class:'field'},h('span',{class:'flabel'},'Columns'),radio('cols','all','All columns',null,st.cols==='all',v=>st.cols=v),radio('cols','selected','Selected columns ('+Sel.cols.size+')',Sel.selectedCols().join(', '),st.cols==='selected',v=>st.cols=v)):null,
       h('div',{class:'field'},h('span',{class:'flabel'},'Options'),h('label',{class:'check'},h('input',{type:'checkbox',checked:st.header,onchange:e=>{st.header=e.target.checked}}),'Include header row'),guardBox,excelBox),
       h('div',{class:'field'},h('label',{},'File name'),fname));
     const build=()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'&&st.scope!=='final'?Sel.selectedCols():(st.cols==='selected'?Sel.selectedCols():null),format:st.format,options:{header:st.header,formulaGuard:st.guard,excel:st.excel}});
     const d=Dialog.open({title:'Export',body,foot:[summary,
-      h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:st.format==='csv'?'tsv':st.format,options:{header:st.header,formulaGuard:false}}));const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(st.format==='csv'||st.format==='tsv'?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),st.format==='csv'||st.format==='tsv'?'Copy for spreadsheet':'Copy'),
-      h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{const r=await Busy.run('Building file',build);const mime={csv:'text/csv',tsv:'text/tab-separated-values',json:'application/json',jsoncols:'application/json',ndjson:'application/x-ndjson',md:'text/markdown',lines:'text/plain'}[st.format];downloadText(fname.value.trim()||'weft-export.'+EXT[st.format],r.text,mime);Toast.show('Downloaded '+plural(r.rows,'row')+' ('+fmtBytes(r.bytes)+')');d.close(true)}},icon('download',16),'Download')]});
+      h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:(st.format==='csv'||st.format==='xlsx')?'tsv':st.format,options:{header:st.header,formulaGuard:false}}));const sp=st.format==='csv'||st.format==='tsv'||st.format==='xlsx';const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(sp?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),'Copy'),
+      h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{
+        if(st.format==='xlsx'){try{const r=await Busy.run('Building workbook',build);await Xlsx.write(r,fname.value.trim()||'weft-export.xlsx',(S.file||'Weft').replace(/\.[^.]+$/,''));Toast.show('Downloaded '+plural(r.rows,'row')+' as an Excel workbook');d.close(true)}catch(e){Toast.err('Could not build the workbook: '+e.message)}return}
+        const r=await Busy.run('Building file',build);const mime={csv:'text/csv',tsv:'text/tab-separated-values',json:'application/json',jsoncols:'application/json',ndjson:'application/x-ndjson',md:'text/markdown',lines:'text/plain'}[st.format];downloadText(fname.value.trim()||'weft-export.'+EXT[st.format],r.text,mime);Toast.show('Downloaded '+plural(r.rows,'row')+' ('+fmtBytes(r.bytes)+')');d.close(true)}},icon('download',16),'Download')]});
     refresh()
   }
 };
@@ -194,7 +198,9 @@ async function loadReference(after){
   inp.onchange=async()=>{
     const f=inp.files[0];inp.value='';if(!f)return;
     if(f.size>300e6){Toast.err('That file is larger than 300 MB. Weft cannot open files that big in a browser tab.');return}
-    const text=await f.text();
+    let text;
+    if(Xlsx.isExcel(f.name)){try{const x=await Xlsx.readFile(f);if(!x)return;text=x.text}catch(e){Toast.err(e.message);return}}
+    else text=await f.text();
     try{const r=await Busy.run('Reading reference file',()=>Engine.call('refLoad',{text,name:f.name}));S.refs=(await Engine.call('refList',{})).refs;Toast.show('Loaded reference "'+r.name+'" · '+plural(r.n,'row')+' × '+plural(r.cols.length,'column'));if(after)after(r.name)}
     catch(e){Toast.err('Could not read the reference file: '+e.message)}
   };

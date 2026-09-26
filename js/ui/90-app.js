@@ -64,7 +64,7 @@ async function boot(){
   App.renderExamples();App.renderSession();
   $('#cmdHint').textContent=MOD+'K';$('#searchHint').textContent=MOD+'F';$('#pasteHint').textContent='or press '+MOD+'V anywhere';
   $('#btnCommands').addEventListener('click',()=>Palette.open());
-  $('#stressLink').addEventListener('click',()=>Input.loadSample('stress'));
+  $('#stressLink').addEventListener('click',()=>Perf.run());
   $('#btnExport').addEventListener('click',()=>Commands.run('file.export'));
   $('#btnNew').addEventListener('click',()=>Commands.run('file.new'));
   $('#btnHelp').addEventListener('click',()=>Commands.run('help.keys'));
