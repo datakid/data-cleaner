@@ -209,6 +209,15 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 .gfoot{flex:none;display:flex;align-items:center;justify-content:space-between;padding:7px 18px;border-top:1px solid var(--border);background:var(--surface);font:600 11px var(--mono);color:var(--ink-mute)}
 .footinfo{display:flex;align-items:center;gap:10px}
 .densityctl{display:flex;align-items:center;gap:6px;font:600 11px var(--mono);color:var(--ink-mute)}
+.footq{width:20px;height:20px;border-radius:50%;border:1px solid var(--border);background:var(--surface-strong);color:var(--ink-mute);font:700 11px var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;margin-left:4px}
+.footq:hover{background:var(--raised);color:var(--ink)}
+.actionbar{display:flex;gap:8px;align-items:center;padding:9px 18px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.abtn{padding:6px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-strong);color:var(--ink);font:600 12px var(--sans);cursor:pointer;display:flex;align-items:center;gap:6px}
+.abtn:hover:not(:disabled){background:var(--raised);border-color:var(--ink-mute)}
+.abtn:disabled{opacity:.45;cursor:default}
+.abtn.primary{background:var(--primary);color:#fff;border-color:var(--primary);margin-left:auto}
+.abtn.primary:hover{background:var(--primary-hi)}
+.abtn kbd{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);border-radius:var(--r-sm);padding:1px 5px;font:600 10px var(--mono);margin-left:2px}
 
 .pop{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-paper);z-index:30;padding:14px;display:none;width:270px}
 .pop.open{display:block}
@@ -313,6 +322,16 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
 
 .scrim{position:fixed;inset:0;background:rgba(23,24,26,.32);z-index:39;display:none}
 .scrim.show{display:block}
+.shortcutsheet{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-paper);width:360px;max-width:90vw;max-height:80vh;overflow:auto;padding:18px 20px;display:none}
+.shortcutsheet.open{display:block}
+.sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sheethead h2{font:700 15px var(--sans);color:var(--ink);margin:0}
+#shortcutClose{background:none;border:0;font-size:20px;line-height:1;color:var(--ink-mute);cursor:pointer;padding:2px 6px}
+#shortcutClose:hover{color:var(--ink)}
+.sheetrow{display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px solid var(--border);font:500 12.5px var(--sans);color:var(--ink-mute)}
+.sheetrow:last-child{border-bottom:none}
+.sheetkeys{flex:none;white-space:nowrap}
+.sheetrow kbd{background:var(--raised);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px 6px;font:600 11px var(--mono);color:var(--ink-dim);white-space:nowrap}
 .palette{position:fixed;top:14vh;left:50%;transform:translateX(-50%);width:min(560px,92vw);max-height:66vh;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-lift);z-index:40;display:none;flex-direction:column;overflow:hidden}
 .palette.open{display:flex}
 .psearch{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--border);flex:none}
@@ -571,6 +590,14 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
           <span id="warnText"></span>
         </div>
       </div>
+      <div class="actionbar hidden" id="actionBar">
+        <button class="abtn" id="abTrim" type="button">Trim all</button>
+        <button class="abtn" id="abDropEmptyRows" type="button">Drop empty rows</button>
+        <button class="abtn" id="abDropEmptyCols" type="button">Drop empty columns</button>
+        <button class="abtn" id="abDedupe" type="button">Dedupe</button>
+        <button class="abtn" id="abFilter" type="button">Filter…</button>
+        <button class="abtn primary" id="abAddStep" type="button">Add step <kbd>&#8984;K</kbd></button>
+      </div>
       <div class="gscroll" id="gscroll" role="grid" aria-label="Data table">
         <div class="ghead" id="ghead" role="row" aria-rowindex="1"></div>
         <div class="gbody" id="gbody" role="rowgroup"></div>
@@ -586,12 +613,31 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
             <option value="compact">Compact</option>
           </select>
         </label>
+        <button class="footq" id="btnShortcuts" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
       </div>
     </section>
   </div>
 </main>
 
 <div class="scrim" id="paletteScrim"></div>
+<div class="scrim" id="shortcutScrim"></div>
+<div class="shortcutsheet" id="shortcutSheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" tabindex="-1">
+  <div class="sheethead">
+    <h2>Keyboard shortcuts</h2>
+    <button type="button" id="shortcutClose" aria-label="Close">&times;</button>
+  </div>
+  <div class="sheetlist">
+    <div class="sheetrow"><span class="sheetkeys"><kbd>&#8984;K</kbd></span><span>Open the step palette</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>&#8984;Z</kbd></span><span>Undo</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>&#8984;&#8679;Z</kbd></span><span>Redo</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>Enter</kbd> / <kbd>F2</kbd></span><span>Edit the focused cell</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>&#8593;&#8595;&#8592;&#8594;</kbd></span><span>Move around the grid</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>Home</kbd> / <kbd>End</kbd></span><span>Jump to the start or end of a row</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>Delete</kbd></span><span>Remove selected rows</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>Esc</kbd></span><span>Close a menu or dialog</span></div>
+    <div class="sheetrow"><span class="sheetkeys"><kbd>?</kbd></span><span>This sheet</span></div>
+  </div>
+</div>
 <div class="scrim" id="railScrim"></div>
 <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Add or edit pipeline step" tabindex="-1">
   <div class="psearch">
@@ -1496,6 +1542,7 @@ function loadTable(result){
   $('#searchWrap').classList.remove('hidden');
   $('#headerActions').classList.remove('hidden');
   $('#dataBar').classList.remove('hidden');
+  $('#actionBar').classList.remove('hidden');
   $('#fmtTag').textContent=FMT_LABEL[BASE.format];
   const delimited=BASE.format==='CSV'||BASE.format==='TSV'||BASE.format==='CSV;'||BASE.format==='CSVPIPE';
   $('#hdrToggleRow').classList.toggle('hidden',!delimited||!lastRawText);
@@ -1567,7 +1614,8 @@ function setViewIdx(i){
     $('#btnFilterToStep').classList.add('hidden');
     layoutGrid();paint()
   }
-  updateScrubBar()
+  updateScrubBar();
+  scheduleActionBarRefresh()
 }
 stTest('setViewIdx: preserves an active filter across steps instead of resetting it',()=>{
   const savedBASE=BASE,savedStates=states,savedViewIdx=viewIdx,savedView=VIEW,savedT=T;
@@ -2373,6 +2421,88 @@ function addKeepRowsStep(rowIdsArr){
   renderRail();
   toast('Kept '+fmtInt(rowIdsArr.length)+' row'+(rowIdsArr.length===1?'':'s'),false,doUndo)
 }
+function anyCellNeedsTrim(t){
+  for(let ci=0;ci<t.cols.length;ci++){
+    const col=t.data[ci];
+    for(let r=0;r<t.n;r++){
+      const v=String(col[r]??'');
+      if(v.replace(/\s+/g,' ').trim()!==v)return true
+    }
+  }
+  return false
+}
+function anyFullyBlankRow(t){
+  for(let r=0;r<t.n;r++){
+    let blank=true;
+    for(let ci=0;ci<t.cols.length;ci++){if(String(t.data[ci][r]??'').trim()!==''){blank=false;break}}
+    if(blank)return true
+  }
+  return false
+}
+function anyFullyBlankColumn(t){
+  for(let ci=0;ci<t.cols.length;ci++){
+    let blank=true;
+    for(let r=0;r<t.n;r++){if(String(t.data[ci][r]??'').trim()!==''){blank=false;break}}
+    if(blank)return true
+  }
+  return false
+}
+function anyDuplicateRow(t){
+  const idx=t.cols.map((_,i)=>i);
+  const seen=new Set();
+  for(let r=0;r<t.n;r++){
+    const key=idx.map(ci=>t.data[ci][r]).join('\u0001');
+    if(seen.has(key))return true;
+    seen.add(key)
+  }
+  return false
+}
+function refreshActionBar(){
+  if(!T)return;
+  const setBtn=(id,disabled,reason)=>{
+    const b=$(id);
+    if(!b)return;
+    b.disabled=disabled;
+    b.title=disabled?reason:''
+  };
+  setBtn('#abTrim',!anyCellNeedsTrim(T),'No cells have extra whitespace to trim');
+  setBtn('#abDropEmptyRows',!anyFullyBlankRow(T),'No fully blank rows found');
+  setBtn('#abDropEmptyCols',!anyFullyBlankColumn(T),'No fully blank columns found');
+  setBtn('#abDedupe',!anyDuplicateRow(T),'No duplicate rows found')
+}
+let actionBarRefreshT=null;
+function scheduleActionBarRefresh(){
+  clearTimeout(actionBarRefreshT);
+  actionBarRefreshT=setTimeout(refreshActionBar,120)
+}
+$('#abTrim').addEventListener('click',()=>addSuggestedStep('trim',{columns:['*']}));
+$('#abDropEmptyRows').addEventListener('click',()=>addSuggestedStep('dropEmptyRows',{columns:['*']}));
+$('#abDropEmptyCols').addEventListener('click',()=>addSuggestedStep('dropEmptyCols',{}));
+$('#abDedupe').addEventListener('click',()=>addSuggestedStep('dedupe',{on:['*']}));
+$('#abFilter').addEventListener('click',()=>openPaletteForNewStep('filter',{}));
+$('#abAddStep').addEventListener('click',()=>openPalette());
+function openShortcutSheet(){
+  $('#shortcutScrim').classList.add('show');
+  $('#shortcutSheet').classList.add('open');
+  openFocusTrap($('#shortcutSheet'),{onEscape:closeShortcutSheet,scrim:$('#shortcutScrim')})
+}
+function closeShortcutSheet(){
+  $('#shortcutScrim').classList.remove('show');
+  $('#shortcutSheet').classList.remove('open');
+  closeFocusTrap($('#shortcutSheet'))
+}
+$('#shortcutScrim').addEventListener('click',closeShortcutSheet);
+$('#shortcutClose').addEventListener('click',closeShortcutSheet);
+$('#btnShortcuts').addEventListener('click',openShortcutSheet);
+document.addEventListener('keydown',e=>{
+  if(e.key!=='?')return;
+  const ae=document.activeElement,tag=ae&&ae.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(ae&&ae.isContentEditable))return;
+  if(ae&&ae.closest&&(ae.closest('#palette')||ae.closest('#shortcutSheet')))return;
+  if($('#shortcutSheet').classList.contains('open'))return;
+  e.preventDefault();
+  openShortcutSheet()
+});
 let currentSuggestions=[];
 $('#profilePop').addEventListener('click',e=>{
   const btn=e.target.closest('.psuggestbtn');
@@ -2875,6 +3005,7 @@ $('#btnReplace').addEventListener('click',()=>{
   $('#searchWrap').classList.add('hidden');
   $('#headerActions').classList.add('hidden');
   $('#dataBar').classList.add('hidden');
+  $('#actionBar').classList.add('hidden');
   $('#pasteArea').value='';
   $('#parseErr').textContent='';
   closeProfile();closeAllHeaderPopovers();closePalette()
