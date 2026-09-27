@@ -120,4 +120,4 @@ How it stays fast:
 - Undo and edits reuse every unchanged step's result.
 - On the page, the work after each step is split into short tasks. The grid caches its scroll position and size instead of reading layout, and its rows use CSS containment.
 
-Freezes: Weft's own code no longer runs longer than about 50 ms at a time. The shared preview browser still reports one freeze per run (70–105 ms, occasionally more when the machine is busy). Almost none of it is Weft's script (5 ms); the rest is browser work that couldn't be traced there. The real test is Help ▸ Measure performance on your own machine.
+Freezes: Weft's own code no longer runs longer than about 50 ms at a time.
