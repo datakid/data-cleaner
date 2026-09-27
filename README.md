@@ -121,13 +121,3 @@ How it stays fast:
 - On the page, the work after each step is split into short tasks. The grid caches its scroll position and size instead of reading layout, and its rows use CSS containment.
 
 Freezes: Weft's own code no longer runs longer than about 50 ms at a time. The shared preview browser still reports one freeze per run (70–105 ms, occasionally more when the machine is busy). Almost none of it is Weft's script (5 ms); the rest is browser work that couldn't be traced there. The real test is Help ▸ Measure performance on your own machine.
-
-## Not yet done
-`index.html` already links these files; they just need to be copied in:
-- `favicon.ico` in the project root: generate it with `tools/favicon.html` (or decode `tools/ico.b64.txt`).
-- `fonts/InstrumentSerif-Regular.ttf` and `fonts/InstrumentSerif-Italic.ttf`.
-
-## Next steps
-1. Try it with your own messy files and tune the detectors on any that are misread.
-2. More sample-paste tests (bank statements, PDF invoices).
-3. An optional build step that bundles everything into one HTML file.
