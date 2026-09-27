@@ -24,16 +24,16 @@ W.needCol=function(t,name){
   return i
 };
 W.rewriteCells=function(t,cols,fn){
-  const data=W.cow(t,cols);
+  const data=t.data.slice();
   let changed=0;const touched=new Map();
   for(const ci of cols){
-    const col=data[ci];let set=null;
+    const src=t.data[ci];let out=null,set=null;
     for(let r=0;r<t.n;r++){
-      const v=col[r]==null?'':String(col[r]);
+      const x=src[r];const v=x==null?'':(typeof x==='string'?x:String(x));
       const w=fn(v,r,ci);
-      if(w!==v&&w!=null){col[r]=w;changed++;if(!set)set=new Set();set.add(r)}
+      if(w!==v&&w!=null){if(!out)out=src.slice();out[r]=w;changed++;if(!set)set=new Set();set.add(r)}
     }
-    if(set)touched.set(t.cols[ci],set)
+    if(out){data[ci]=out;touched.set(t.cols[ci],set)}
   }
   return{table:W.keepSame(t,data),stats:{changed},touched}
 };
@@ -145,14 +145,15 @@ W.compileConds=function(t,conds,ctx){
   const matchers=conds.map(c=>{
     const ci=c.col==='*'?-1:W.needCol(t,c.col);
     const cs=!!c.caseSensitive;
-    const norm=s=>cs?s:s.toLowerCase();
+    const norm=cs?(s=>s):(s=>s.toLowerCase());
     const val=norm(String(c.value==null?'':c.value));
+    const valT=val.trim();
     let test;
     switch(c.op){
       case'contains':test=s=>norm(s).indexOf(val)!==-1;break;
       case'notContains':test=s=>norm(s).indexOf(val)!==-1;break;
-      case'equals':test=s=>norm(s.trim())===val.trim();break;
-      case'notEquals':test=s=>norm(s.trim())===val.trim();break;
+      case'equals':test=s=>{if(s.length<valT.length)return false;return norm(s.trim())===valT};break;
+      case'notEquals':test=s=>{if(s.length<valT.length)return false;return norm(s.trim())===valT};break;
       case'startsWith':test=s=>norm(s.trim()).indexOf(val)===0;break;
       case'endsWith':test=s=>{const x=norm(s.trim());return x.length>=val.length&&x.slice(x.length-val.length)===val};break;
       case'matches':{const re=W.compileRegex(String(c.value||''),cs?'':'i');test=s=>re.test(s);break}

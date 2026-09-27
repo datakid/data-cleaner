@@ -226,9 +226,9 @@ svg{display:block;flex:none}
 .gresize:hover,.gresize.on{background:var(--clay);opacity:.5}
 .gh.colsel{background:var(--sel-wash);box-shadow:inset 0 -2px 0 var(--clay)}
 .gh.drop-left{box-shadow:inset 3px 0 0 var(--clay)}
-.gbody{position:relative}
-.grow{position:absolute;left:0;display:flex;height:var(--row-h);width:max-content;min-width:100%}
-.gc{flex:none;height:var(--row-h);line-height:var(--row-h);padding:0 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font:450 12.5px/var(--row-h) var(--mono);font-variant-numeric:tabular-nums;white-space:pre;overflow:hidden;text-overflow:ellipsis;background:var(--surface);color:var(--ink);cursor:cell}
+.gbody{position:relative;contain:layout style}
+.grow{position:absolute;left:0;display:flex;height:var(--row-h);width:max-content;min-width:100%;contain:layout style}
+.gc{flex:none;contain:layout paint style;height:var(--row-h);line-height:var(--row-h);padding:0 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font:450 12.5px/var(--row-h) var(--mono);font-variant-numeric:tabular-nums;white-space:pre;overflow:hidden;text-overflow:ellipsis;background:var(--surface);color:var(--ink);cursor:cell}
 .grow.even .gc{background:var(--surface-2)}
 .gc.num{text-align:right}
 .gc.idx{position:sticky;left:0;z-index:2;text-align:right;color:var(--ink-mute);background:var(--surface-2);border-right:1px solid var(--border-hi);font-size:11px;cursor:pointer;user-select:none}

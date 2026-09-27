@@ -85,8 +85,22 @@ function makeView(p){
   let pos=null;
   const q=s(p.search).trim().toLowerCase();
   if(q){
-    const idx=searchIndex(t);const terms=q.split(/\s+/).filter(Boolean);pos=[];
-    for(let r=0;r<t.n;r++){const x=idx[r];let ok=true;for(const tm of terms)if(x.indexOf(tm)===-1){ok=false;break}if(ok)pos.push(r)}
+    const terms=q.split(/\s+/).filter(Boolean);pos=[];
+    const w=t.cols.length,cols=t.data;
+    if(t._search){const idx=t._search;for(let r=0;r<t.n;r++){const x=idx[r];let ok=true;for(const tm of terms)if(x.indexOf(tm)===-1){ok=false;break}if(ok)pos.push(r)}}
+    else{
+      const res=terms.map(tm=>new RegExp(tm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'));
+      const nt=res.length;
+      for(let r=0;r<t.n;r++){
+        let all=true;
+        for(let k=0;k<nt;k++){
+          const re=res[k];let hit=false;
+          for(let c=0;c<w;c++){const v=cols[c][r];if(v&&re.test(v)){hit=true;break}}
+          if(!hit){all=false;break}
+        }
+        if(all)pos.push(r)
+      }
+    }
   }
   if(p.filter&&p.filter.conditions&&p.filter.conditions.length){
     const valid=p.filter.conditions.filter(c=>c.col==='*'||t.cols.indexOf(c.col)!==-1);
@@ -167,6 +181,8 @@ const H={
   ping:()=>({version:W.version}),
   setCtx(p){Object.assign(E.ctx,p||{});E.states.forEach(t=>{t._types=null});if(E.base){recompute(0);return pipelineResult()}return{}},
   sample(p){const r=W.makeSample(p.kind);return r},
+  stageStress(p){const s=W.makeStress(p.n||200000);E.staged=s;return{bytes:s.text.length,fileName:s.fileName}},
+  loadStaged(){if(!E.staged)throw new Error('Nothing is staged.');const s=E.staged;E.staged=null;return H.load({text:s.text,fileName:s.fileName})},
   loadSample(p){const r=W.makeSample(p.kind);return H.load({text:r.text,fileName:r.fileName,hint:p.hint})},
   removedIds(p){need();const i=p.stateIdx;if(i<1||i>=E.states.length)return{rowIds:[]};const a=E.states[i-1],b=E.states[i];const pm=W.posMap(b);const out=[];for(let r=0;r<a.n;r++)if(!pm.has(a.rowIds[r]))out.push(a.rowIds[r]);return{rowIds:out}},
   schema(p){const t=stateAt(p.stateIdx);return schemaOf(t)},
@@ -195,7 +211,16 @@ const H={
     return{cols:t.cols,rows:W.tableRows(t,50),n:t.n,warnings:t.warnings}
   },
   rawLines(p){if(!E.src)return{lines:[]};const n=p&&p.count||40;return{lines:E.src.text.split('\n').slice(p&&p.start||0,(p&&p.start||0)+n)}},
-  setPipeline(p){need();E.steps=W.clone(p.steps||[]);recompute(Math.max(0,p.fromIndex|0));return pipelineResult()},
+  setPipeline(p){
+    need();
+    const next=W.clone(p.steps||[]);
+    const key=s=>s.opId+'|'+(s.muted?1:0)+'|'+JSON.stringify(s.cfg||{});
+    let k=0;
+    while(k<next.length&&k<E.steps.length&&k<E.meta.length&&k+1<E.states.length&&key(next[k])===key(E.steps[k]))k++;
+    const from=p.force?Math.max(0,p.fromIndex|0):k;
+    E.steps=next;recompute(from);
+    return pipelineResult()
+  },
   setView:p=>{need();return makeView(p)},
   getRows(p){
     const v=getView(p.viewKey);const t=v.t;const w=t.cols.length;
@@ -269,6 +294,7 @@ const H={
     const t=W.applyReading(text,det.readings[0],{htmlTables:p.htmlTables});
     let name=p.name||'reference';let k=2;const base=name;while(E.refs[name]&&!p.replace){name=base+' ('+k+')';k++}
     E.refs[name]=t;
+    if(E.base){const i=E.steps.findIndex(s=>(s.opId==='join'||s.opId==='diff')&&s.cfg&&s.cfg.refName===name);if(i!==-1)recompute(i)}
     return{name,cols:t.cols,n:t.n,reading:det.readings[0].label}
   },
   refList:()=>({refs:Object.keys(E.refs).map(k=>({name:k,cols:E.refs[k].cols,n:E.refs[k].n}))}),

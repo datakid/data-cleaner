@@ -70,24 +70,48 @@ async function run(){
 }
 const PROF={};
 function wrap(obj,name,label){const f=obj[name];if(typeof f!=='function')return;obj[name]=function(){const t=performance.now();const r=f.apply(this,arguments);const done=()=>{const d=performance.now()-t;const p=PROF[label]||(PROF[label]={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d};if(r&&typeof r.then==='function'){const t2=performance.now()-t;const p=PROF[label+' (sync part)']||(PROF[label+' (sync part)']={n:0,max:0,sum:0});p.n++;p.sum+=t2;if(t2>p.max)p.max=t2}else done();return r}}
+const SLOWT=[];
+if(/\[perf\d*\]/.test(document.title)&&!/nowrap/.test(document.title)){
+  const oST=window.setTimeout;
+  window.setTimeout=function(fn,ms){if(typeof fn!=='function')return oST.apply(window,arguments);const src=String(fn).slice(0,90).replace(/\s+/g,' ');const stack=(new Error().stack||'').split('\n').slice(2,4).map(s=>s.trim().replace(/https?:\/\/[^)]*\//,'')).join(' < ');return oST.call(window,function(){const t=performance.now();const r=fn.apply(this,arguments);const d=performance.now()-t;if(d>25)SLOWT.push({d:Math.round(d),src,stack});const mc=new MessageChannel();mc.port1.onmessage=()=>{const full=performance.now()-t;if(full>45)SLOWT.push({d:Math.round(full),src:'TASK+microtasks '+src,stack})};mc.port2.postMessage(0);return r},ms)};
+  const oRAF=window.requestAnimationFrame;
+  window.requestAnimationFrame=function(fn){const src=String(fn).slice(0,60);return oRAF.call(window,function(ts){const t=performance.now();fn(ts);const d=performance.now()-t;if(d>25)SLOWT.push({d:Math.round(d),src:'rAF '+src,stack:''})})};
+}
+const MSGT=[];
+if(/\[perf\d*\]/.test(document.title)&&!/nowrap/.test(document.title)){
+  const oAdd=Worker.prototype.addEventListener;
+  const desc=Object.getOwnPropertyDescriptor(Worker.prototype,'onmessage');
+  Object.defineProperty(Worker.prototype,'onmessage',{set(fn){desc.set.call(this,function(e){const t=performance.now();fn.call(this,e);const mc=new MessageChannel();mc.port1.onmessage=()=>{const d=performance.now()-t;if(d>40){const res=e.data&&e.data.result;MSGT.push({d:Math.round(d),keys:res?Object.keys(res).slice(0,6).join(','):'',rows:res&&res.rows?res.rows.length:''})}};mc.port2.postMessage(0)})},get(){return desc.get.call(this)},configurable:true});
+}
+const LOAF=[];
+try{new PerformanceObserver(l=>l.getEntries().forEach(e=>{if(e.duration<50)return;LOAF.push({t:Math.round(e.startTime),d:Math.round(e.duration),block:Math.round(e.blockingDuration||0),layout:Math.round(e.styleAndLayoutStart?e.startTime+e.duration-e.styleAndLayoutStart:0),render:Math.round(e.renderStart?e.startTime+e.duration-e.renderStart:0),scripts:(e.scripts||[]).map(s=>({d:Math.round(s.duration),fl:Math.round(s.forcedStyleAndLayoutDuration||0),inv:s.invoker,src:(s.sourceURL||'').split('/').pop()+':'+(s.sourceFunctionName||'')+'@'+s.sourceCharPosition})).filter(s=>s.d>3)})})).observe({type:'long-animation-frame',buffered:false})}catch(e){}
 async function perf(){
-  [[Grid,'reset','Grid.reset'],[Grid,'paint','Grid.paint'],[Grid,'autoFit','Grid.autoFit'],[Grid,'renderHead','Grid.renderHead'],[Rail,'render','Rail.render'],[Inspector,'renderIssues','Inspector.renderIssues'],[Status,'render','Status.render'],[ReadingBar,'render','ReadingBar.render'],[Scrub,'render','Scrub.render'],[Toolbar,'render','Toolbar.render'],[window,'cleanSteps','cleanSteps'],[Session,'save','Session.save'],[App,'showWorkspace','App.showWorkspace'],[W,'makeStress','makeStress'],[JSON,'parse','JSON.parse'],[JSON,'stringify','JSON.stringify']].forEach(a=>wrap(a[0],a[1],a[2]));
+  if(!/nowrap/.test(document.title))[[Grid,'reset','Grid.reset'],[Grid,'paint','Grid.paint'],[Grid,'autoFit','Grid.autoFit'],[Grid,'renderHead','Grid.renderHead'],[Rail,'render','Rail.render'],[Inspector,'renderIssues','Inspector.renderIssues'],[Status,'render','Status.render'],[ReadingBar,'render','ReadingBar.render'],[Scrub,'render','Scrub.render'],[Toolbar,'render','Toolbar.render'],[window,'cleanSteps','cleanSteps'],[Session,'save','Session.save'],[App,'showWorkspace','App.showWorkspace'],[W,'makeStress','makeStress'],[JSON,'parse','JSON.parse'],[JSON,'stringify','JSON.stringify']].forEach(a=>wrap(a[0],a[1],a[2]));
   const om=Engine.worker&&Engine.worker.onmessage;
-  for(let i=0;i<200&&Engine.mode==='none';i++)await wait(50);
-  if(Engine.worker){const orig=Engine.worker.onmessage;Engine.worker.onmessage=function(e){const t=performance.now();orig.call(this,e);const d=performance.now()-t;const p=PROF['worker message handler']||(PROF['worker message handler']={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d}}
+  for(let i=0;i<200&&!Engine.ready;i++)await wait(50);
+  const tr=performance.now();await Engine.ready;log('ENGINE ready after extra '+Math.round(performance.now()-tr)+'ms mode '+Engine.mode+' reason '+(Engine.fallbackReason||'-'));
+  if(Engine.worker&&!/nowrap/.test(document.title)){const orig=Engine.worker.onmessage;Engine.worker.onmessage=function(e){const t=performance.now();const sz=JSON.stringify(e.data).length;if(sz>200000)log('BIGMSG '+Math.round(sz/1024)+'KB id '+e.data.id+' keys '+Object.keys(e.data.result||{}).join(','));orig.call(this,e);const d=performance.now()-t;const p=PROF['worker message handler']||(PROF['worker message handler']={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d}}
   const po=Engine.worker&&Engine.worker.postMessage.bind(Engine.worker);
-  if(po)Engine.worker.postMessage=function(m){const t=performance.now();po(m);const d=performance.now()-t;const p=PROF['postMessage '+m.type]||(PROF['postMessage '+m.type]={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d};
+  if(po&&!/nowrap/.test(document.title))Engine.worker.postMessage=function(m){const t=performance.now();po(m);const d=performance.now()-t;const p=PROF['postMessage '+m.type]||(PROF['postMessage '+m.type]={n:0,max:0,sum:0});p.n++;p.sum+=d;if(d>p.max)p.max=d};
+  const RES=[];const oc=Engine.call.bind(Engine);Engine.call=function(type,payload,ch){const t=performance.now();const p=oc(type,payload,ch);p.then(r=>RES.push({type,t:Math.round(t),d:Math.round(performance.now()-t),r}),()=>{});return p};
+  window.__RES=RES;
   log('PERF engine '+Engine.mode);
   const t0=performance.now();
   const n=+(document.title.match(/\[perf(\d+)?\]/)[1]||200000);
   try{await Perf.run(n)}catch(e){log('PERF ERROR '+e.message);return}
   const p=window.WEFT_PERF;if(!p){log('PERF no result');return}
   p.rows.forEach(r=>log('PERF '+(r.ms<=r.budget?'OK   ':'OVER ')+Math.round(r.ms)+'ms / '+r.budget+'ms  '+r.label));
-  (Perf.longTasks||[]).forEach(t=>log('PERF long task '+t.d+'ms during: '+t.phase));
+  (Perf.longTasks||[]).forEach(t=>log('PERF long task '+t.d+'ms @'+t.t+' during: '+t.phase));
+  LOAF.filter(f=>(Perf.longTasks||[]).some(t=>Math.abs(t.t-f.t)<300)).forEach(f=>log('LOAF @'+f.t+' '+f.d+'ms block '+f.block+' rl '+f.render+' :: '+f.scripts.map(s=>s.d+'ms(f'+s.fl+') '+s.inv+' '+s.src).join(' | ')));
   log('PERF longest freeze '+Math.round(p.info.worst)+'ms, long tasks '+p.info.longCount+', supported '+p.info.supported);
   log('PERF total '+Math.round(performance.now()-t0)+'ms, final rows '+finalN());
-  Object.keys(PROF).map(k=>[k,PROF[k]]).sort((a,b)=>b[1].max-a[1].max).slice(0,14).forEach(([k,p])=>log('PROF '+k+': max '+Math.round(p.max)+'ms, total '+Math.round(p.sum)+'ms, calls '+p.n))
+  log('MSGS '+RES.filter(x=>x.t>=(Perf.afterLoad||0)-2000).map(x=>x.type+':'+Math.round(JSON.stringify(x.r||{}).length/1024)+'KB/'+x.d+'ms@'+x.t).join(' '));
+  log('STEPMS '+S.meta.map(m=>m.ms).join(',')+' mode now '+Engine.mode+' reason '+Engine.fallbackReason);
+  MSGT.forEach(m=>log('SLOWMSG '+m.d+'ms (incl. microtasks) result keys: '+m.keys+' rows:'+m.rows));
+  SLOWT.filter(s=>s.d<1000).slice(0,0).forEach(s=>log('SLOWTIMER '+s.d+'ms :: '+s.src+' :: '+s.stack));
+  LOAF.slice(0,0).forEach(f=>log('LOAF '+f.d+'ms block '+f.block+' render+layout '+f.render+' :: '+f.scripts.map(s=>s.d+'ms(forced '+s.fl+') '+s.inv+' '+s.src).join(' | ')));
+  Object.keys(PROF).map(k=>[k,PROF[k]]).sort((a,b)=>b[1].max-a[1].max).slice(0,6).forEach(([k,p])=>log('PROF '+k+': max '+Math.round(p.max)+'ms, total '+Math.round(p.sum)+'ms, calls '+p.n))
 }
-if(/\[perf\d*\]/.test(document.title))setTimeout(perf,4000);
+if(/\[perf\d*\]/.test(document.title))setTimeout(perf,1000);
 else if(mode!=='none')setTimeout(run,300);
 })();

@@ -73,9 +73,16 @@ const Input={
     if(/\.html?$/i.test(f.name))return this.loadText('',f.name,text);
     await this.loadText(text,f.name)
   },
+  async stageStress(n){return Busy.run('Generating '+fmtInt(n)+' rows',()=>Engine.call('stageStress',{n}))},
+  async loadStaged(fileName){
+    let r;try{r=await Busy.run('Reading your data',()=>Engine.call('loadStaged',{}))}catch(e){this.showErr(e.message);return}
+    S.sourceText=null;S.htmlTables=null;S.htmlCount=0;
+    await applyLoad(r,{fileName});
+    Toast.show('Read as '+r.reading.label+' · '+plural(r.baseSchema.n,'row')+' × '+plural(r.baseSchema.cols.length,'column'))
+  },
   async loadSample(kind){
+    if(kind==='stress'){Toast.show('Generating 200,000 rows…');const st=await this.stageStress(200000);return this.loadStaged(st.fileName)}
     const s=W.makeSample(kind);
-    if(kind==='stress')Toast.show('Generating 200,000 rows…');
     await this.loadText(s.text,s.fileName,s.html)
   },
   async pasteFromClipboard(){

@@ -150,3 +150,6 @@ function placeFloating(el,x,y,opts){
 }
 function isEditable(t){return!!t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable)}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+const yieldChan=typeof MessageChannel==='function'?new MessageChannel():null;const yieldQ=[];
+if(yieldChan)yieldChan.port1.onmessage=()=>{const f=yieldQ.shift();f&&f()};
+function yieldUI(){if(window.scheduler&&typeof scheduler.yield==='function')return scheduler.yield();if(!yieldChan)return sleep(0);return new Promise(r=>{yieldQ.push(r);yieldChan.port2.postMessage(0)})}

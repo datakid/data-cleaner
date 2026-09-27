@@ -1,7 +1,8 @@
 'use strict';
 const Engine={
-  worker:null,mode:'none',seq:0,pending:new Map(),gens:{},recovering:null,lastLoad:null,lastReading:null,
-  async init(){
+  worker:null,mode:'none',seq:0,pending:new Map(),gens:{},recovering:null,lastLoad:null,lastReading:null,lastActive:0,
+  init(){if(!this.ready)this.ready=this.init_();return this.ready},
+  async init_(){
     const noWorker=/[?&]noworker=1/.test(location.search);
     if(!noWorker&&typeof Worker==='function'){
       try{
@@ -17,6 +18,7 @@ const Engine={
   },
   fallback(reason){
     if(this.mode==='main')return;
+    this.fallbackReason=reason;
     try{if(this.worker)this.worker.terminate()}catch(e){}
     this.worker=null;this.mode='main';
     const stalled=Array.from(this.pending.values());this.pending.clear();
@@ -28,7 +30,7 @@ const Engine={
     if(!this.lastLoad||typeof S==='undefined'||!S.loaded)return;
     const H=W.Engine;
     H.handle('setCtx',{dateOrder:S.dateOrder});
-    H.handle('load',this.lastLoad);
+    if(this.lastLoad.__stress){H.handle('stageStress',{n:this.lastLoad.__stress});H.handle('loadStaged',{})}else H.handle('load',this.lastLoad);
     if(this.lastReading)H.handle('chooseReading',{reading:this.lastReading});
     (S.refsRaw||[]).forEach(r=>H.handle('refLoad',r));
     if(S.steps.length)H.handle('setPipeline',{steps:cleanSteps(S.steps),fromIndex:0});
@@ -43,7 +45,9 @@ const Engine={
     return W.Engine.handle(type,payload)
   },
   call(type,payload,channel){
+    if(type!=='issues'&&type!=='ping')this.lastActive=performance.now();
     if(type==='load'){this.lastLoad=payload;this.lastReading=null;S.refsRaw=S.refsRaw||[]}
+    if(type==='stageStress'){this.lastLoad={__stress:payload.n};this.lastReading=null}
     if(type==='chooseReading')this.lastReading=payload.reading||(S.readings[payload.index]?{kind:S.readings[payload.index].kind,params:S.readings[payload.index].params}:null);
     if(type==='refLoad')S.refsRaw=(S.refsRaw||[]).concat([payload]);
     let gen=0;

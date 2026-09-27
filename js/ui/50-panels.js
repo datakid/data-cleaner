@@ -54,7 +54,7 @@ const Rail={
     list.appendChild(h('div',{class:'tl tl-end',style:{'--tl':'var(--ink)'}},h('span',{class:'tl-node'}),
       h('div',{class:'step-card'+(atEnd()?' active':''),tabindex:'0',role:'button','aria-label':'View final result',onclick:()=>setViewIdx(S.steps.length),onkeydown:e=>{if(e.key==='Enter'){e.preventDefault();setViewIdx(S.steps.length)}}},
         h('div',{class:'sc-row1'},h('span',{class:'sc-name'},'Result')),h('div',{class:'sc-meta'},fmtInt(fin.n)+' rows × '+fin.cols+' columns'))));
-    const a=list.querySelector('.step-card.active');if(a)a.scrollIntoView({block:'nearest'})
+    const a=list.querySelector('.step-card.active');if(a)requestAnimationFrame(()=>{if(a.isConnected)a.scrollIntoView({block:'nearest'})})
   },
   moreMenu(i){
     const mk=(label,ic,fn,w)=>({title:label,icon:ic,when:()=>w===undefined?true:w,run:fn,keywords:[],contexts:[]});

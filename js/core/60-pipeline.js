@@ -30,11 +30,13 @@ W.statsChips=function(stats,n0,n1){
 W.runPipeline=function(base,steps,ctx,fromIdx,prevStates,prevMeta){
   ctx=ctx||{};
   fromIdx=Math.max(0,Math.min(fromIdx||0,steps.length));
+  fromIdx=prevStates&&prevStates.length?Math.min(fromIdx,prevStates.length-1):0;
+  if(prevMeta)fromIdx=Math.min(fromIdx,prevMeta.length);
   const states=prevStates&&prevStates.length>fromIdx?prevStates.slice(0,fromIdx+1):[base];
   const meta=prevMeta?prevMeta.slice(0,fromIdx):[];
   if(!states.length||fromIdx===0){states.length=0;states.push(base);meta.length=0;fromIdx=0}
   let maxId=base.n;
-  for(const s of states)for(let i=0;i<s.rowIds.length;i++)if(s.rowIds[i]>=maxId)maxId=s.rowIds[i]+1;
+  if(ctx.nextRowId==null)for(const s of states)for(let i=0;i<s.rowIds.length;i++)if(s.rowIds[i]>=maxId)maxId=s.rowIds[i]+1;
   const rctx=Object.assign({},ctx,{nextRowId:Math.max(ctx.nextRowId||0,maxId)});
   for(let i=fromIdx;i<steps.length;i++){
     const st=steps[i],input=states[i];

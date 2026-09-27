@@ -3,8 +3,10 @@ const Grid={
   pool:[],widths:[],idxW:64,pages:new Map(),lru:[],inflight:new Set(),rowH:34,lastTop:0,editing:null,dragSel:null,
   init(){
     this.sc=$('#gscroll');this.head=$('#ghead');this.body=$('#gbody');this.sizer=$('#gsizer');this.rect=$('#selrect');
-    this.sc.addEventListener('scroll',()=>{this.paint();Halo.close()},{passive:true});
-    new ResizeObserver(()=>this.paint()).observe(this.sc);
+    this.rowH_();
+    this.scrollY=0;this.scrollX=0;
+    this.sc.addEventListener('scroll',()=>{this.scrollY=this.sc.scrollTop;this.scrollX=this.sc.scrollLeft;this.paint();Halo.close()},{passive:true});
+    new ResizeObserver(en=>{const r=en[0]&&en[0].contentRect;this.vh=r&&r.height?r.height:0;this.paint()}).observe(this.sc);
     this.body.addEventListener('mousedown',e=>this.onBodyDown(e));
     this.body.addEventListener('dblclick',e=>{const c=e.target.closest('.gc');if(c&&!c.classList.contains('idx'))this.startEdit(+c.parentNode.dataset.pos,+c.dataset.ci)});
     this.body.addEventListener('contextmenu',e=>this.onContext(e));
@@ -19,16 +21,21 @@ const Grid={
     this.sc.addEventListener('touchend',()=>{if(lp){clearTimeout(lp.tm);lp=null}});
     document.addEventListener('mouseup',()=>{this.dragSel=null});
   },
-  rowH_(){return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-h'))||34},
+  rowHCache:0,
+  rowH_(){if(!this.rowHCache)this.rowHCache=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-h'))||34;return this.rowHCache},
   reset(keepScroll){
+    const top0=keepScroll?this.scrollY:0;
     this.pages.clear();this.lru=[];this.inflight.clear();
     this.rowH=this.rowH_();
-    this.computeWidths();
-    this.renderHead();
-    if(!keepScroll){this.sc.scrollTop=0;this.sc.scrollLeft=0}
-    this.pool.forEach(r=>r.el.remove());this.pool=[];
+    const sig=S.view.schema.cols.map(c=>c.name).join('\u0001');
+    const same=sig===this.lastSig;
+    if(!same){this.computeWidths();this.renderHead();this.lastSig=sig}
+    else{this.idxW=Math.max(56,String(S.view.n).length*8+28);this.renderHead()}
+    if(!keepScroll){if(this.scrollY||this.scrollX){this.sc.scrollTop=0;this.sc.scrollLeft=0}this.scrollY=0;this.scrollX=0}
+    if(!same){this.pool.forEach(r=>r.el.remove());this.pool=[]}
+    else this.pool.forEach(r=>{r.key=''});
     this.cancelEdit();
-    this.layout();this.paint()
+    this.layout();this.paint(top0)
   },
   computeWidths(){
     const cols=S.view.schema.cols;const saved=Prefs.get('colWidths',{});
@@ -47,10 +54,11 @@ const Grid={
       for(const row of p.rows.slice(0,250)){const v=row[i]||'';const L=Math.min(v.length,60);if(L*7.3+30>mx)mx=L*7.3+30}
       this.widths[i]=Math.round(Math.min(360,Math.max(80,mx)))
     });
-    this.renderHead();this.layout();this.pool.forEach(r=>{r.cols=-1})
+    const hs=this.head.children;for(let i=0;i<this.widths.length;i++)if(hs[i+1])hs[i+1].style.width=this.widths[i]+'px';
+    this.layout();this.paint()
   },
   totalW(){return this.idxW+this.widths.reduce((a,b)=>a+b,0)},
-  layout(){this.sizer.style.height=(S.view.n*this.rowH+40)+'px';this.sizer.style.width=this.totalW()+'px';this.head.style.width=this.totalW()+'px';$('#gridEmpty').classList.toggle('hidden',S.view.n>0);$('#gridEmpty').textContent=S.view.total&&!S.view.n?'No rows match. Clear the search or filter to see all rows.':'This step has no rows.'},
+  layout(){const hh=(S.view.n*this.rowH+40)+'px',ww=this.totalW()+'px',st=S.view.total+'|'+S.view.n;if(this._lay===hh+ww+st)return;this._lay=hh+ww+st;this.sizer.style.height=(S.view.n*this.rowH+40)+'px';this.sizer.style.width=this.totalW()+'px';this.head.style.width=this.totalW()+'px';$('#gridEmpty').classList.toggle('hidden',S.view.n>0);$('#gridEmpty').textContent=S.view.total&&!S.view.n?'No rows match. Clear the search or filter to see all rows.':'This step has no rows.'},
   renderHead(){
     const cols=S.view.schema.cols;
     const frag=[h('div',{class:'gh idx',role:'columnheader','aria-colindex':'1',style:{width:this.idxW+'px'}},'#')];
@@ -64,6 +72,7 @@ const Grid={
         h('div',{class:'gresize','data-ci':String(i)}));
       frag.push(el)
     });
+    this.headSelKey=null;
     clear(this.head).append(...frag);
     const g=$('#grid');g.setAttribute('aria-rowcount',String(S.view.n+1));g.setAttribute('aria-colcount',String(cols.length+1))
   },
@@ -82,9 +91,10 @@ const Grid={
     }catch(e){}
     finally{this.inflight.delete(key)}
   },
-  paint(){
+  paint(topArg){
     if(!S.loaded||!this.sc)return;
-    const top=this.sc.scrollTop,vh=this.sc.clientHeight||600,rh=this.rowH;
+    const top=typeof topArg==='number'?topArg:this.scrollY,rh=this.rowH;
+    const vh=this.vh||Math.max(600,innerHeight);
     const first=Math.max(0,Math.floor((top)/rh)-8),last=Math.min(S.view.n-1,Math.ceil((top+vh)/rh)+8);
     const need=last-first+1;
     while(this.pool.length<need&&this.pool.length<400){const el=h('div',{class:'grow',role:'row'});this.body.appendChild(el);this.pool.push({el,pos:-1,cols:-1,key:''})}
@@ -93,8 +103,12 @@ const Grid={
     const dir=top>=this.lastTop?1:-1;this.lastTop=top;
     const pre=dir>0?pl+1:pf-1;if(pre>=0&&pre*256<S.view.n)this.fetchPage(pre);
     const cols=S.view.schema.cols;const types=cols.map(c=>c.type);
+    const t0=performance.now();
+    let deferred=false;
     for(let i=0;i<this.pool.length;i++){
       const r=this.pool[i];const pos=first+i;
+      if(!deferred&&r.key===''&&performance.now()-t0>12){deferred=true;requestAnimationFrame(()=>this.paint())}
+      if(deferred&&r.key===''){continue}
       if(pos>last||pos>=S.view.n){r.el.style.display='none';r.pos=-1;continue}
       r.el.style.display='';
       const data=this.rowAt(pos);
@@ -122,12 +136,13 @@ const Grid={
         if(Sel.kind==='cols'&&Sel.cols.has(cols[ci].name))cls+=' colsel';
         if(Sel.cursor.pos===pos&&Sel.cursor.col===ci&&document.activeElement===this.sc)cls+=' cursor';
         if(cell.className!==cls)cell.className=cls;
-        cell.style.width=this.widths[ci]+'px'
+        const wv=this.widths[ci];if(cell._w!==wv){cell._w=wv;cell.style.width=wv+'px'}
       }
-      r.cells[0].style.width=this.idxW+'px'
+      if(r.cells[0]._w!==this.idxW){r.cells[0]._w=this.idxW;r.cells[0].style.width=this.idxW+'px'}
     }
     this.paintRect();
-    $$('.gh[data-col]',this.head).forEach(g=>g.classList.toggle('colsel',Sel.kind==='cols'&&Sel.cols.has(g.dataset.col)))
+    const selKey=Sel.kind==='cols'?Array.from(Sel.cols).join('\u0001'):'';
+    if(selKey!==this.headSelKey){this.headSelKey=selKey;$$('.gh[data-col]',this.head).forEach(g=>g.classList.toggle('colsel',Sel.kind==='cols'&&Sel.cols.has(g.dataset.col)))}
   },
   fillWs(cell,v){
     clear(cell);
@@ -220,7 +235,7 @@ const Grid={
   },
   scrollToPos(pos,col){
     const rh=this.rowH,top=pos*rh,vh=this.sc.clientHeight-40;
-    if(top<this.sc.scrollTop)this.sc.scrollTop=top;else if(top+rh>this.sc.scrollTop+vh)this.sc.scrollTop=top+rh-vh;
+    if(top<this.sc.scrollTop)this.sc.scrollTop=top;else if(top+rh>this.sc.scrollTop+vh)this.sc.scrollTop=top+rh-vh;this.scrollY=this.sc.scrollTop;
     if(col!=null&&col>=0){const x=this.colX(col),w=this.widths[col];const vw=this.sc.clientWidth;if(x-this.idxW<this.sc.scrollLeft)this.sc.scrollLeft=x-this.idxW;else if(x+w>this.sc.scrollLeft+vw)this.sc.scrollLeft=x+w-vw}
   },
   onKey(e){

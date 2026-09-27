@@ -11,7 +11,15 @@ W.defineOp({
   fields:[{key:'columns',type:'columns',label:'Columns',allowAll:true},{key:'collapse',type:'checkbox',label:'Also collapse repeated inner spaces'}],
   defaults:()=>({columns:['*'],collapse:true}),
   describe:cfg=>'Trim whitespace in '+colsText(cfg.columns)+(cfg.collapse===false?' (keep inner spaces)':''),
-  apply(t,cfg){W.needCols(t,cfg.columns);const cols=W.resolveCols(t,cfg.columns);const col=cfg.collapse!==false;return W.rewriteCells(t,cols,v=>col?v.replace(/[ \t\u00A0]+/g,' ').replace(/^\s+|\s+$/g,''):v.replace(/^\s+|\s+$/g,''))},
+  apply(t,cfg){
+    W.needCols(t,cfg.columns);const cols=W.resolveCols(t,cfg.columns);const col=cfg.collapse!==false;
+    const ws=c=>c<=32||c===160||c===0x2007||c===0x202F||c===0xFEFF;
+    return W.rewriteCells(t,cols,v=>{
+      const L=v.length;if(!L)return v;
+      if(!ws(v.charCodeAt(0))&&!ws(v.charCodeAt(L-1))&&(!col||(v.indexOf('  ')===-1&&v.indexOf('\t')===-1&&v.indexOf('\u00A0')===-1)))return v;
+      return col?v.replace(/[ \t\u00A0]+/g,' ').replace(/^\s+|\s+$/g,''):v.replace(/^\s+|\s+$/g,'')
+    })
+  },
   toDsl:cfg=>'trim '+cd(cfg.columns)+(cfg.collapse===false?' keep inner':''),
   dslPattern:/^trim\b/i,
   fromDsl(line){const cur=W.cursor(line);cur.word('trim');const columns=cur.done()?['*']:cur.cols();let collapse=true;if(cur.optWord('keep')){cur.word('inner');collapse=false}cur.end();return{columns,collapse}},

@@ -11,7 +11,13 @@ const Inspector={
     const ins=$('#inspector');if(ins.classList.contains('hidden')||ins.classList.contains('closed'))Panels.toggle('inspector');
     this.render()
   },
-  refresh(force){if(force)this.issuesKey='';this.render()},
+  refresh(force){
+    if(force)this.issuesKey='';
+    if(this.tab!=='suggestions'){this.render();return}
+    clearTimeout(this.rt);
+    const tick=()=>{const idle=performance.now()-Engine.lastActive;if(Busy.n>0||idle<450){this.rt=setTimeout(tick,Math.max(120,450-idle));return}this.render()};
+    this.rt=setTimeout(tick,450)
+  },
   onSelection(){if(this.tab==='column'){const c=Sel.focusCol();if(c&&c!==this.col){this.col=c;this.render()}}},
   onColumn(c){this.col=c;if(this.tab==='column')this.render()},
   onCell(){

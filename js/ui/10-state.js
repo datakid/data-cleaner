@@ -26,9 +26,14 @@ async function applyLoad(r,opts){
   S.meta=r.stepsMeta;S.states=r.states;
   if(!opts.keepSteps){S.steps=[];S.undo=[];S.redo=[];S.sort=[];S.search='';S.vfilter=null;Sel.clear(true);$('#searchInput').value=''}
   S.viewIdx=S.steps.length;
+  const wasHidden=$('#workspace').classList.contains('hidden');
   App.showWorkspace();
+  if(wasHidden)await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
   await refreshView();
-  ReadingBar.render();Rail.render();Scrub.render();Inspector.refresh(true);Status.render();
+  await yieldUI();
+  ReadingBar.render();Rail.render();Scrub.render();
+  await yieldUI();
+  Inspector.refresh(true);Status.render();
   Coach.maybeShow();
   Session.saveData()
 }
@@ -44,7 +49,10 @@ async function setPipeline(steps,from,opts){
   S.viewIdx=Math.max(0,Math.min(opts.viewIdx==null?next.length:opts.viewIdx,next.length));
   if(!opts.noUndo){S.undo.push(prev);if(S.undo.length>100)S.undo.shift();S.redo=[]}
   await refreshView();
-  Rail.render();Scrub.render();Inspector.refresh();Status.render();ReadingBar.render();
+  await yieldUI();
+  Rail.render();Scrub.render();
+  await yieldUI();
+  Status.render();Inspector.refresh();
   Session.save();
   return true
 }
@@ -119,6 +127,7 @@ async function refreshView(keepScroll){
   Sel.pruneCols(names);
   S.sort=S.sort.filter(k=>names.has(k.col));
   Grid.reset(keepScroll);
+  await yieldUI();
   Status.render();
   $('#btnSearchStep').classList.toggle('hidden',!S.search.trim());
   VFilter.render()
@@ -129,6 +138,7 @@ async function setViewIdx(i){
   S.viewIdx=i;
   if(S.vfilter&&S.vfilter.stateIdx!=null&&S.vfilter.stateIdx!==i)S.vfilter=null;
   await refreshView(true);
+  await yieldUI();
   Rail.render();Scrub.render();Inspector.refresh();Status.render()
 }
 

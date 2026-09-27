@@ -10,10 +10,11 @@ const Perf={
     const phases=[];
     const time=async(label,budgetKey,fn,note)=>{const t0=mark();await fn();const ms=mark()-t0;phases.push({label,t0,t1:mark()});out.push({label,ms,budget:this.BUDGET[budgetKey],note});return ms};
     Toast.show('Running the performance test. This takes a few seconds.');
-    const s=W.makeStress(nRows);
-    const bytes=s.text.length;
-    await time('Read and detect '+fmtBytes(bytes)+' of CSV ('+fmtInt(nRows)+' rows)','load',()=>Input.loadText(s.text,s.fileName));
-    const afterLoad=mark();
+    const st=await Input.stageStress(nRows);
+    const bytes=st.bytes;
+    await sleep(50);
+    await time('Read and detect '+fmtBytes(bytes)+' of CSV ('+fmtInt(nRows)+' rows)','load',()=>Input.loadStaged(st.fileName));
+    const afterLoad=mark();this.afterLoad=afterLoad;
     await time('Trim whitespace on all columns','trim',()=>addStep('trim',{columns:['*'],collapse:true},{silent:true}));
     await time('Sort by "amount" (as a step)','sort',()=>addStep('sortRows',{keys:[{col:'amount',dir:'desc',type:'auto'}]},{silent:true}));
     await time('Remove rows where "payment_status" is "paid"','sort',()=>addStep('filterRows',{mode:'remove',match:'all',conditions:[{col:'payment_status',op:'equals',value:'paid',caseSensitive:false}]},{silent:true}));
@@ -25,7 +26,7 @@ const Perf={
     if(obs)obs.disconnect();
     const lt=long.filter(e=>e.t>=afterLoad);
     const worst=lt.reduce((m,e)=>Math.max(m,e.d),0);
-    this.longTasks=lt.map(e=>{const p=phases.find(p=>e.t>=p.t0-5&&e.t<=p.t1+5);return{d:Math.round(e.d),phase:p?p.label:'between steps'}});
+    this.longTasks=lt.map(e=>{const p=phases.find(p=>e.t>=p.t0-5&&e.t<=p.t1+5);return{d:Math.round(e.d),t:Math.round(e.t),phase:p?p.label:'between steps'}});
     this.show(out,{engine:Engine.mode,worst,longCount:lt.length,supported:!!obs,bytes})
   },
   show(rows,info){

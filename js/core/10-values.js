@@ -56,6 +56,7 @@ W.parseNumber=function(raw,opts){
   const locale=opts.locale||'us';
   let s=String(raw==null?'':raw).trim();
   if(s===''||s.length>40)return null;
+  if(s.length<16){const c0=s.charCodeAt(0);if((c0>=48&&c0<=57)||c0===45){if(locale==='eu'?/^-?\d+$/.test(s):/^-?\d+(\.\d+)?$/.test(s)){const v=+s;return{value:v,isPercent:false,negative:c0===45}}}}
   let neg=false;
   if(s.length>1&&s[0]==='('&&s[s.length-1]===')'){neg=true;s=s.slice(1,-1).trim()}
   if(s[0]==='-'||s[0]==='−'){neg=true;s=s.slice(1).trim()}
