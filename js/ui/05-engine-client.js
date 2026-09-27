@@ -1,7 +1,7 @@
 'use strict';
 const Engine={
   worker:null,mode:'none',seq:0,pending:new Map(),gens:{},recovering:null,lastLoad:null,lastReading:null,lastActive:0,
-  init(){if(!this.ready)this.ready=this.init_();return this.ready},
+  init(){if(!this.ready)this.ready=this.init_().finally(()=>{this.ready_=true;const pp=document.getElementById('pageProgress');if(pp&&!Busy.n)pp.classList.add('hidden')});return this.ready},
   async init_(){
     const noWorker=/[?&]noworker=1/.test(location.search);
     if(!noWorker&&typeof Worker==='function'){
@@ -61,8 +61,9 @@ const Busy={
   n:0,label:'',t:null,
   async run(label,fn){
     this.n++;this.label=label;
+    const pp=$('#pageProgress');if(pp&&$('#workspace').classList.contains('hidden'))pp.classList.remove('hidden');
     if(!this.t)this.t=setTimeout(()=>{if(this.n>0){$('#progress').classList.remove('hidden');Status.work(this.label)}},300);
     try{return await fn()}
-    finally{this.n--;if(this.n<=0){this.n=0;clearTimeout(this.t);this.t=null;$('#progress').classList.add('hidden');Status.work(null)}}
+    finally{this.n--;if(this.n<=0){this.n=0;clearTimeout(this.t);this.t=null;$('#progress').classList.add('hidden');Status.work(null);const pp=$('#pageProgress');if(pp&&Engine.ready_)pp.classList.add('hidden')}}
   }
 };

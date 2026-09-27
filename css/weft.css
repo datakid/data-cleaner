@@ -296,6 +296,7 @@ svg{display:block;flex:none}
 .sb-work i{width:8px;height:8px;border-radius:50%;background:var(--clay);animation:breathe 1s ease-in-out infinite}
 .progress-bar{position:absolute;left:0;right:0;top:0;height:3px;z-index:6;overflow:hidden;pointer-events:none}
 .progress-bar i{position:absolute;top:0;bottom:0;width:30%;border-radius:3px;background:var(--clay);animation:slide 1.1s var(--ease) infinite}
+.page-progress{position:fixed;top:0;bottom:auto;height:3px;z-index:1000}
 @keyframes slide{0%{left:-30%}100%{left:100%}}
 @keyframes breathe{50%{opacity:.35}}
 .blink{animation:blink .15s linear}
