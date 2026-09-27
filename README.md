@@ -13,7 +13,7 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `index.html?noworker=1` | Forces the engine onto the main thread (for debugging) |
 | `index.html?theme=dark` / `?theme=light` | Forces a theme |
 | `tests.html` | Engine tests: 226 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures) |
-| `ui-test.html` | Runs the full UI end to end (27 checks) and logs results to the console |
+| `ui-test.html` | Runs the full UI end to end (31 checks) and logs results to the console |
 
 ## Features
 
@@ -102,19 +102,25 @@ js/tests/*.js                fixtures, engine tests, UI drive test
 - **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data".
 
 ## Measured performance
-Run in the preview browser with the background engine on, 50,000 rows (4.6 MB):
+Help ▸ Measure performance, 200,000 rows (18.7 MB), background engine on, run in the shared preview browser:
 
 | Action | Time | Budget |
 |---|---|---|
-| Read and detect | 2.5 s | 3 s |
-| Trim all columns | 0.37–0.46 s | 0.6 s |
-| Sort as a step | 0.25–0.32 s | 0.9 s |
-| Filter rows | 0.29–0.36 s | 0.9 s |
-| Search | 0.15–0.21 s | 0.25 s |
-| Fetch a page while scrolling | 12–16 ms | 100 ms |
-| Undo | 0.15–0.23 s | 0.6 s |
+| Read and detect | 0.63–0.75 s | 3 s |
+| Trim all columns | 0.24–0.28 s | 0.6 s |
+| Sort as a step | 0.29–0.32 s | 0.9 s |
+| Filter rows | 52–84 ms | 0.9 s |
+| Search | 49–60 ms | 0.25 s |
+| Fetch a page while scrolling | 4–12 ms | 100 ms |
+| Undo | 9–14 ms | 0.6 s |
 
-Open issue: the page registered several 100–285 ms freezes. Weft's own main-thread code accounts for at most 52 ms of that (the grid reset); the rest could not be traced in this shared test browser. Run Help ▸ Measure performance on a real machine to confirm. The full 200,000-row run could not complete in the preview browser.
+How it stays fast:
+- Trim skips cells with nothing to trim and copies a column only when something in it changes.
+- Search scans the columns directly instead of building an index.
+- Undo and edits reuse every unchanged step's result.
+- On the page, the work after each step is split into short tasks. The grid caches its scroll position and size instead of reading layout, and its rows use CSS containment.
+
+Freezes: Weft's own code no longer runs longer than about 50 ms at a time. The shared preview browser still reports one freeze per run (70–105 ms, occasionally more when the machine is busy). Almost none of it is Weft's script (5 ms); the rest is browser work that couldn't be traced there. The real test is Help ▸ Measure performance on your own machine.
 
 ## Not yet done
 `index.html` already links these files; they just need to be copied in:

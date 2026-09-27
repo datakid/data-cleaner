@@ -13,7 +13,7 @@ const Perf={
     const st=await Input.stageStress(nRows);
     const bytes=st.bytes;
     await sleep(50);
-    await time('Read and detect '+fmtBytes(bytes)+' of CSV ('+fmtInt(nRows)+' rows)','load',()=>Input.loadStaged(st.fileName));
+    await time('Read and detect '+fmtBytes(bytes)+' of CSV ('+fmtInt(nRows)+' rows)','load',async()=>{await Input.loadStaged(st.fileName);for(let i=0;i<100&&(!Grid.pages.has(0)||Grid.autoFitPending);i++)await sleep(20);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await sleep(30)});
     const afterLoad=mark();this.afterLoad=afterLoad;
     await time('Trim whitespace on all columns','trim',()=>addStep('trim',{columns:['*'],collapse:true},{silent:true}));
     await time('Sort by "amount" (as a step)','sort',()=>addStep('sortRows',{keys:[{col:'amount',dir:'desc',type:'auto'}]},{silent:true}));
