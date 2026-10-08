@@ -85,6 +85,13 @@ function searchIndex(t){
   }
   return t._search
 }
+const INDEX_BUDGET=60e6;
+function buildSearchIndex(t){
+  const n=t.n,w=t.cols.length;let bytes=0;
+  for(let c=0;c<w&&bytes<=INDEX_BUDGET;c++){const col=t.data[c];for(let r=0;r<n;r++){const v=col[r];if(v)bytes+=v.length+1}}
+  if(bytes>INDEX_BUDGET){t._noIndex=true;return}
+  searchIndex(t)
+}
 function makeView(p){
   const si=p.stateIdx==null||p.stateIdx<0?E.states.length-1:Math.min(p.stateIdx,E.states.length-1);
   const t=E.states[si];
@@ -93,6 +100,7 @@ function makeView(p){
   if(q){
     const terms=q.split(/\s+/).filter(Boolean);pos=[];
     const w=t.cols.length,cols=t.data;
+    if(!t._search&&!t._noIndex){t._searches=(t._searches||0)+1;if(t._searches>=2)buildSearchIndex(t)}
     if(t._search){const idx=t._search;for(let r=0;r<t.n;r++){const x=idx[r];let ok=true;for(const tm of terms)if(x.indexOf(tm)===-1){ok=false;break}if(ok)pos.push(r)}}
     else{
       const res=terms.map(tm=>new RegExp(tm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'));

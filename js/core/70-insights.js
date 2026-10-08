@@ -6,6 +6,10 @@ const ART_RE=new RegExp(W.JUNK_ARTIFACT_SRC,'i');
 const s=v=>v==null?'':String(v);
 function isWsCode(c){return c===32||(c>=9&&c<=13)||c===160||c===0xFEFF||c===0x1680||(c>=0x2000&&c<=0x200A)||c===0x2028||c===0x2029||c===0x202F||c===0x205F||c===0x3000}
 function tlen(x){if(typeof x!=='string')x=String(x);let a=0,b=x.length;while(a<b&&isWsCode(x.charCodeAt(a)))a++;while(b>a&&isWsCode(x.charCodeAt(b-1)))b--;return b-a}
+const NUMFMT_RE=/[$€£¥₹%,()]|\s/;
+const ISO_RE=/^\d{4}-\d{2}-\d{2}$/;
+function dateShape(x){let o='',i=0;const L=x.length;while(i<L){const c=x.charCodeAt(i);if(c>=48&&c<=57){let j=i;while(j<L){const d=x.charCodeAt(j);if(d<48||d>57)break;j++}o+='9999'.slice(0,Math.min(j-i,4));i=j}else if((c>=65&&c<=90)||(c>=97&&c<=122)){let j=i;while(j<L){const d=x.charCodeAt(j)|32;if(d<97||d>122)break;j++}const k=j-i;if(k>=3&&k<=9)o+='M';else if(k<3)o+=x.slice(i,j);else{let rest=k;while(rest>9){o+='M';rest-=9}o+=rest>=3?'M':x.slice(j-rest,j)}i=j}else{o+=x[i];i++}}return o}
+W._dateShape=dateShape;
 const INV_RE=/[\u00A0\u200B-\u200D\u2060\uFEFF\u2018\u2019\u201C\u201D\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
 
 W.posMap=function(t){
@@ -182,24 +186,28 @@ function issuesRaw(t,ctx){
   if(inv)push({kind:'invisible',severity:'medium',title:'Invisible or curly characters',detail:W.plural(inv,'cell')+' contain non-breaking spaces, zero-width characters or curly quotes. They break matching and lookups.',count:inv,showRows:{filter:{match:'any',conditions:Array.from(invCols).slice(0,8).map(c=>({col:c,op:'matches',value:'[\\u00A0\\u200B-\\u200D\\u2060\\uFEFF\\u2018\\u2019\\u201C\\u201D]'}))}},fix:{opId:'cleanText',cfg:{columns:['*'],nbsp:true,zeroWidth:true,smartQuotes:true,nfc:true,controlChars:true}}});
   for(let c=0;c<w;c++){
     const name=t.cols[c],col=t.data[c],type=types[c];
-    const vals=[];for(let r=0;r<Math.min(n,4000);r++)vals.push(s(col[r]));
-    const ne=vals.filter(v=>v.trim());
+    const ne=[],tr=[];const lim2=Math.min(n,4000);
+    for(let r=0;r<lim2;r++){const v=s(col[r]);const x=v.trim();if(x){ne.push(v);tr.push(x)}}
     if(!ne.length)continue;
     if(type==='number'){
-      const fmt=ne.filter(v=>/[$€£¥₹%,()]|\s/.test(v.trim())||/^[+]/.test(v.trim())).length;
       const loc=W.detectNumberLocale(ne);
-      const bad=ne.filter(v=>!W.parseNumber(v,{locale:loc})).length;
+      let fmt=0,bad=0;const badEx=[];
+      for(let i=0;i<ne.length;i++){const x=tr[i];if(NUMFMT_RE.test(x)||x.charCodeAt(0)===43)fmt++;if(!W.parseNumber(ne[i],{locale:loc})){bad++;if(badEx.length<3)badEx.push(ne[i])}}
       if(fmt)push({kind:'numText',severity:fmt>ne.length*0.2?'medium':'low',title:'Numbers stored as text in "'+name+'"',detail:W.plural(fmt,'value')+' include currency signs, thousands separators or brackets'+(loc==='eu'?' (European style)':'')+'. Spreadsheets may not add them up.',count:fmt,column:name,showRows:{filter:{match:'all',conditions:[{col:name,op:'matches',value:'[$€£¥₹%,()]|^\\s|\\s$'}]}},fix:{opId:'convertType',cfg:{column:name,to:'number',locale:loc,percentAsFraction:false}}});
-      if(bad)push({kind:'notNum',severity:'low',title:W.plural(bad,'value')+' in "'+name+'" are not numbers',detail:'Examples: '+ne.filter(v=>!W.parseNumber(v,{locale:loc})).slice(0,3).map(v=>'"'+W.trunc(v,16)+'"').join(', ')+'.',count:bad,column:name,showRows:null,fix:null})
+      if(bad)push({kind:'notNum',severity:'low',title:W.plural(bad,'value')+' in "'+name+'" are not numbers',detail:'Examples: '+badEx.map(v=>'"'+W.trunc(v,16)+'"').join(', ')+'.',count:bad,column:name,showRows:null,fix:null})
     }else if(type==='date'){
-      const shapes=new Map();
-      for(const v of ne){const sh=v.trim().replace(/[A-Za-z]{3,9}/g,'M').replace(/\d+/g,m=>'9'.repeat(Math.min(m.length,4)));shapes.set(sh,(shapes.get(sh)||0)+1)}
-      const amb=ne.filter(W.isDateAmbiguous).length;
-      if(shapes.size>1){const nonIso=ne.filter(v=>!/^\d{4}-\d{2}-\d{2}$/.test(v.trim())).length;push({kind:'mixedDates',severity:'medium',title:'Mixed date formats in "'+name+'"',detail:shapes.size+' different formats, such as '+Array.from(shapes.keys()).slice(0,3).map(x=>'"'+ne.find(v=>v.trim().replace(/[A-Za-z]{3,9}/g,'M').replace(/\d+/g,m=>'9'.repeat(Math.min(m.length,4)))===x)+'"').join(', ')+'.',count:nonIso,column:name,showRows:{filter:{match:'all',conditions:[{col:name,op:'isNotEmpty'},{col:name,op:'matches',value:'^(?!\\d{4}-\\d{2}-\\d{2}$)'}]}},fix:{opId:'dateNormalize',cfg:{column:name,format:'iso'}}})}
+      const shapes=new Map();let amb=0,nonIso=0;
+      for(let i=0;i<ne.length;i++){
+        const x=tr[i];const sh=dateShape(x);const e=shapes.get(sh);
+        if(e)e.n++;else shapes.set(sh,{n:1,ex:x});
+        if(W.isDateAmbiguous(x))amb++;
+        if(!ISO_RE.test(x))nonIso++
+      }
+      if(shapes.size>1){push({kind:'mixedDates',severity:'medium',title:'Mixed date formats in "'+name+'"',detail:shapes.size+' different formats, such as '+Array.from(shapes.values()).slice(0,3).map(e=>'"'+e.ex+'"').join(', ')+'.',count:nonIso,column:name,showRows:{filter:{match:'all',conditions:[{col:name,op:'isNotEmpty'},{col:name,op:'matches',value:'^(?!\\d{4}-\\d{2}-\\d{2}$)'}]}},fix:{opId:'dateNormalize',cfg:{column:name,format:'iso'}}})}
       if(amb)push({kind:'ambiguousDates',severity:'low',title:'Ambiguous dates in "'+name+'"',detail:W.plural(amb,'date')+' like 3/4/2025 could be March 4 or April 3. They are read as '+((ctx.dateOrder||'mdy')==='dmy'?'day/month':'month/day')+'. Change this under View ▸ Date order.',count:amb,column:name,showRows:{filter:{match:'all',conditions:[{col:name,op:'matches',value:'^(0?[1-9]|1[0-2])[-/.](0?[1-9]|1[0-2])[-/.]\\d{2,4}$'}]}},fix:null})
     }else{
       const groups=new Map();
-      for(const v of ne){const k=v.trim().replace(/\s+/g,' ').toLowerCase();if(!groups.has(k))groups.set(k,new Map());const g=groups.get(k);const tv=v.trim().replace(/\s+/g,' ');g.set(tv,(g.get(tv)||0)+1);if(groups.size>200)break}
+      for(let i=0;i<tr.length;i++){const x=tr[i];const tv=x.indexOf('  ')===-1&&x.indexOf('\t')===-1&&x.indexOf('\n')===-1?x:x.replace(/\s+/g,' ');const k=tv.toLowerCase();let g=groups.get(k);if(!g){g=new Map();groups.set(k,g)}g.set(tv,(g.get(tv)||0)+1);if(groups.size>200)break}
       if(groups.size<=60&&groups.size<ne.length/2){
         let variants=0,rows=0;const allVar=new Map();
         groups.forEach(g=>{if(g.size>1){variants++;g.forEach((cnt,val)=>{allVar.set(val,cnt)});let tot=0;g.forEach(x=>tot+=x);rows+=tot-Math.max.apply(null,Array.from(g.values()))}});

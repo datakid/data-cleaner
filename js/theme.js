@@ -18,6 +18,11 @@
   var q=location.search.match(/[?&]theme=(light|dark|system)/);
   apply(q?q[1]:p.theme);
   if(p.density)root.setAttribute('data-density',p.density);
+  var cq=window.matchMedia?matchMedia('(prefers-contrast: more)'):null;
+  function applyContrast(c){c=c==='high'||c==='normal'?c:'system';var on=c==='high'||(c==='system'&&cq&&cq.matches);if(on)root.setAttribute('data-contrast','high');else root.removeAttribute('data-contrast');root.setAttribute('data-contrast-choice',c);return on}
+  var cqs=location.search.match(/[?&]contrast=(high|normal)/);
+  applyContrast(cqs?cqs[1]:p.contrast);
+  if(cq){var onc=function(){if(root.getAttribute('data-contrast-choice')==='system')applyContrast('system')};if(cq.addEventListener)cq.addEventListener('change',onc);else if(cq.addListener)cq.addListener(onc)}
   var m=mq();
   if(m){var on=function(){if((root.getAttribute('data-theme-choice')||'system')==='system'){root.classList.add('theme-switching');apply('system');setTimeout(function(){root.classList.remove('theme-switching')},320);if(window.WeftTheme&&WeftTheme.onChange)WeftTheme.onChange()}};if(m.addEventListener)m.addEventListener('change',on);else if(m.addListener)m.addListener(on)}
   window.WeftTheme={
@@ -31,6 +36,9 @@
       if(this.onChange)this.onChange();
       return eff
     },
+    contrast:function(){return root.getAttribute('data-contrast-choice')||'system'},
+    highContrast:function(){return root.getAttribute('data-contrast')==='high'},
+    setContrast:function(c){root.classList.add('theme-switching');var on=applyContrast(c);var d=read();d.contrast=c;try{localStorage.setItem('weft.prefs.v1',JSON.stringify(d))}catch(e){}clearTimeout(this._t);this._t=setTimeout(function(){root.classList.remove('theme-switching')},320);return on},
     onChange:null
   };
 })();

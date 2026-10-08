@@ -104,6 +104,16 @@ G.runCoreTests=function(){
     const ws=is.find(i=>i.kind==='whitespace');ok(ws&&ws.count===3,'ws '+(ws&&ws.count));
     const inv=is.find(i=>i.kind==='invisible');ok(inv&&inv.count===3,'inv '+(inv&&inv.count))
   });
+  test('date shape matches original regex',()=>{
+    const old=v=>v.replace(/[A-Za-z]{3,9}/g,'M').replace(/\d+/g,m=>'9'.repeat(Math.min(m.length,4)));
+    ['2025-01-02','3/4/25','March 4, 2025','4-Jan-2025','Wed, 5 Mar 2025','12 de enero 2025','Sept 9 2025','ab 2025','20250102','Thursdayyyyyy 4','x','TBD','10:30 PM 1/2/2025'].forEach(v=>eq(W._dateShape(v),old(v),v))
+  });
+  test('search index gives same rows as scan',()=>{
+    const E=W.Engine;E.handle('load',{text:'n,c\nAda Lovelace,UK\nalan turing,uk\nGrace,US\nada b,us'});
+    const a=E.handle('setView',{search:'ada'}).n,b=E.handle('setView',{search:'ada us'}).n;
+    const t=W.E.states[W.E.states.length-1];ok(!!t._search,'index not built after repeat searches');
+    eq([E.handle('setView',{search:'ada'}).n,E.handle('setView',{search:'ada us'}).n,E.handle('setView',{search:'UK'}).n],[a,b,2]);eq([a,b],[2,1])
+  });
   test('schema reports fill share',()=>{const r=W.Engine.handle('load',{text:'a,b\n1,\n2,x\n3,\n4,'});eq(r.finalSchema.cols.map(c=>c.fill),[1,0.25])});
   return results
 };

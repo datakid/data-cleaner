@@ -67,6 +67,12 @@ async function run(){
     setTheme('dark',true);ok('theme dark',html.getAttribute('data-theme')==='dark'&&WeftTheme.choice()==='dark'&&$('#themeSwitch [data-theme-opt="dark"]').getAttribute('aria-checked')==='true');
     setTheme('light',true);ok('theme light',html.getAttribute('data-theme')==='light'&&JSON.parse(localStorage.getItem('weft.prefs.v1')).theme==='light');
     setTheme('system',true);ok('theme system default',!html.hasAttribute('data-theme')&&WeftTheme.choice()==='system'&&Commands.get('view.theme.system').checked());
+    Commands.run('view.contrast.high');await wait(50);ok('contrast high',html.getAttribute('data-contrast')==='high'&&getComputedStyle(html).getPropertyValue('--ink').trim().toUpperCase()==='#000000');
+    Commands.run('view.contrast.normal');await wait(50);ok('contrast normal',!html.hasAttribute('data-contrast'));
+    Commands.run('view.contrast.system');await wait(50);
+    await Input.loadSample('vendor');await until(()=>S.loaded&&Grid.pages.has(0));
+    const fb=$('.gh-fill.can');ok('fill bar clickable',!!fb);
+    if(fb){const col=fb.closest('.gh').dataset.col;fb.click();await until(()=>S.vfilter);await wait(200);ok('fill bar filters empties',S.vfilter&&/is empty/.test(S.vfilter.label)&&S.view.n<S.view.total,col+' '+S.view.n+'/'+S.view.total);VFilter.clear();await wait(100)}
     let blocked=false;try{await fetch('data:,x')}catch(e){blocked=true}ok('csp blocks fetch',blocked);
   }catch(e){log('ERROR '+e.message+' '+e.stack)}
   const f=results.filter(r=>!r[1]);log('DONE '+(results.length-f.length)+'/'+results.length);

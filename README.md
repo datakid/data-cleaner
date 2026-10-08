@@ -12,8 +12,9 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `index.html#r=<code>` | Opens a shared recipe. The review dialog appears before anything runs. `#p=` links from Sift are also accepted. |
 | `index.html?noworker=1` | Forces the engine onto the main thread (for debugging) |
 | `index.html?theme=dark` / `?theme=light` / `?theme=system` | Forces a theme for this visit (doesn't change the saved choice) |
-| `tests.html` | Engine tests: 251 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, parser parity, sort stability, suggestions scans) |
-| `ui-test.html` | Runs the full UI end to end (34 checks, including the theme switch) and logs results to the console |
+| `index.html?contrast=high` / `?contrast=normal` | Forces a contrast level for this visit |
+| `tests.html` | Engine tests: 253 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, parser parity, sort stability, suggestions scans, date shapes, search index) |
+| `ui-test.html` | Runs the full UI end to end (38 checks, including theme, contrast and fill-bar filtering) and logs results to the console |
 | `perf-test.html` | Runs the 200,000-row performance test automatically and logs the timings |
 | `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
 
@@ -119,7 +120,7 @@ js/tests/*.js                fixtures, engine tests, UI drive test
 - **Browser storage keys:**
   - `weft.session.v1`: the autosaved recipe.
   - `weft.library.v2`: saved recipes. Old `sift_library_v1` entries are migrated automatically.
-  - `weft.prefs.v1`: settings, including `theme` (`system`, `light` or `dark`; missing means `system`), density, date order and column widths.
+  - `weft.prefs.v1`: settings, including `theme` (`system`, `light` or `dark`; missing means `system`), `contrast` (`system`, `high` or `normal`), density, date order and column widths.
   - `weft.recentCommands`, `weft.tips.v1`.
 - **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data".
 
@@ -148,12 +149,12 @@ How it stays fast:
 
 Freezes: Weft's own code no longer runs longer than about 50 ms at a time.
 
-## Not done yet
-- The per-column part of the suggestions scan (capital-letter variants, date shapes, values that look structured) still makes several passes over a 4,000-value sample for each column. It could be a single pass.
-- Search still scans every cell for each query. For files much larger than 200,000 rows, an index built on demand would help.
-- There is no `favicon.ico`. Modern browsers use `favicon.svg`. Very old browsers that need an `.ico` can use one built with `tools/favicon.html`.
+## Done since 2.5
+- **Single-pass column checks:** each column's suggestion checks (number formats, date shapes, ambiguous dates, capital-letter variants) now trim each value once and gather everything in one loop. A dedicated test confirms the new date-shape code gives exactly the same result as the old regex.
+- **Search index on demand:** the first search on a table version scans the cells. From the second search on, Weft builds a lower-cased index, so later searches take about 6 ms instead of about 40 ms on 200,000 rows. Tables with more than 60 MB of text skip the index to save memory. A test checks that indexed and scanned results are the same.
+- **Clickable fill bars:** clicking a column's fill bar (when the column has gaps) shows only the rows where that column is empty. "Show all rows" or Esc clears it, and "Make this a step" turns it into a filter.
+- **High contrast:** View ▸ Contrast offers Match device (default, following the operating system's "increase contrast" setting), High or Standard. It works with Light, Dark and System, uses the same design tokens, and is applied before first paint. `?contrast=high` forces it for one visit.
 
-## Next steps
-- Make the per-column suggestion checks a single pass.
-- Let the fill bars filter on click, for example "show rows where this column is empty".
-- Add a high-contrast theme that uses the same design tokens.
+## Not done yet
+- `favicon.ico` has to be added by hand because this editor can't write binary files. `index.html` already links to it, and modern browsers use `favicon.svg` until then. To add it, open `tools/favicon.html` from the project and press "Download favicon.ico". If nothing downloads, right-click the link that appears and choose "Save link as…". Put the file in the project root next to `index.html`. The builder now draws every size from `favicon.svg`, so the `.ico` always matches the icon. (It previously failed because the page pointed to a script path that doesn't exist.)
+- High contrast passed its automated check, but hasn't been looked over by eye on every screen yet.

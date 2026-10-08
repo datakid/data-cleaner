@@ -149,8 +149,8 @@ const Menus={
   groupEntries(g){
     const cmds=Commands.list.filter(c=>c.contexts.indexOf('toolbar:'+g)!==-1&&Commands.visible(c));
     const sub=(prefix,label,ic)=>{const list=cmds.filter(c=>c.id.indexOf(prefix)===0);return list.length?{label,icon:ic,sub:list}:null};
-    let rest=cmds.filter(c=>!/^(columns\.type\.|text\.case\.|view\.density\.|view\.theme\.|view\.dates\.)/.test(c.id));
-    const extra=[sub('columns.type.','Change type','columns'),sub('text.case.','Change case','text'),sub('view.density.','Row density','rows'),sub('view.theme.','Theme','sun'),sub('view.dates.','Date order','clock')].filter(Boolean);
+    let rest=cmds.filter(c=>!/^(columns\.type\.|text\.case\.|view\.density\.|view\.theme\.|view\.contrast\.|view\.dates\.)/.test(c.id));
+    const extra=[sub('columns.type.','Change type','columns'),sub('text.case.','Change case','text'),sub('view.density.','Row density','rows'),sub('view.theme.','Theme','sun'),sub('view.contrast.','Contrast','eye'),sub('view.dates.','Date order','clock')].filter(Boolean);
     const out=rest.slice();if(extra.length){out.push('-');extra.forEach(e=>out.push(e))}
     return out
   }

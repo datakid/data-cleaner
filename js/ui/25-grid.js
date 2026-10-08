@@ -76,7 +76,7 @@ const Grid={
         sk?h('button',{class:'gh-sort',type:'button',title:'Sorted '+(sk.dir==='desc'?'descending':'ascending')+'. Click to change.','data-act':'sort'},icon(sk.dir==='desc'?'sortDesc':'sortAsc',14)):null,
         h('button',{class:'gh-menu',type:'button','aria-label':'Column menu for '+c.name,'data-act':'menu'},icon('chevDown',14)),
         h('div',{class:'gresize','data-ci':String(i)}),
-        c.fill!=null?h('span',{class:'gh-fill'+(c.fill<0.5?' low':c.fill<0.95?' mid':''),title:Math.round(c.fill*1000)/10+'% of rows have a value','aria-hidden':'true'},h('i',{style:{width:(c.fill*100).toFixed(1)+'%'}})):null);
+        c.fill!=null?h('span',{class:'gh-fill'+(c.fill<0.5?' low':c.fill<0.95?' mid':'')+(c.fill<1?' can':''),'data-act':c.fill<1?'fill':null,title:Math.round(c.fill*1000)/10+'% of rows have a value'+(c.fill<1?'. Click to show the empty ones.':''),'aria-hidden':'true'},h('i',{style:{width:(c.fill*100).toFixed(1)+'%'}})):null);
       frag.push(el)
     });
     this.headSelKey=null;
@@ -227,6 +227,7 @@ const Grid={
     if(act&&act.dataset.act==='menu'){e.stopPropagation();const r=act.getBoundingClientRect();if(!(Sel.kind==='cols'&&Sel.cols.has(col)))Sel.selectCol(col);Menus.openContext('colHeader',r.left,r.bottom+4,act);return}
     if(act&&act.dataset.act==='type'){e.stopPropagation();if(!(Sel.kind==='cols'&&Sel.cols.has(col)))Sel.selectCol(col);const r=act.getBoundingClientRect();Menus.openList(Commands.byPrefix('columns.type.'),r.left,r.bottom+4,act);return}
     if(act&&act.dataset.act==='sort'){e.stopPropagation();cycleViewSort(col);return}
+    if(act&&act.dataset.act==='fill'){e.stopPropagation();VFilter.set('"'+col+'" is empty',{filter:{match:'all',conditions:[{col,op:'isEmpty'}]},stateIdx:S.viewIdx});return}
     const mod=isMac?e.metaKey:e.ctrlKey;
     Sel.selectCol(col,e.shiftKey,mod);Inspector.onColumn(col)
   },
