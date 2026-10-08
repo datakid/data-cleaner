@@ -27,6 +27,28 @@ const App={
   }
 };
 
+const THEME_LABEL={system:'Matching your device',light:'Light theme',dark:'Dark theme'};
+function syncThemeSwitch(){
+  const c=window.WeftTheme?WeftTheme.choice():'system';
+  $$('#themeSwitch [data-theme-opt]').forEach(b=>{const on=b.dataset.themeOpt===c;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1})
+}
+function setTheme(choice,quiet){
+  Prefs.d.theme=choice;
+  const eff=window.WeftTheme?WeftTheme.set(choice):choice;
+  syncThemeSwitch();
+  if(!quiet)Toast.show(THEME_LABEL[choice]+(choice==='system'?' ('+eff+' right now)':''))
+}
+function initThemeSwitch(){
+  const g=$('#themeSwitch');if(!g)return;
+  g.addEventListener('click',e=>{const b=e.target.closest('[data-theme-opt]');if(b)setTheme(b.dataset.themeOpt)});
+  g.addEventListener('keydown',e=>{
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(e.key)===-1)return;
+    e.preventDefault();const opts=['system','light','dark'];const i=opts.indexOf(WeftTheme.choice());
+    const n=opts[(i+(e.key==='ArrowRight'||e.key==='ArrowDown'?1:2))%3];setTheme(n,true);$('#themeSwitch [data-theme-opt="'+n+'"]').focus()
+  });
+  if(window.WeftTheme)WeftTheme.onChange=syncThemeSwitch;
+  syncThemeSwitch()
+}
 function onKey(e){
   if(e.isComposing)return;
   const key=e.key&&e.key.length===1?e.key.toLowerCase():e.key;
@@ -37,6 +59,7 @@ function onKey(e){
   if(ed)return;
   if(Layers.stack.length&&!Layers.has('halo'))return;
   if(key==='?'&&!mod){e.preventDefault();HelpSheet.open();return}
+  if(key==='/'&&!mod&&S.loaded){e.preventDefault();const si=$('#searchInput');si.focus();si.select();return}
   if(mod&&key==='z'&&!e.shiftKey){e.preventDefault();Commands.run('recipe.undo');return}
   if(mod&&((key==='z'&&e.shiftKey)||key==='y')){e.preventDefault();Commands.run('recipe.redo');return}
   if(mod&&key==='f'&&S.loaded){e.preventDefault();Commands.run('view.search');return}
@@ -59,7 +82,7 @@ async function boot(){
   document.addEventListener('keydown',onKey,true);
   document.addEventListener('mousedown',e=>{if(Menus.el&&!e.target.closest('.menu')&&!e.target.closest('[aria-haspopup="menu"]'))Menus.close();if(Halo.el&&!e.target.closest('.halo'))Halo.close()});
   window.addEventListener('beforeunload',e=>{if(S.loaded&&S.steps.length&&S.sessionDirty){e.preventDefault();e.returnValue=''}});
-  Grid.init();Inspector.init();Panels.init();Input.init();
+  Grid.init();Inspector.init();Panels.init();Input.init();initThemeSwitch();
   Recipes.migrate();
   App.renderExamples();App.renderSession();
   $('#cmdHint').textContent=MOD+'K';$('#searchHint').textContent=MOD+'F';$('#pasteHint').textContent='or press '+MOD+'V anywhere';

@@ -65,6 +65,46 @@ G.runCoreTests=function(){
     const v=E.handle('setView',{stateIdx:0,search:'3'});eq(v.n,1);
     const x=E.handle('export',{scope:'final',format:'tsv',options:{header:true}});eq(x.text,'a\tb\n1\t2\n3\t4\n')
   });
+  const slowParse=(text,delim,quote)=>{
+    const rows=[];let row=[],f='',q=false;
+    for(let i=0;i<text.length;i++){const c=text[i];
+      if(q){if(c===quote){if(text[i+1]===quote){f+=quote;i++}else q=false}else f+=c}
+      else{if(quote&&c===quote&&f.trim()===''){q=true;f=''}else if(c===delim){row.push(f);f=''}else if(c==='\n'){row.push(f);f='';rows.push(row);row=[]}else if(c!=='\r')f+=c}}
+    if(f!==''||row.length){row.push(f);rows.push(row)}
+    return rows
+  };
+  [
+    ['plain','a,b\n1,2\n'],['crlf','a,b\r\n1,2\r\n3,4'],['quoted comma','"x,y",2\n'],['escaped quote','"say ""hi""",z'],
+    ['quoted newline','"line1\nline2",b\nc,d'],['space before quote','a, "b,c" ,d'],['quote mid field','ab"c,d'],
+    ['empty fields',',,\n,'],['trailing delim','a,b,\n'],['lone cr','a\rb,c'],['nbsp before quote','\u00A0"x,y",z'],
+    ['empty quoted','"",x'],['blank lines','a\n\nb'],['no newline end','a,b'],['only quotes','""""'],['tab',"a\tb\n\"c\td\"\te"]
+  ].forEach(([name,txt])=>{
+    test('parser parity: '+name,()=>{const d=txt.indexOf('\t')!==-1?'\t':',';eq(W.parseDelimited(txt,d,'"'),slowParse(txt,d,'"'));eq(W.parseDelimited(txt,d,''),slowParse(txt,d,''))})
+  });
+  test('parser unclosed quote reports line',()=>{let m='';try{W.parseDelimited('a,b\nc,"d\ne,f',',','"')}catch(e){m=e.message}ok(/line 2/.test(m),m)});
+  test('parser row limit',()=>{eq(W.parseDelimited('1\n2\n3\n4',',','"',2).length,2)});
+  test('sort stable + blanks last both directions',()=>{
+    const t=W.tableFromRows(['k','i'],[['b','1'],['','2'],['a','3'],['B','4'],['a','5'],['','6']]);
+    const asc=W.OPS.sortRows.apply(t,{keys:[{col:'k',dir:'asc',type:'text'}]},{}).table;
+    eq(asc.data[1],['3','5','1','4','2','6']);
+    const desc=W.OPS.sortRows.apply(t,{keys:[{col:'k',dir:'desc',type:'text'}]},{}).table;
+    eq(desc.data[1],['1','4','3','5','2','6'])
+  });
+  test('sort natural numeric text',()=>{const t=W.tableFromRows(['k'],[['item 10'],['item 2'],['item 1']]);eq(W.OPS.sortRows.apply(t,{keys:[{col:'k',dir:'asc',type:'text'}]},{}).table.data[0],['item 1','item 2','item 10'])});
+  test('sort multi-key mixed types',()=>{const t=W.tableFromRows(['g','n'],[['x','2'],['y','1'],['x','10'],['y',''],['x','1']]);const o=W.OPS.sortRows.apply(t,{keys:[{col:'g',dir:'asc',type:'text'},{col:'n',dir:'desc',type:'number'}]},{}).table;eq(o.data[1],['10','2','1','1',''])});
+  test('issues cached per table and date order',()=>{const t=W.tableFromRows(['d'],[['3/4/2025'],['5/6/2025'],['2025-01-01']]);const a=W.issues(t,{dateOrder:'mdy'});ok(W.issues(t,{dateOrder:'mdy'})===a,'not cached');ok(W.issues(t,{dateOrder:'dmy'})!==a,'cache ignores date order')});
+  test('issues duplicates via hash chain',()=>{
+    const rows=[['a','1'],['a','1'],['a','11'],['a1',''],['a','1'],['',''],['','']];
+    const t=W.tableFromRows(['x','y'],rows);const is=W.issues(t,{});
+    const d=is.find(i=>i.kind==='duplicates');ok(d&&d.count===2,'dups '+(d&&d.count));
+    const e=is.find(i=>i.kind==='emptyRows');ok(e&&e.count===2,'empty '+(e&&e.count))
+  });
+  test('issues whitespace + invisible scan',()=>{
+    const t=W.tableFromRows(['a','b'],[['x  y','ok'],[' lead','a\u00A0b'],['fine','q\u201Cx'],['tab\t','c\u0007']]);const is=W.issues(t,{});
+    const ws=is.find(i=>i.kind==='whitespace');ok(ws&&ws.count===3,'ws '+(ws&&ws.count));
+    const inv=is.find(i=>i.kind==='invisible');ok(inv&&inv.count===3,'inv '+(inv&&inv.count))
+  });
+  test('schema reports fill share',()=>{const r=W.Engine.handle('load',{text:'a,b\n1,\n2,x\n3,\n4,'});eq(r.finalSchema.cols.map(c=>c.fill),[1,0.25])});
   return results
 };
 })(typeof self!=='undefined'?self:globalThis);

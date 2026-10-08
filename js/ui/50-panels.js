@@ -37,8 +37,8 @@ const Rail={
         onclick:()=>setViewIdx(i+1),
         ondblclick:()=>editStep(i),
         onkeydown:e=>{if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();this.move(i,e.key==='ArrowUp'?-1:1)}else if(e.key==='Enter'){e.preventDefault();setViewIdx(i+1)}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();e.stopPropagation();this.remove(i)}}},
-        h('div',{class:'sc-row1'},h('span',{class:'grip','aria-hidden':'true',title:'Drag to reorder'},icon('grip',14)),h('span',{class:'sc-name'},def.label),
-          h('span',{class:'sc-actions'},act('pencil','Edit step',()=>editStep(i)),act(st.muted?'eye':'eyeOff',st.muted?'Unmute step':'Mute step',()=>this.toggleMute(i)),act('trash','Delete step',()=>this.remove(i)),act('more','More actions',e=>{const r=e.currentTarget.getBoundingClientRect();Menus.open(this.moreMenu(i),r.left,r.bottom+4,e.currentTarget)},{'aria-haspopup':'menu'}))),
+        h('div',{class:'sc-row1'},h('span',{class:'sc-name',title:def.label},def.label),
+          h('span',{class:'sc-actions'},act('pencil','Edit step',()=>editStep(i)),act(st.muted?'eye':'eyeOff',st.muted?'Unmute step':'Mute step',()=>this.toggleMute(i)),act('more','More actions',e=>{const r=e.currentTarget.getBoundingClientRect();Menus.open(this.moreMenu(i),r.left,r.bottom+4,e.currentTarget)},{'aria-haspopup':'menu'}))),
         h('div',{class:'sc-desc',title:m.describe||''},m.describe||W.describeStep(st)),
         (m.chips&&m.chips.length||m.portable===false)?h('div',{class:'sc-chips'},(m.chips||[]).map(c=>h('span',{class:'chip c-'+(c.kind==='none'?'x':c.kind)},c.text)),m.portable===false?h('span',{class:'chip c-manual'},'Manual'):null,st.muted?h('span',{class:'chip'},'Muted'):null):null,
         m.error?h('div',{class:'sc-err'},m.error):null,
@@ -133,7 +133,7 @@ const Status={
     if(S.sort.length)el.append(h('span',{class:'sb-opt'},'View sorted by "'+S.sort[0].col+'"'));
     el.append(h('span',{class:'spacer'}));
     el.append(h('span',{id:'sbWork',class:'sb-work hidden'},h('i'),h('span')));
-    el.append(h('span',{class:'sb-opt'},Engine.mode==='worker'?'Background engine on':'Main-thread engine'));
+    el.append(h('span',{class:'sb-opt sb-engine'+(Engine.mode==='worker'?'':' main'),title:Engine.mode==='worker'?'Heavy work runs in a background thread, so the page stays responsive.':'No background thread is available, so heavy steps run on the page.'},h('i'),Engine.mode==='worker'?'Background engine':'Main-thread engine'));
     this.selStats()
   },
   selStats:debounce(async function(){

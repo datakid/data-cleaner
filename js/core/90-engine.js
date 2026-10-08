@@ -7,7 +7,13 @@ const E={
 W.E=E;
 const s=v=>v==null?'':String(v);
 
-function schemaOf(t){return{n:t.n,cols:t.cols.map((c,i)=>({name:c,type:W.typesOf(t,E.ctx)[i]}))}}
+function fillOf(t){
+  if(!t._fill){
+    t._fill=t.data.map(col=>{if(!t.n)return 1;let k=0;for(let r=0;r<t.n;r++){const v=col[r];if(v!=null&&v!==''&&(typeof v!=='string'||v.charCodeAt(0)>32||v.trim()!==''))k++}return k/t.n})
+  }
+  return t._fill
+}
+function schemaOf(t){const types=W.typesOf(t,E.ctx),fill=fillOf(t);return{n:t.n,cols:t.cols.map((c,i)=>({name:c,type:types[i],fill:fill[i]}))}}
 function need(){if(!E.base)throw new Error('Load some data first.')}
 function stateAt(i){need();if(i==null||i<0||i>=E.states.length)i=E.states.length-1;return E.states[i]}
 function engineCtx(){return{dateOrder:E.ctx.dateOrder,yearPivot:E.ctx.yearPivot,refs:E.refs,nextRowId:E.nextRowId}}

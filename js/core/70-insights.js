@@ -4,6 +4,9 @@ const W=G.WeftCore;
 const TOTAL_RE=new RegExp(W.TOTAL_SRC,'i');
 const ART_RE=new RegExp(W.JUNK_ARTIFACT_SRC,'i');
 const s=v=>v==null?'':String(v);
+function isWsCode(c){return c===32||(c>=9&&c<=13)||c===160||c===0xFEFF||c===0x1680||(c>=0x2000&&c<=0x200A)||c===0x2028||c===0x2029||c===0x202F||c===0x205F||c===0x3000}
+function tlen(x){if(typeof x!=='string')x=String(x);let a=0,b=x.length;while(a<b&&isWsCode(x.charCodeAt(a)))a++;while(b>a&&isWsCode(x.charCodeAt(b-1)))b--;return b-a}
+const INV_RE=/[\u00A0\u200B-\u200D\u2060\uFEFF\u2018\u2019\u201C\u201D\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
 
 W.posMap=function(t){
   if(!t._pos){const m=new Map();for(let r=0;r<t.n;r++)m.set(t.rowIds[r],r);t._pos=m}
@@ -43,7 +46,7 @@ function findJunkTable(t){
   if(!n||w<1)return res;
   const ne=r=>{let k=0;for(let c=0;c<w;c++)if(s(t.data[c][r]).trim())k++;return k};
   const joined=r=>{const a=[];for(let c=0;c<w;c++){const v=s(t.data[c][r]).trim();if(v)a.push(v)}return a.join(' ')};
-  for(let r=0;r<n&&res.artifacts.length<20000;r++){const j=joined(r);if(j&&j.length<40&&ART_RE.test(j))res.artifacts.push(r)}
+  for(let r=0;r<n&&res.artifacts.length<20000;r++){let L=0;for(let c=0;c<w&&L<40;c++){const x=t.data[c][r];if(x)L+=tlen(x)}if(!L||L>=40)continue;const j=joined(r);if(j&&j.length<40&&ART_RE.test(j))res.artifacts.push(r)}
   const art=new Set(res.artifacts);
   if(w>=2){
     const lim=Math.min(n,2000);const counts=[];for(let r=0;r<lim;r++)counts.push(ne(r));
@@ -64,7 +67,8 @@ function findJunkTable(t){
   else if(!W.isGenericCols(t.cols))hdr=t.cols.map(c=>String(c).trim().toLowerCase());
   if(hdr&&w>=2){
     const key=hdr.join('\u0001');
-    for(let q=0;q<n&&res.repeated.length<20000;q++){if(q===res.headerRow)continue;let k='';for(let c=0;c<w;c++){if(c)k+='\u0001';k+=s(t.data[c][q]).trim().toLowerCase()}if(k===key)res.repeated.push(q)}
+    const h0=hdr[0];
+    for(let q=0;q<n&&res.repeated.length<20000;q++){if(q===res.headerRow)continue;const f0=s(t.data[0][q]);if(f0.length<h0.length||f0.trim().toLowerCase()!==h0)continue;let k='';for(let c=0;c<w;c++){if(c)k+='\u0001';k+=s(t.data[c][q]).trim().toLowerCase()}if(k===key)res.repeated.push(q)}
   }
   return res
 }
@@ -88,6 +92,13 @@ function looksStructured(vals){
 
 W.issues=function(t,ctx){
   ctx=ctx||{};
+  const ck=(ctx.dateOrder||'mdy')+'|'+(ctx.yearPivot==null?'':ctx.yearPivot);
+  if(t._issues&&t._issuesKey===ck)return t._issues;
+  const res=issuesRaw(t,ctx);
+  t._issues=res;t._issuesKey=ck;
+  return res
+};
+function issuesRaw(t,ctx){
   const out=[];const n=t.n,w=t.cols.length;
   if(!n||!w)return out;
   const types=W.typesOf(t,ctx);
@@ -110,14 +121,39 @@ W.issues=function(t,ctx){
     push({kind:'artifacts',severity:'medium',title:W.plural(junk.artifacts.length,'page artifact row'),detail:'Rows like "Page 2 of 5" or lines of dashes.',count:junk.artifacts.length,showRows:{rowIds:idsAt(junk.artifacts.slice(0,5000))},fix:{opId:'filterRows',cfg:{mode:'remove',match:'any',conditions:[{col:'*',op:'matches',value:W.JUNK_ARTIFACT_SRC,caseSensitive:false}]}}})
   }
   let emptyRows=0;
-  for(let r=0;r<n;r++){let e=true;for(let c=0;c<w;c++)if(s(t.data[c][r]).trim()){e=false;break}if(e)emptyRows++}
+  const blankStr=v=>{if(v==null||v==='')return true;const x=typeof v==='string'?v:String(v);const c0=x.charCodeAt(0);if(c0>32&&c0!==160)return false;return x.trim()===''};
+  const dupScan=n<=300000;
+  let dups=0;const dupIds=[];
+  if(dupScan){
+    const cols=t.data;const heads=new Map();const next=new Int32Array(n);
+    const cell=(c,r)=>{const x=cols[c][r];return x==null?'':typeof x==='string'?x:String(x)};
+    const same=(a,b)=>{for(let c=0;c<w;c++)if(cell(c,a)!==cell(c,b))return false;return true};
+    for(let r=0;r<n;r++){
+      let hsh=0x811c9dc5,blank=true,any=false;
+      for(let c=0;c<w;c++){
+        const x=cols[c][r];
+        if(x!=null&&x!==''){
+          const v=typeof x==='string'?x:String(x);any=true;
+          if(blank&&!blankStr(v))blank=false;
+          for(let i=0;i<v.length;i++){hsh^=v.charCodeAt(i);hsh=Math.imul(hsh,16777619)}
+        }
+        hsh^=0x1f;hsh=Math.imul(hsh,16777619)
+      }
+      if(blank)emptyRows++;
+      if(!any)continue;
+      const head=heads.get(hsh);let p=head===undefined?-1:head,dup=false;
+      while(p!==-1){if(same(p,r)){dup=true;break}p=next[p]}
+      if(dup){dups++;if(dupIds.length<5000)dupIds.push(t.rowIds[r])}
+      else{next[r]=head===undefined?-1:head;heads.set(hsh,r)}
+    }
+  }else{
+    for(let r=0;r<n;r++){let e=true;for(let c=0;c<w;c++)if(!blankStr(t.data[c][r])){e=false;break}if(e)emptyRows++}
+  }
   if(emptyRows)push({kind:'emptyRows',severity:'medium',title:W.plural(emptyRows,'empty row'),detail:'Rows with nothing in any column.',count:emptyRows,showRows:{filter:{match:'all',conditions:[{col:'*',op:'isEmpty'}]}},fix:{opId:'dropEmptyRows',cfg:{columns:['*']}}});
   const emptyCols=[];
-  for(let c=0;c<w;c++){let e=true;for(let r=0;r<n;r++)if(s(t.data[c][r]).trim()){e=false;break}if(e)emptyCols.push(t.cols[c])}
+  for(let c=0;c<w;c++){let e=true;const col=t.data[c];for(let r=0;r<n;r++)if(!blankStr(col[r])){e=false;break}if(e)emptyCols.push(t.cols[c])}
   if(emptyCols.length&&emptyCols.length<w)push({kind:'emptyCols',severity:'low',title:W.plural(emptyCols.length,'empty column'),detail:W.trunc(emptyCols.map(c=>'"'+c+'"').join(', '),80)+' '+(emptyCols.length===1?'has':'have')+' no values.',count:emptyCols.length,showRows:null,fix:{opId:'dropEmptyCols',cfg:{}}});
-  if(n<=300000){
-    const seen=new Map();let dups=0;const dupIds=[];
-    for(let r=0;r<n;r++){let k='';for(let c=0;c<w;c++){k+=s(t.data[c][r]);k+='\u0001'}if(k.length===w)continue;if(seen.has(k)){dups++;if(dupIds.length<5000)dupIds.push(t.rowIds[r])}else seen.set(k,1)}
+  if(dupScan){
     if(dups)push({kind:'duplicates',severity:'medium',title:W.plural(dups,'exact duplicate row'),detail:'These rows are identical to an earlier row in every column.',count:dups,showRows:{rowIds:dupIds},fix:{opId:'dedupe',cfg:{on:['*'],ignoreCase:false,keep:'first'}}})
   }
   const wsCols=[];let wsCells=0;
@@ -125,7 +161,21 @@ W.issues=function(t,ctx){
   const lim=Math.min(n,50000);
   for(let c=0;c<w;c++){
     let k=0;const col=t.data[c];
-    for(let r=0;r<lim;r++){const v=s(col[r]);if(!v)continue;const cc0=v.charCodeAt(0),cc1=v.charCodeAt(v.length-1);if(cc0===32||cc0===9||cc1===32||cc1===9||v.indexOf('  ')!==-1)k++;if(/[\u00A0\u200B-\u200D\u2060\uFEFF\u2018\u2019\u201C\u201D\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(v)){inv++;invCols.add(t.cols[c])}}
+    for(let r=0;r<lim;r++){
+      const x=col[r];if(x==null||x==='')continue;const v=typeof x==='string'?x:String(x);
+      const L=v.length,cc0=v.charCodeAt(0),cc1=v.charCodeAt(L-1);
+      let ws=cc0===32||cc0===9||cc1===32||cc1===9,bad=false,prevSp=false;
+      for(let i=0;i<L;i++){
+        const ch=v.charCodeAt(i);
+        if(ch===32){if(prevSp)ws=true;prevSp=true;continue}
+        prevSp=false;
+        if(ch<32){if(ch!==9&&ch!==10&&ch!==13){bad=true}}
+        else if(ch>=0xA0&&(ch===0xA0||(ch>=0x200B&&ch<=0x200D)||ch===0x2060||ch===0xFEFF||ch===0x2018||ch===0x2019||ch===0x201C||ch===0x201D))bad=true;
+        if(bad&&ws)break
+      }
+      if(ws)k++;
+      if(bad){inv++;invCols.add(t.cols[c])}
+    }
     if(k){wsCols.push(t.cols[c]);wsCells+=k}
   }
   if(wsCols.length)push({kind:'whitespace',severity:wsCells>n*0.05?'medium':'low',title:'Extra spaces in '+(wsCols.length===1?'"'+wsCols[0]+'"':W.plural(wsCols.length,'column')),detail:W.plural(wsCells,'cell')+' have spaces at the start or end, or doubled spaces'+(wsCols.length>1?': '+W.trunc(wsCols.map(c=>'"'+c+'"').join(', '),70):'')+'.',count:wsCells,column:wsCols.length===1?wsCols[0]:null,showRows:{filter:{match:'any',conditions:wsCols.slice(0,8).map(c=>({col:c,op:'matches',value:'^\\s|\\s$|\\s\\s'}))}},fix:{opId:'trim',cfg:{columns:wsCols.length===w?['*']:wsCols,collapse:true}}});
@@ -166,7 +216,7 @@ W.issues=function(t,ctx){
   const sev={high:0,medium:1,low:2};
   out.sort((a,b)=>sev[a.severity]-sev[b.severity]||(b.count||0)-(a.count||0));
   return out
-};
+}
 
 W.likeThese=function(t,rowIds,ctx){
   const pm=W.posMap(t);

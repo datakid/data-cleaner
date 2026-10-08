@@ -1,7 +1,7 @@
 (function(G){
 'use strict';
 const W=G.WeftCore||(G.WeftCore={});
-W.version='2.1.0';
+W.version='2.5.0';
 W.OPS=W.OPS||{};
 W.OP_ORDER=W.OP_ORDER||[];
 

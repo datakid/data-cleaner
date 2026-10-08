@@ -10,7 +10,7 @@ const Engine={
         this.worker.onmessage=e=>{const d=e.data,p=this.pending.get(d.id);if(!p)return;this.pending.delete(d.id);d.ok?p.resolve(d.result):p.reject(Object.assign(new Error(d.error&&d.error.message||'Engine error'),{code:d.error&&d.error.code}))};
         this.worker.onerror=e=>{if(e&&e.preventDefault)e.preventDefault();this.fallback('worker error')};
         this.mode='worker';
-        const ok=await Promise.race([this.call('ping').then(()=>true,()=>false),sleep(8000).then(()=>false)]);
+        const ok=await Promise.race([this.call('ping').then(()=>true,()=>false),sleep(20000).then(()=>false)]);
         if(ok)return;
       }catch(e){}
     }
@@ -57,6 +57,7 @@ const Engine={
     return p.then(r=>{if(this.gens[channel]!==gen)throw Object.assign(new Error('stale'),{stale:true});return r})
   }
 };
+try{Engine.init()}catch(e){}
 const Busy={
   n:0,label:'',t:null,
   async run(label,fn){

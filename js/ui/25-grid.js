@@ -5,7 +5,13 @@ const Grid={
     this.sc=$('#gscroll');this.head=$('#ghead');this.body=$('#gbody');this.sizer=$('#gsizer');this.rect=$('#selrect');
     this.rowH_();
     this.scrollY=0;this.scrollX=0;
-    this.sc.addEventListener('scroll',()=>{this.scrollY=this.sc.scrollTop;this.scrollX=this.sc.scrollLeft;this.paint();Halo.close()},{passive:true});
+    let raf=0;
+    this.sc.addEventListener('scroll',()=>{
+      this.scrollY=this.sc.scrollTop;this.scrollX=this.sc.scrollLeft;
+      this.sc.classList.toggle('scrolled-x',this.scrollX>0);this.sc.classList.toggle('scrolled-y',this.scrollY>0);
+      if(!raf)raf=requestAnimationFrame(()=>{raf=0;this.paint()});
+      if(Halo.el)Halo.close()
+    },{passive:true});
     new ResizeObserver(en=>{const r=en[0]&&en[0].contentRect;this.vh=r&&r.height?r.height:0;this.paint()}).observe(this.sc);
     this.body.addEventListener('mousedown',e=>this.onBodyDown(e));
     this.body.addEventListener('dblclick',e=>{const c=e.target.closest('.gc');if(c&&!c.classList.contains('idx'))this.startEdit(+c.parentNode.dataset.pos,+c.dataset.ci)});
@@ -69,7 +75,8 @@ const Grid={
         h('span',{class:'gh-name',text:c.name}),
         sk?h('button',{class:'gh-sort',type:'button',title:'Sorted '+(sk.dir==='desc'?'descending':'ascending')+'. Click to change.','data-act':'sort'},icon(sk.dir==='desc'?'sortDesc':'sortAsc',14)):null,
         h('button',{class:'gh-menu',type:'button','aria-label':'Column menu for '+c.name,'data-act':'menu'},icon('chevDown',14)),
-        h('div',{class:'gresize','data-ci':String(i)}));
+        h('div',{class:'gresize','data-ci':String(i)}),
+        c.fill!=null?h('span',{class:'gh-fill'+(c.fill<0.5?' low':c.fill<0.95?' mid':''),title:Math.round(c.fill*1000)/10+'% of rows have a value','aria-hidden':'true'},h('i',{style:{width:(c.fill*100).toFixed(1)+'%'}})):null);
       frag.push(el)
     });
     this.headSelKey=null;
@@ -103,6 +110,9 @@ const Grid={
     const dir=top>=this.lastTop?1:-1;this.lastTop=top;
     const pre=dir>0?pl+1:pf-1;if(pre>=0&&pre*256<S.view.n)this.fetchPage(pre);
     const cols=S.view.schema.cols;const types=cols.map(c=>c.type);
+    const sq=S.search.trim().toLowerCase();
+    if(sq!==this._sq){this._sq=sq;this._terms=sq?sq.split(/\s+/).filter(Boolean).sort((a,b)=>b.length-a.length):null}
+    const terms=this._terms;
     const t0=performance.now();
     let deferred=false;
     for(let i=0;i<this.pool.length;i++){
@@ -119,14 +129,14 @@ const Grid={
       const sel=data&&Sel.kind==='rows'&&Sel.rowSelected(data.id);
       r.el.className='grow'+(pos%2?' even':'')+(sel?' sel':'');
       if(sel)r.el.setAttribute('aria-selected','true');else r.el.removeAttribute('aria-selected');
-      const dk=k+'|'+S.showWs;
+      const dk=k+'|'+S.showWs+'|'+sq;
       if(r.key!==dk){
         r.key=dk;
         r.cells[0].textContent=fmtInt(pos+1);
         const ch=data&&data.changed?new Set(data.changed):null;
         for(let ci=0;ci<cols.length;ci++){
           const cell=r.cells[ci+1];const v=data?data.row[ci]:'';
-          if(S.showWs&&data)this.fillWs(cell,v);else cell.textContent=v;
+          if(S.showWs&&data)this.fillWs(cell,v);else if(terms&&data&&v)this.fillMark(cell,v,terms);else cell.textContent=v;
           let cls='gc';if(types[ci]==='number')cls+=' num';if(!data)cls+=' pending';else if(v.trim()==='')cls+=' empty';if(ch&&ch.has(ci))cls+=' changed';
           cell.dataset.base=cls
         }
@@ -153,6 +163,20 @@ const Grid={
       cell.appendChild(h('span',{class:'ws',text:s}));last=m.index+m[0].length;if(m[0]==='')re.lastIndex++
     }
     if(last<v.length)cell.appendChild(document.createTextNode(v.slice(last)))
+  },
+  fillMark(cell,v,terms){
+    const low=v.toLowerCase();let i=0,hit=false;const parts=[];
+    while(i<low.length){
+      let best=-1,bl=0;
+      for(const tm of terms){const j=low.indexOf(tm,i);if(j!==-1&&(best===-1||j<best||(j===best&&tm.length>bl))){best=j;bl=tm.length}}
+      if(best===-1)break;
+      if(best>i)parts.push(v.slice(i,best));
+      parts.push({m:v.slice(best,best+bl)});i=best+bl;hit=true
+    }
+    if(!hit){cell.textContent=v;return}
+    if(i<v.length)parts.push(v.slice(i));
+    clear(cell);
+    for(const p of parts)cell.appendChild(typeof p==='string'?document.createTextNode(p):h('mark',{class:'hit',text:p.m}))
   },
   colX(ci){let x=this.idxW;for(let i=0;i<ci;i++)x+=this.widths[i];return x},
   paintRect(){

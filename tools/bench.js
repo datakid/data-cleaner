@@ -30,9 +30,12 @@ time('view sort text',()=>W.Engine.handle('setView',{sort:[{col:'full_name',dir:
 time('view sort num',()=>W.Engine.handle('setView',{sort:[{col:'amount',dir:'asc'}]}),2);
 const v=W.Engine.handle('setView',{});
 time('getRows',()=>W.Engine.handle('getRows',{viewKey:v.key,start:100000,count:256}),5);
-time('issues',()=>W.Engine.handle('issues',{}),2);
+time('issues (cold)',()=>{W.E.states.forEach(s=>{s._issues=null});return W.Engine.handle('issues',{})},2);
+time('issues (cached)',()=>W.Engine.handle('issues',{}),3);
 const ft=W.E.states[W.E.states.length-1];
 time('  findJunkTable',()=>W.findJunkTable(ft),2);
+time('  issues on 1-col text sample',()=>W.issues({cols:['full_name'],data:[ft.data[1]],n:ft.n,rowIds:ft.rowIds},{}),2);
+time('  issues on email col',()=>W.issues({cols:['email'],data:[ft.data[2]],n:ft.n,rowIds:ft.rowIds},{}),2);
 time('  dup map',()=>{const seen=new Map();const w=ft.cols.length;for(let r=0;r<ft.n;r++){let k='';for(let c=0;c<w;c++){const x=ft.data[c][r];if(x)k+=x;k+='\u0001'}if(!seen.has(k))seen.set(k,1)}},2);
 time('profile amount',()=>W.Engine.handle('profile',{col:'amount'}),2);
 time('export csv',()=>W.Engine.handle('export',{scope:'final',format:'csv',options:{header:true}}),2);

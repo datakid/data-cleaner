@@ -63,6 +63,10 @@ async function run(){
       ok('xlsx round-trip',S.baseSchema.n===d.rows.length+1||S.baseSchema.n===d.rows.length,S.reading.label+' '+S.baseSchema.n+' vs '+d.rows.length+' '+curCols().slice(0,3).join('|'));
       const types=d.types;ok('xlsx typed export info',types.length===d.cols.length,types.join(','))
     }catch(e){ok('xlsx',false,e.message)}
+    const html=document.documentElement;
+    setTheme('dark',true);ok('theme dark',html.getAttribute('data-theme')==='dark'&&WeftTheme.choice()==='dark'&&$('#themeSwitch [data-theme-opt="dark"]').getAttribute('aria-checked')==='true');
+    setTheme('light',true);ok('theme light',html.getAttribute('data-theme')==='light'&&JSON.parse(localStorage.getItem('weft.prefs.v1')).theme==='light');
+    setTheme('system',true);ok('theme system default',!html.hasAttribute('data-theme')&&WeftTheme.choice()==='system'&&Commands.get('view.theme.system').checked());
     let blocked=false;try{await fetch('data:,x')}catch(e){blocked=true}ok('csp blocks fetch',blocked);
   }catch(e){log('ERROR '+e.message+' '+e.stack)}
   const f=results.filter(r=>!r[1]);log('DONE '+(results.length-f.length)+'/'+results.length);
