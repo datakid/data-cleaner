@@ -114,8 +114,18 @@ W.inferType=function(col,n,ctx){
 };
 W.inferTypes=function(t,ctx){return t.cols.map((_,c)=>W.inferType(t.data[c],t.n,ctx))};
 
+const keyCache=new WeakMap();
 W.sortKeysFor=function(col,type,ctx){
   ctx=ctx||{};
+  const sig=type+'|'+(ctx.dateOrder||'')+'|'+(ctx.yearPivot==null?'':ctx.yearPivot);
+  let per=keyCache.get(col);
+  if(per&&per.has(sig))return per.get(sig);
+  const k=sortKeysRaw(col,type,ctx);
+  if(!per){per=new Map();keyCache.set(col,per)}
+  per.set(sig,k);
+  return k
+};
+function sortKeysRaw(col,type,ctx){
   const n=col.length;
   if(type==='number'){
     const sample=[];for(let r=0;r<n&&sample.length<250;r++){const v=col[r];if(v!=null&&String(v).trim()!=='')sample.push(v)}
@@ -132,25 +142,55 @@ W.sortKeysFor=function(col,type,ctx){
   const k=new Array(n);
   for(let r=0;r<n;r++)k[r]=String(col[r]==null?'':col[r]).trim().toLowerCase();
   return k
+}
+let COLL=null;
+function collator(){if(COLL===null)COLL=typeof Intl!=='undefined'?new Intl.Collator(undefined,{numeric:true,sensitivity:'base'}):false;return COLL}
+const rankCache=new WeakMap();
+W.textRanks=function(keys){
+  if(rankCache.has(keys))return rankCache.get(keys);
+  const n=keys.length,map=new Map(),uniq=[];
+  for(let r=0;r<n;r++){const k=keys[r];if(k!==''&&!map.has(k)){map.set(k,0);uniq.push(k)}}
+  const coll=collator();
+  uniq.sort(coll?coll.compare:(a,b)=>a<b?-1:a>b?1:0);
+  let rank=0;
+  for(let i=0;i<uniq.length;i++){if(i>0&&(coll?coll.compare(uniq[i-1],uniq[i])!==0:uniq[i-1]!==uniq[i]))rank++;map.set(uniq[i],rank)}
+  const out=new Float64Array(n);
+  for(let r=0;r<n;r++){const k=keys[r];out[r]=k===''?NaN:map.get(k)}
+  rankCache.set(keys,out);
+  return out
 };
 W.sortPositions=function(positions,keySets){
-  const coll=typeof Intl!=='undefined'?new Intl.Collator(undefined,{numeric:true,sensitivity:'base'}):null;
-  const cmpText=coll?coll.compare:(a,b)=>a<b?-1:a>b?1:0;
-  const idx=positions.map((p,i)=>i);
+  const m=positions.length;
+  const sets=keySets.map(ks=>({keys:ks.type==='text'?W.textRanks(ks.keys):ks.keys,dir:ks.dir}));
+  if(sets.length===1){
+    const ks=sets[0].keys,dir=sets[0].dir;
+    const vals=new Float64Array(m);let blanks=0;
+    for(let i=0;i<m;i++){const v=ks[positions[i]];vals[i]=v;if(v!==v)blanks++}
+    const idx=new Uint32Array(m-blanks),tail=new Uint32Array(blanks);
+    let a=0,b=0;
+    for(let i=0;i<m;i++){if(vals[i]!==vals[i])tail[b++]=i;else idx[a++]=i}
+    idx.sort(dir>0?(x,y)=>(vals[x]-vals[y])||(x-y):(x,y)=>(vals[y]-vals[x])||(x-y));
+    const out=new Array(m);
+    for(let i=0;i<a;i++)out[i]=positions[idx[i]];
+    for(let i=0;i<b;i++)out[a+i]=positions[tail[i]];
+    return out
+  }
+  const cols=sets.map(s=>{const v=new Float64Array(m);for(let i=0;i<m;i++)v[i]=s.keys[positions[i]];return v});
+  const dirs=sets.map(s=>s.dir);const K=cols.length;
+  const idx=new Uint32Array(m);for(let i=0;i<m;i++)idx[i]=i;
   idx.sort((ia,ib)=>{
-    const a=positions[ia],b=positions[ib];
-    for(const ks of keySets){
-      const ka=ks.keys[a],kb=ks.keys[b];
-      const text=ks.type==='text';
-      const ea=text?ka==='':Number.isNaN(ka),eb=text?kb==='':Number.isNaN(kb);
+    for(let k=0;k<K;k++){
+      const v=cols[k],ka=v[ia],kb=v[ib];
+      const ea=ka!==ka,eb=kb!==kb;
       if(ea&&eb)continue;
       if(ea)return 1;
       if(eb)return-1;
-      const c=text?cmpText(ka,kb):(ka-kb);
-      if(c!==0)return ks.dir*c
+      const c=ka-kb;
+      if(c!==0)return dirs[k]*c
     }
     return ia-ib
   });
-  return idx.map(i=>positions[i])
+  const out=new Array(m);for(let i=0;i<m;i++)out[i]=positions[idx[i]];
+  return out
 };
 })(typeof self!=='undefined'?self:globalThis);

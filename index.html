@@ -8,8 +8,9 @@
 <meta name="description" content="Paste CSV, logs, copied web tables, contact lists or JSON. Weft detects the columns, shows how it read them, and lets you clean rows and columns step by step. Runs entirely in your browser.">
 <meta name="theme-color" content="#F5F2EA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1F1E1C" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/jpeg" sizes="256x256" href="images/icon-256.jpg">
+<link rel="apple-touch-icon" href="images/icon-256.jpg">
 <link rel="preload" href="fonts/InstrumentSerif-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="preload" href="fonts/InstrumentSerif-Italic.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="css/weft.css">
@@ -65,6 +66,9 @@
     </svg>
     <h1 id="emptyH1">Turn pasted text into a <span class="h1-accent">clean table</span></h1>
     <p class="lede">Paste a CSV, a log, a copied web table, a contact list or JSON. Weft works out the columns, shows you how it read them, and lets you fix rows and columns step by step. Nothing leaves this tab.</p>
+    <ul class="format-row" aria-label="Formats Weft reads">
+      <li>CSV &amp; TSV</li><li>Excel</li><li>JSON</li><li>Web tables</li><li>Server logs</li><li>Terminal output</li><li>Contact lists</li>
+    </ul>
     <div class="session-banner hidden" id="sessionBanner"></div>
     <section class="paste-card" aria-label="Paste your data">
       <textarea id="pasteArea" placeholder="Paste anything here, or drop a file onto this page" aria-label="Paste your data" spellcheck="false"></textarea>

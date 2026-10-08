@@ -14,6 +14,16 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `index.html?theme=dark` / `?theme=light` | Forces a theme |
 | `tests.html` | Engine tests: 226 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures) |
 | `ui-test.html` | Runs the full UI end to end (31 checks) and logs results to the console |
+| `perf-test.html` | Runs the 200,000-row performance test automatically and logs the timings |
+| `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
+
+## What's new in 2.1
+- **Faster CSV parsing:** the parser copies whole runs of text between separators instead of building each field one character at a time. Parsing 200,000 rows takes about 0.14 s instead of 0.55 s.
+- **Faster sorting:** each distinct text value is ranked once, then rows are sorted by number. Sort keys are cached for each column. Sorting the view by a text column takes about 18 ms instead of 128 ms.
+- **Faster suggestions scan:** cheap checks rule rows out before the expensive work, and a regex that was rebuilt on every use is now built once.
+- **Smoother scrolling:** scroll events are batched to one repaint per frame.
+- **Faster start:** the background engine starts as soon as its script loads, and gets up to 20 s to start on slow devices before Weft switches to the main thread.
+- **Visual polish:** your icon is now the favicon (SVG) and the Apple touch icon. The landing page has a soft warm glow and a row of supported formats. Inspector tabs are segmented controls. The grid header and row numbers cast a shadow once you scroll. Empty-cell hatching is quieter. Changed cells are marked with a bar on the left edge. Selected rows have better contrast. The status bar is split into sections and shows a dot for the engine. Step cards fade their buttons until you hover over them. Toasts and dialog backgrounds are now frosted glass. Primary buttons have a subtle gradient.
 
 ## Features
 
@@ -76,14 +86,17 @@ Warm ivory paper with clay as the accent, and ochre, sage, slate and rose as sec
 
 - **Type:** the system serif (New York / Iowan / Palatino) for headings, and system sans for the UI. No web fonts, to keep the app fully offline.
 - **Shapes:** rounded pill buttons, soft layered shadows.
-- **Favicon:** `favicon.svg`, a clay tile with one wavy thread straightening into two woven rows.
+- **Favicon:** `favicon.svg`, a vector redraw of your icon (a clay tile with a wavy thread and woven rows). `images/icon-256.jpg` is used as the large icon and the Apple touch icon.
+- **Fonts:** Instrument Serif (`fonts/`) for headings and the wordmark.
 
 ## Project structure
 ```
 index.html  tests.html  ui-test.html  favicon.svg
 vendor/xlsx.full.min.js      SheetJS 0.20.3, loaded only when needed
 tools/favicon.html           builds favicon.ico and the Apple touch PNG
-fonts/                       Instrument Serif (to be added)
+fonts/                       Instrument Serif (Regular and Italic, OFL)
+images/                      the icon you uploaded (256 and 150 px)
+tools/bench.html             benchmark for each engine stage
 css/weft.css                 design tokens + components
 js/theme.js                  applies the saved theme before first paint
 js/worker.js                 Web Worker host (importScripts core)
@@ -104,15 +117,17 @@ js/tests/*.js                fixtures, engine tests, UI drive test
 ## Measured performance
 Help ▸ Measure performance, 200,000 rows (18.7 MB), background engine on, run in the shared preview browser:
 
-| Action | Time | Budget |
-|---|---|---|
-| Read and detect | 0.63–0.75 s | 3 s |
-| Trim all columns | 0.24–0.28 s | 0.6 s |
-| Sort as a step | 0.29–0.32 s | 0.9 s |
-| Filter rows | 52–84 ms | 0.9 s |
-| Search | 49–60 ms | 0.25 s |
-| Fetch a page while scrolling | 4–12 ms | 100 ms |
-| Undo | 9–14 ms | 0.6 s |
+| Action | 2.0 | 2.1 | Budget |
+|---|---|---|---|
+| Read and detect | 1.20 s | 0.52 s | 3 s |
+| Trim all columns | 256 ms | 182 ms | 0.6 s |
+| Sort as a step | 296 ms | 292 ms | 0.9 s |
+| Filter rows | 71 ms | 64 ms | 0.9 s |
+| Search | 49 ms | 57 ms | 0.25 s |
+| Fetch a page while scrolling | 14 ms | 3 ms | 100 ms |
+| Undo | 10 ms | 6 ms | 0.6 s |
+
+On its own, sorting the view by a text column went from 128 ms to 18 ms.
 
 How it stays fast:
 - Trim skips cells with nothing to trim and copies a column only when something in it changes.

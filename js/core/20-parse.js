@@ -2,8 +2,38 @@
 'use strict';
 const W=G.WeftCore;
 
+function isTrimWs(c){return c===32||(c>=9&&c<=13)||c===160||c===0xFEFF||c===0x1680||(c>=0x2000&&c<=0x200A)||c===0x2028||c===0x2029||c===0x202F||c===0x205F||c===0x3000}
+function lineAt(text,pos){let k=1,i=-1;while((i=text.indexOf('\n',i+1))!==-1&&i<pos)k++;return k}
+function parseFast(text,delim,quote,limitRows){
+  const n=text.length,D=delim.charCodeAt(0),Q=quote?quote.charCodeAt(0):-1;
+  const rows=[];let row=[];
+  let f='',start=0,blank=true,cr=false,i=0;
+  const take=end=>{let seg=text.slice(start,end);if(cr)seg=seg.replace(/\r/g,'');return f===''?seg:f+seg};
+  while(i<n){
+    const c=text.charCodeAt(i);
+    if(c===D){row.push(take(i));i++;f='';start=i;blank=true;cr=false;continue}
+    if(c===10){row.push(take(i));rows.push(row);row=[];i++;f='';start=i;blank=true;cr=false;if(limitRows&&rows.length>=limitRows)return rows;continue}
+    if(c===Q&&blank){
+      const open=i;f='';i++;
+      for(;;){
+        const k=text.indexOf(quote,i);
+        if(k===-1)throw new Error('A quoted field starting near line '+lineAt(text,open)+' is never closed. A closing '+quote+' is missing.');
+        if(text.charCodeAt(k+1)===Q){f+=text.slice(i,k+1);i=k+2;continue}
+        f+=text.slice(i,k);i=k+1;break
+      }
+      start=i;cr=false;blank=f.trim()==='';
+      continue
+    }
+    if(c===13)cr=true;else if(blank&&!isTrimWs(c))blank=false;
+    i++
+  }
+  const last=take(n);
+  if(last!==''||row.length){row.push(last);rows.push(row)}
+  return rows
+}
 W.parseDelimited=function(text,delim,quote,limitRows){
   quote=quote===undefined?'"':quote;
+  if(typeof delim==='string'&&delim.length===1&&delim!=='\n'&&delim!=='\r'&&(quote===''||quote.length===1)&&delim!==quote)return parseFast(text,delim,quote,limitRows);
   const rows=[];let row=[],f='',q=false,line=1,qLine=0;
   const n=text.length;
   for(let i=0;i<n;i++){
