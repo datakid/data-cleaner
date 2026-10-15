@@ -49,4 +49,44 @@ G.WEFT_FIXTURES=[
   {name:'22 nested JSON',text:nested,expect:{kind:'json',rows:26}},
   {name:'23 prose',text:prose,expect:{kindIn:['lines','list']},maxTabularConf:0.6}
 ];
+
+const mRowsOf=(n,f)=>{const r=[];for(let i=1;i<=n;i++)r.push(f(i));return r};
+const mCsvA=()=>L(['name,dept,salary'].concat(mRowsOf(4,i=>'Emp '+i+',Ops,'+(40000+i*1500))));
+const mCsvB=()=>L(['sku,qty,price,stock'].concat(mRowsOf(5,i=>'S-'+i+','+(i*4)+','+(i*2.5).toFixed(2)+','+(i%2?'yes':'no'))));
+const mSales=()=>L(['region,units,revenue'].concat(mRowsOf(3,i=>'North '+i+','+(i*7)+','+(i*700))));
+const mReturns=()=>L(['region,units,revenue'].concat(mRowsOf(3,i=>'South '+i+','+(i*2)+','+(i*90))));
+const mTbl=(h,rows)=>L([h].concat(rows));
+const mdA=()=>L(['| Name | Role |','|------|------|','| Ada | Eng |','| Grace | Admiral |','| Alan | Math |']);
+const mdB=()=>L(['| Region | Sales | Cost |','|--------|------:|-----:|','| North | 120 | 80 |','| South | 95 | 60 |','| East | 70 | 41 |']);
+const myA=()=>L(['+----+-------+--------+','| id | name  | status |','+----+-------+--------+','|  1 | Ada   | active |','|  2 | Grace | idle   |','|  3 | Alan  | active |','+----+-------+--------+','3 rows in set (0.00 sec)']);
+const myB=()=>L(['+-----+-----+','| sku | qty |','+-----+-----+','| A1  |  4  |','| B2  |  9  |','| C3  |  2  |','+-----+-----+','3 rows in set (0.00 sec)']);
+const pgA=()=>L([' id | name  | city','----+-------+--------','  1 | Ada   | London','  2 | Grace | NYC','  3 | Alan  | Wilmslow','(3 rows)']);
+const pgB=()=>L([' sku | qty','-----+-----',' A1  |   4',' B2  |   9','(2 rows)']);
+const mPara=()=>'The first quarter closed with steady demand across every region. Management expects the same trend through the summer. Please review the figures below before the meeting on Friday.';
+const mNdGroup=(k)=>L(mRowsOf(4,i=>'{"id":'+(k*10+i)+',"name":"n'+(k*10+i)+'","ok":true}'));
+const mAddr=(k)=>L(['Name: Person '+k,'Street: '+k+' Main St','City: Town '+k,'Phone: 555-010'+k]);
+const mHtmlT=(rows,docIndex,extra)=>Object.assign({rows,thHeader:true,warnings:[],docIndex},extra||{});
+const mMany=()=>{const out=[];for(let k=1;k<=13;k++)out.push(L(['h'+k+'a,h'+k+'b,h'+k+'c','Item '+k+',5,9.5','Item '+(k+1)+',6,10.5']));return out.join('\n\n')};
+const mSampleNames=()=>{const W=G.WeftCore;return Object.keys(W.SAMPLES).filter(k=>k!=='stress')};
+G.WEFT_MULTI_FIXTURES=[
+  {name:'M01 csv 3 cols then csv 4 cols',text:()=>mCsvA()+'\n\n'+mCsvB(),expect:{split:true,count:2}},
+  {name:'M02 titled csv tables',text:()=>'Sales Q1\n'+mSales()+'\n\nReturns\n'+mReturns(),expect:{split:true,count:2,titles:['Sales Q1','Returns']}},
+  {name:'M03 blank line, no second header',text:()=>mTbl('rep,units,revenue',mRowsOf(5,i=>'Rep '+i+','+(i*3)+','+(i*300)))+'\n\n'+L(mRowsOf(5,i=>'Rep '+(i+5)+','+((i+5)*3)+','+((i+5)*300))),expect:{split:false}},
+  {name:'M04 blank line, same header repeated',text:()=>mTbl('sku,qty,price',mRowsOf(4,i=>'S'+i+','+i+','+(i*2)+'.50'))+'\n\n'+mTbl('sku,qty,price',mRowsOf(4,i=>'S'+(i+4)+','+(i+4)+','+((i+4)*2)+'.50')),expect:{split:false}},
+  {name:'M05 two markdown tables back to back',text:()=>mdA()+'\n'+mdB(),expect:{split:true,count:2,kinds:['markdown-table','markdown-table']}},
+  {name:'M06 two MySQL outputs',text:()=>myA()+'\n\n'+myB(),expect:{split:true,count:2}},
+  {name:'M07 two psql outputs, no blank line',text:()=>pgA()+'\n'+pgB(),expect:{split:true,count:2}},
+  {name:'M08 csv then tsv',text:()=>mCsvA()+'\n\n'+L(['Name\tDept\tSalary\tStart'].concat(mRowsOf(4,i=>'Emp '+i+'\tEng\t'+(50000+i*1000)+'\t2024-0'+i+'-1'+i))),expect:{split:true,count:2}},
+  {name:'M09 width change without blank line',text:()=>L(['id,name,city'].concat(mRowsOf(4,i=>i+',Person '+i+',Town '+i)).concat(['sku,color,size,qty,price']).concat(mRowsOf(3,i=>'K'+i+',red,M,'+(i*2)+','+(i*1.5).toFixed(2)))),expect:{split:true,count:2}},
+  {name:'M10 built-in samples',samples:true,expect:{split:false}},
+  {name:'M11 paragraph between tables',text:()=>mCsvA()+'\n\n'+mPara()+'\n\n'+mCsvB(),expect:{split:true,count:2,skipped:1}},
+  {name:'M12 NDJSON groups',text:()=>mNdGroup(1)+'\n\n'+mNdGroup(2),expect:{split:false}},
+  {name:'M13 address blocks',text:()=>mAddr(1)+'\n\n'+mAddr(2)+'\n\n'+mAddr(3),expect:{split:false}},
+  {name:'M14 html tables follow document order',text:()=>'',html:[mHtmlT([['x','y']],0),mHtmlT([['a','b','c','d'],['1','2','3','4'],['5','6','7','8']],2),mHtmlT([['p','q','r'],['1','2','3'],['4','5','6'],['7','8','9']],1)],expect:{split:true,count:2,htmlOrder:[2,1]}},
+  {name:'M15 html with a nested table',text:()=>'',html:[mHtmlT([['a','b'],['1','2'],['3','4']],0),mHtmlT([['a','b'],['1','2'],['3','4']],1,{nested:true})],expect:{split:false}},
+  {name:'M16 thirteen tables are capped',text:mMany,expect:{split:true,count:12,truncated:true,total:13}},
+  {name:'M17 empty input',text:()=>'',expect:{split:false}},
+  {name:'M17b whitespace only',text:()=>' \n \n',expect:{split:false}}
+];
+G.WEFT_SAMPLE_NAMES=mSampleNames;
 })(typeof self!=='undefined'?self:globalThis);

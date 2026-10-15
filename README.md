@@ -13,12 +13,22 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `index.html?noworker=1` | Forces the engine onto the main thread (for debugging) |
 | `index.html?theme=dark` / `?theme=light` / `?theme=system` | Forces a theme for this visit (doesn't change the saved choice) |
 | `index.html?contrast=high` / `?contrast=normal` | Forces a contrast level for this visit |
-| `tests.html` | Engine tests: 253 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, parser parity, sort stability, suggestions scans, date shapes, search index) |
-| `ui-test.html` | Runs the full UI end to end (38 checks, including theme, contrast and fill-bar filtering) and logs results to the console |
+| `tests.html` | Engine tests: 284 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, 18 multi-table fixtures, parser parity, sort stability, suggestions scans, date shapes, search index, isolated tables) |
+| `ui-test.html` | Runs the full UI end to end (68 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs and restore) and logs results to the console |
 | `perf-test.html` | Runs the 200,000-row performance test automatically and logs the timings |
 | `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
 
-## What's new in 2.5
+## What's new in 2.6
+- **Several tables in one paste, each in its own tab.** Paste text or a copied web page that holds more than one table and Weft opens each table in a tab above the "Read as" bar. Tables are found by blank lines, by a change in column count with a new header, by markdown and database (MySQL, psql) output, and by document order for web tables. A short line above a table becomes its tab name, and footers such as "3 rows in set" stay with their table. A single table, JSON, logs, address blocks and every built-in sample are never split. Up to 12 tables open at once. A message after the split says how many were found and has **Keep as one table** to undo it.
+- **Every tab has its own recipe, undo history, search, filters, sort and scroll position.** Switching tabs is blocked while a step is still running, so a result can never land in the wrong tab. `Alt+Shift+←/→` moves between tabs, and the tab strip works with arrow keys, Home, End, `Delete` to close and `F2` to rename.
+- **Open data in a new tab instead of replacing it.** Pasting or dropping onto loaded data now asks: Cancel, Replace this table, or Open in a new tab. The **+** button at the end of the strip adds a table from the clipboard or a file, copies the current result, or opens the selected rows as their own table.
+- **Use another tab in Join and Compare.** The reference picker lists the other open tables next to "Choose a file". It uses that table's result as it is now; pick it again to refresh.
+- **One workbook with every tab.** File ▸ Download all tables as one Excel workbook, or tick "Include every open table" in the Excel export. One sheet per table, with names made unique.
+- **Remember my data keeps all tabs,** with each tab's recipe and chosen reading.
+- **Bug fixes:** a failed paste no longer stacks the old recipe on top of the old data; "Remember my data" now restores copied web tables and the reading you chose, and no longer shows an error when nothing could be restored; Start over also clears loaded references; changing the reading drops stale row views.
+- **Tests:** 31 new engine checks and 30 new UI checks. Table detection on a 200,000-row paste takes about 40 ms and is skipped for built-in test data. Loading is unchanged (engine bench: full load 430 ms before, 407-489 ms after).
+
+## What was new in 2.5
 - **Search shows where it matched:** while you search, each match is highlighted inside its cell, so you can see why a row was kept. Press `/` to jump to the search box.
 - **Column fill bars:** a thin bar under each column name shows how much of the column is filled in: green when (almost) full, amber when partly empty, red when mostly empty. Hover over it to see the exact share.
 - **Theme: System, Light or Dark.** System is the default, so Weft follows the device's appearance setting and switches live when it changes. A three-way switch in the header (monitor, sun, moon) sets it, as does View ▸ Theme or Commands; all three stay in sync. Your choice is saved in this browser. The theme is applied before the page first draws, so it never flashes the wrong colors, and the browser bar color matches. Switching fades the colors over about a quarter of a second (instantly if your device asks for reduced motion). The switch works with arrow keys and screen readers. On phones it appears only on the start screen, to keep the workspace header roomy (View ▸ Theme still works there).
@@ -110,8 +120,8 @@ tools/bench.html             benchmark for each engine stage
 css/weft.css                 design tokens + components
 js/theme.js                  WeftTheme: applies System/Light/Dark before first paint, follows the device live
 js/worker.js                 Web Worker host (importScripts core)
-js/core/*.js                 engine, no DOM: parsing, detectors, 33 step types, pipeline, insights, samples
-js/ui/*.js                   interface: DOM helpers, engine client, state, selection, grid, forms, commands, panels, dialogs
+js/core/*.js                 engine, no DOM: parsing, detectors, table splitting (35-tables.js), 33 step types, pipeline, insights, samples
+js/ui/*.js                   interface: DOM helpers, engine client, state, selection, grid, forms, commands, panels, dialogs, tabs (58-tabs.js)
 js/tests/*.js                fixtures, engine tests, UI drive test
 ```
 
@@ -122,7 +132,7 @@ js/tests/*.js                fixtures, engine tests, UI drive test
   - `weft.library.v2`: saved recipes. Old `sift_library_v1` entries are migrated automatically.
   - `weft.prefs.v1`: settings, including `theme` (`system`, `light` or `dark`; missing means `system`), `contrast` (`system`, `high` or `normal`), density, date order and column widths.
   - `weft.recentCommands`, `weft.tips.v1`.
-- **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data".
+- **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data". With several tabs open it stores each tab's source text, recipe and reading (`v: 2`); with one tab it keeps the older single-table shape.
 
 ## Measured performance
 Help ▸ Measure performance, 200,000 rows (18.7 MB), background engine on, run in the shared preview browser:

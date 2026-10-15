@@ -1,10 +1,15 @@
 (function(G){
 'use strict';
 const W=G.WeftCore;
-const E={
-  src:null,base:null,steps:[],states:[],meta:[],refs:{},ctx:{dateOrder:'mdy',yearPivot:69},views:new Map(),viewSeq:0,nextRowId:0
-};
-W.E=E;
+const CTX={dateOrder:'mdy',yearPivot:69};
+const REFS={};
+function newSession(){return{src:null,base:null,steps:[],states:[],meta:[],refs:REFS,ctx:CTX,views:new Map(),nextRowId:0,staged:null}}
+const T={map:new Map(),active:'t1',viewSeq:0};
+let E=newSession();
+T.map.set('t1',E);
+W.E=E;W.T=T;
+function useSession(id){const x=T.map.get(id);if(!x)throw new Error('That table is no longer open.');E=x;W.E=x;T.active=id}
+function withSession(x,fn){const prev=E,pid=T.active;E=x;W.E=x;try{return fn()}finally{E=prev;W.E=prev;T.active=pid}}
 const s=v=>v==null?'':String(v);
 
 function fillOf(t){
@@ -55,7 +60,7 @@ function useReading(reading){
   const t=W.applyReading(E.src.text,reading,{htmlTables:E.src.htmlTables});
   E.src.reading={kind:reading.kind,label:reading.label||(W.READERS[reading.kind]||{}).label,params:Object.assign({},reading.params)};
   delete E.src.reading.params.junk;
-  E.base=t;E.nextRowId=t.n;E.states=[];E.meta=[];
+  E.base=t;E.nextRowId=t.n;E.states=[];E.meta=[];E.views.clear();
   recompute(0);
   return t.warnings||[]
 }
@@ -133,7 +138,7 @@ function makeView(p){
     const sets=p.sort.filter(k=>t.cols.indexOf(k.col)!==-1).map(k=>{const ci=t.cols.indexOf(k.col);const type=k.type&&k.type!=='auto'?k.type:types[ci];return{keys:W.sortKeysFor(t.data[ci],type,E.ctx),type,dir:k.dir==='desc'?-1:1}});
     if(sets.length)pos=W.sortPositions(pos,sets)
   }
-  const key='v'+(++E.viewSeq);
+  const key='v'+(++T.viewSeq);
   E.views.set(key,{si,pos,t});
   if(E.views.size>8){const first=E.views.keys().next().value;E.views.delete(first)}
   return{viewKey:key,key,n:pos.length,stateIdx:si,total:t.n,schema:schemaOf(t)}
@@ -193,7 +198,35 @@ function buildExport(p){
 
 const H={
   ping:()=>({version:W.version}),
-  setCtx(p){Object.assign(E.ctx,p||{});E.states.forEach(t=>{t._types=null});if(E.base){recompute(0);return pipelineResult()}return{}},
+  setCtx(p){
+    Object.assign(CTX,p||{});
+    T.map.forEach(x=>{x.states.forEach(t=>{t._types=null});if(x.base)withSession(x,()=>recompute(0))});
+    return E.base?pipelineResult():{}
+  },
+  tableNew(p){if(T.map.has(p.id))throw new Error('A table with that id is already open.');const x=newSession();T.map.set(p.id,x);useSession(p.id);return{id:p.id}},
+  tableUse(p){useSession(p.id);return{id:p.id}},
+  tableClose(p){
+    const was=T.active===p.id;
+    T.map.delete(p.id);
+    if(was){
+      if(T.map.size)useSession(T.map.keys().next().value);
+      else{const id='t'+Date.now().toString(36);T.map.set(id,newSession());useSession(id)}
+    }
+    return{active:T.active}
+  },
+  tableReset(p){
+    T.map.clear();Object.keys(REFS).forEach(k=>{delete REFS[k]});
+    const x=newSession();T.map.set(p.id,x);useSession(p.id);
+    return{id:p.id}
+  },
+  tableList(){
+    return{active:T.active,tables:Array.from(T.map).map(([id,x])=>{const last=x.states.length?x.states[x.states.length-1]:null;return{id,rows:last?last.n:0,cols:last?last.cols.length:0,steps:x.steps.length}})}
+  },
+  exportTable(p){
+    const x=T.map.get(p.id);if(!x)throw new Error('That table is no longer open.');
+    return withSession(x,()=>{need();return buildExport({scope:'final',format:p.format,options:p.options,columns:p.columns})})
+  },
+  findTables(p){return W.findTables(p.text||'',{htmlTables:p.htmlTables||null})},
   sample(p){const r=W.makeSample(p.kind);return r},
   stageStress(p){const s=W.makeStress(p.n||200000);E.staged=s;return{bytes:s.text.length,fileName:s.fileName}},
   loadStaged(){if(!E.staged)throw new Error('Nothing is staged.');const s=E.staged;E.staged=null;return H.load({text:s.text,fileName:s.fileName})},
@@ -305,11 +338,13 @@ const H={
   refLoad(p){
     const text=W.normalizeInput(p.text||'');
     const det=W.detectReadings(text,{htmlTables:p.htmlTables});
-    const t=W.applyReading(text,det.readings[0],{htmlTables:p.htmlTables});
+    let rd=det.readings[0];
+    if(p.hint&&p.hint.kind){const hi=det.readings.findIndex(r=>r.kind===p.hint.kind);if(hi!==-1&&det.readings[hi].confidence>=0.5){rd=det.readings[hi];rd.params=Object.assign({},rd.params,p.hint.params||{})}}
+    const t=W.applyReading(text,rd,{htmlTables:p.htmlTables});
     let name=p.name||'reference';let k=2;const base=name;while(E.refs[name]&&!p.replace){name=base+' ('+k+')';k++}
     E.refs[name]=t;
-    if(E.base){const i=E.steps.findIndex(s=>(s.opId==='join'||s.opId==='diff')&&s.cfg&&s.cfg.refName===name);if(i!==-1)recompute(i)}
-    return{name,cols:t.cols,n:t.n,reading:det.readings[0].label}
+    T.map.forEach(x=>{if(!x.base)return;const i=x.steps.findIndex(s=>(s.opId==='join'||s.opId==='diff')&&s.cfg&&s.cfg.refName===name);if(i!==-1)withSession(x,()=>recompute(i))});
+    return{name,cols:t.cols,n:t.n,reading:rd.label}
   },
   refList:()=>({refs:Object.keys(E.refs).map(k=>({name:k,cols:E.refs[k].cols,n:E.refs[k].n}))}),
   refRemove(p){delete E.refs[p.name];return{}},

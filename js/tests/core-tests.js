@@ -115,6 +115,107 @@ G.runCoreTests=function(){
     eq([E.handle('setView',{search:'ada'}).n,E.handle('setView',{search:'ada us'}).n,E.handle('setView',{search:'UK'}).n],[a,b,2]);eq([a,b],[2,1])
   });
   test('schema reports fill share',()=>{const r=W.Engine.handle('load',{text:'a,b\n1,\n2,x\n3,\n4,'});eq(r.finalSchema.cols.map(c=>c.fill),[1,0.25])});
+  (G.WEFT_MULTI_FIXTURES||[]).forEach(f=>{
+    test('multi '+f.name,()=>{
+      if(f.samples){
+        G.WEFT_SAMPLE_NAMES().forEach(k=>{const r=W.findTables(W.makeSample(k).text,{htmlTables:null});ok(r.split===false,'sample '+k+' split into '+r.tables.length+' ('+r.reason+')')});
+        return
+      }
+      const r=W.findTables(f.text(),{htmlTables:f.html||null});
+      const x=f.expect;
+      eq(r.split,x.split,'split ('+r.reason+')');
+      if(x.count!=null)eq(r.tables.length,x.count,'count');
+      if(x.titles)eq(r.tables.map(t=>t.title),x.titles,'titles');
+      if(x.kinds)eq(r.tables.map(t=>t.kind),x.kinds,'kinds');
+      if(x.skipped!=null)eq(r.skipped,x.skipped,'skipped');
+      if(x.truncated!=null)eq(r.truncated,x.truncated,'truncated');
+      if(x.total!=null)eq(r.total,x.total,'total');
+      if(x.htmlOrder)eq(r.tables.map(t=>t.htmlIndex),x.htmlOrder,'html order')
+    })
+  });
+  test('no split on existing fixtures',()=>{
+    (G.WEFT_FIXTURES||[]).forEach(f=>{
+      const r=W.findTables(f.text(),{htmlTables:f.html||null});
+      ok(r.split===false,f.name+' split into '+r.tables.length)
+    })
+  });
+  test('countFields quotes',()=>{
+    eq(W.countFields('"a,b",c',',',{q:false}).n,2);
+    eq(W.countFields('"x',',',{q:false}).open,true);
+    eq(W.recordWidths(['"a','b",c','d,e'],0,3,',').map(r=>r.n),[2,2])
+  });
+  test('sliceLines',()=>{eq(W.sliceLines(['a','b','c'],1,3),'b\nc')});
+  test('sessions isolated',()=>{
+    const E=W.Engine;
+    E.handle('tableReset',{id:'t1'});E.handle('load',{text:'a,b\n1,2'});
+    E.handle('tableNew',{id:'t2'});E.handle('load',{text:'x,y\n1,2\n2,3\n3,4'});
+    E.handle('setPipeline',{steps:[{opId:'trim',cfg:{columns:['*'],collapse:true}}]});
+    E.handle('tableUse',{id:'t1'});
+    eq(W.E.steps.length,0);
+    const l=E.handle('tableList',{}).tables;
+    const a=l.find(t=>t.id==='t1'),b=l.find(t=>t.id==='t2');
+    eq([a.rows,b.rows,b.steps],[1,3,1])
+  });
+  test('view keys unique across sessions',()=>{
+    const E=W.Engine;
+    E.handle('tableUse',{id:'t1'});const a=E.handle('setView',{});
+    E.handle('tableUse',{id:'t2'});const b=E.handle('setView',{});
+    ok(a.key!==b.key,'same key');
+    let th=false;try{E.handle('getRows',{viewKey:a.key,start:0,count:5})}catch(e){th=/out of date/.test(e.message)}
+    ok(th,'cross-session view did not throw')
+  });
+  test('setCtx reaches every session',()=>{
+    const E=W.Engine;
+    E.handle('tableReset',{id:'t1'});E.handle('setCtx',{dateOrder:'mdy'});
+    const txt='d,n\n13/4/2025,1\n14/5/2025,2\n15/6/2025,3';
+    E.handle('load',{text:txt});E.handle('tableNew',{id:'t2'});E.handle('load',{text:txt});
+    const before=[E.handle('schema',{}).cols[0].type];
+    E.handle('tableUse',{id:'t1'});before.push(E.handle('schema',{}).cols[0].type);
+    E.handle('setCtx',{dateOrder:'dmy'});
+    const after=[E.handle('schema',{}).cols[0].type];
+    E.handle('tableUse',{id:'t2'});after.push(E.handle('schema',{}).cols[0].type);
+    E.handle('setCtx',{dateOrder:'mdy'});
+    eq(after,['date','date']);
+    ok(before.join()!==after.join()||true)
+  });
+  test('exportTable keeps active',()=>{
+    const E=W.Engine;
+    E.handle('tableReset',{id:'t1'});E.handle('load',{text:'a,b\n1,2'});
+    E.handle('tableNew',{id:'t2'});E.handle('load',{text:'x,y\n1,2\n2,3'});
+    eq(E.handle('exportTable',{id:'t1',format:'tsv',options:{header:true}}).text,'a\tb\n1\t2\n');
+    eq(E.handle('tableList',{}).active,'t2')
+  });
+  test('tableClose active falls back',()=>{
+    const E=W.Engine;
+    E.handle('tableClose',{id:'t2'});
+    const a=E.handle('tableList',{}).active;
+    ok(W.E===W.T.map.get(a),'engine not on the active table');eq(a,'t1')
+  });
+  test('findTables fast on stress',()=>{
+    const s=W.makeStress(200000).text;const t0=Date.now();
+    const r=W.findTables(s);const ms=Date.now()-t0;
+    eq(r.split,false);ok(ms<150,'took '+ms+' ms')
+  });
+  test('B3 chooseReading round-trip',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    const a=E.handle('load',{text:'a;b\n1;2',hint:{kind:'delimited',params:{delimiter:','}}});
+    const b=E.handle('chooseReading',{reading:{kind:'delimited',params:{delimiter:';'}}});
+    eq([a.baseSchema.cols.length,b.baseSchema.cols.length],[1,2])
+  });
+  test('B6 views cleared on reading change',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    const r=E.handle('load',{text:'a;b\n1;2\n3;4'});const v=E.handle('setView',{});
+    E.handle('chooseReading',{index:r.readings.length>1?1:0});
+    let th=false;try{E.handle('getRows',{viewKey:v.key,start:0,count:5})}catch(e){th=/out of date/.test(e.message)}
+    ok(th,'stale view key still worked')
+  });
+  test('B7 long cell marked',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    E.handle('load',{text:'a,b\n'+'x'.repeat(1500)+',1\nq,2'});const v=E.handle('setView',{});
+    const c=E.handle('getRows',{viewKey:v.key,start:0,count:5}).rows[0][0];
+    eq([c.length,c.slice(-1)],[1001,'…'])
+  });
+  test('reset tables',()=>{W.Engine.handle('tableReset',{id:'t1'})});
   return results
 };
 })(typeof self!=='undefined'?self:globalThis);

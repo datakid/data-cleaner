@@ -16,6 +16,7 @@ const norm=time('normalizeInput',()=>W.normalizeInput(text),3);
 time('split lines',()=>norm.split('\n'),3);
 time('scanText',()=>W.scanText(norm),3);
 const det=time('detectReadings',()=>W.detectReadings(norm),2);
+time('findTables',()=>W.findTables(text),3);
 time('parseDelimited',()=>W.parseDelimited(norm,',','"'),3);
 const t=time('applyReading',()=>W.applyReading(norm,det.readings[0]),2);
 time('inferTypes',()=>W.inferTypes(t,{dateOrder:'mdy'}),3);

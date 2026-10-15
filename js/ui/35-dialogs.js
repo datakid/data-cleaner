@@ -25,6 +25,12 @@ const Dialog={
       const d=Dialog.open({title,body:h('div',{class:'dlg-body'},h('p',{class:'dlg-note'},msg)),foot:[h('span',{class:'grow-1'}),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>{d.close(true);res(false)}},'Cancel'),h('button',{class:'btn '+(danger?'btn-danger':'btn-primary'),type:'button',onclick:()=>{d.close(true);res(true)}},okLabel||'Continue')],onClose:()=>res(false),focus:'.dlg-foot .btn:last-child'})
     })
   },
+  choose(title,msg,choices){
+    return new Promise(res=>{
+      const btn=c=>h('button',{class:'btn '+(c.kind==='primary'?'btn-primary':c.kind==='danger'?'btn-danger':'btn-secondary'),type:'button',onclick:()=>{d.close(true);res(c.id)}},c.label);
+      const d=Dialog.open({title,body:h('div',{class:'dlg-body'},h('p',{class:'dlg-note'},msg)),foot:[h('span',{class:'grow-1'})].concat(choices.map(btn)),onClose:()=>res(null),focus:'.dlg-foot .btn-primary'})
+    })
+  },
   prompt(title,label,value,okLabel){
     return new Promise(res=>{
       const inp=h('input',{class:'input',value:value||'',style:{width:'100%'}});

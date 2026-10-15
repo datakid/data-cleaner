@@ -36,8 +36,14 @@ const Xlsx={
       const d=Dialog.open({title:'Choose a sheet',body,foot:[h('span',{class:'grow-1'}),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>{d.close(true);res(null)}},'Cancel'),h('button',{class:'btn btn-primary',type:'button',onclick:()=>{d.close(true);res(sheets[sel])}},'Open sheet')],onClose:()=>res(null)})
     })
   },
-  async write(result,fileName,sheetName){
-    const X=await Busy.run('Loading the Excel writer',()=>this.load());
+  sheetName(n,used){
+    let base=String(n||'').replace(/[\\\/?*\[\]:]/g,' ').trim().slice(0,31).trim()||'Sheet';
+    let name=base,k=2;
+    while(used.has(name.toLowerCase())){const suf=' ('+k+')';name=base.slice(0,31-suf.length).trim()+suf;k++}
+    used.add(name.toLowerCase());
+    return name
+  },
+  sheet(X,result){
     const data=JSON.parse(result.text);
     const aoa=[data.cols].concat(data.rows);
     const ws=X.utils.aoa_to_sheet(aoa,{cellDates:false});
@@ -55,8 +61,15 @@ const Xlsx={
       ws['!autofilter']={ref:ws['!ref']};
       ws['!freeze']={xSplit:0,ySplit:1}
     }
-    const wb=X.utils.book_new();
-    X.utils.book_append_sheet(wb,ws,(sheetName||'Weft').replace(/[\\\/?*\[\]:]/g,' ').slice(0,31)||'Weft');
+    return ws
+  },
+  async writeBook(sheets,fileName){
+    const X=await Busy.run('Loading the Excel writer',()=>this.load());
+    const wb=X.utils.book_new();const used=new Set();
+    sheets.forEach(s=>X.utils.book_append_sheet(wb,this.sheet(X,s.r),this.sheetName(s.name||'Weft',used)));
     X.writeFile(wb,fileName,{compression:true,bookType:'xlsx'})
+  },
+  async write(result,fileName,sheetName){
+    return this.writeBook([{r:result,name:sheetName||'Weft'}],fileName)
   }
 };

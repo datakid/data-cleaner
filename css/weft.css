@@ -174,6 +174,18 @@ svg{display:block;flex:none}
 .theme-switching,.theme-switching *,.theme-switching *::before,.theme-switching *::after{transition:background-color .28s var(--ease),color .28s var(--ease),border-color .28s var(--ease),fill .28s var(--ease),stroke .28s var(--ease),box-shadow .28s var(--ease)!important}
 
 .reading-bar{min-height:44px;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.table-tabs{display:flex;align-items:flex-end;gap:2px;padding:6px 12px 0;background:var(--surface);border-bottom:1px solid var(--border);flex:none;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.tt{display:inline-flex;align-items:center;gap:8px;flex:none;height:32px;max-width:220px;padding:0 6px 0 12px;border-radius:var(--r-sm) var(--r-sm) 0 0;background:transparent;color:var(--ink-dim);font:600 12.5px var(--sans);white-space:nowrap;cursor:pointer;box-shadow:inset 0 -2px 0 transparent;transition:background .12s,color .12s}
+.tt:hover{background:var(--surface-2);color:var(--ink)}
+.tt[aria-selected="true"]{background:var(--surface-2);color:var(--ink);box-shadow:inset 0 -2px 0 var(--primary)}
+.tt-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tt-size{font:500 11px var(--sans);color:var(--ink-mute)}
+.tt-x{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:var(--r-pill);color:var(--ink-mute)}
+.tt-x:hover{background:var(--raised);color:var(--ink)}
+.tt-x svg{width:12px;height:12px}
+.tt-add{display:inline-flex;align-items:center;justify-content:center;flex:none;width:30px;height:30px;margin:0 0 1px 4px;border-radius:var(--r-pill);color:var(--ink-mute);transition:background .12s,color .12s}
+.tt-add:hover{background:var(--surface-2);color:var(--ink)}
+@media(max-width:600px){.tt-size{display:none}.tt{max-width:160px}}
 .small-label{font:650 10.5px var(--sans);text-transform:uppercase;letter-spacing:.07em;color:var(--ink-mute)}
 .kind-badge{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 12px;border-radius:var(--r-pill);background:var(--clay-wash);color:var(--clay-ink);font:650 12.5px var(--sans);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--clay) 22%,transparent);transition:box-shadow .12s}
 .kind-badge:hover{box-shadow:inset 0 0 0 1px var(--clay)}

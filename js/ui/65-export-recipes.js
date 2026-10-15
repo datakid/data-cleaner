@@ -21,15 +21,16 @@ const ExportDialog={
       if(viewDiffers){const bits=[];if(!atEnd())bits.push(S.viewIdx===0?'original data':'at step '+S.viewIdx);if(S.search)bits.push('filtered by search');if(S.vfilter)bits.push('showing '+S.vfilter.label);if(S.sort.length)bits.push('sorted by '+S.sort[0].col);scopeBox.append(radio('scope','view','Current view ('+plural(S.view.n,'row')+')',bits.join(', '),st.scope==='view',v=>st.scope=v))}
       if(rowSel)scopeBox.append(radio('scope','selected','Selected rows ('+fmtInt(Sel.rowCount())+')',null,st.scope==='selected',v=>st.scope=v));
       guardBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
-      xlNote.classList.toggle('hidden',st.format!=='xlsx');excelBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
+      xlNote.classList.toggle('hidden',st.format!=='xlsx');allBox.classList.toggle('hidden',!(st.format==='xlsx'&&Tabs.list.length>1));excelBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
       setName();
       const n=st.scope==='final'?finalN():st.scope==='view'?S.view.n:Sel.rowCount();
       summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?Sel.cols.size:(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
     };
     const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;refresh()}},[['xlsx','Excel workbook (.xlsx)'],['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0]},o[1])));
     const xlNote=h('p',{class:'hint hidden',style:{marginTop:'-6px'}},'Numbers and ISO dates are stored as real Excel values. The header row is frozen with filters turned on. Formulas are never created.');
+    const allBox=h('label',{class:'check hidden'},h('input',{type:'checkbox',onchange:e=>{st.allTabs=e.target.checked}}),'Include every open table (one sheet each)');
     const body=h('div',{class:'dlg-body'},
-      h('div',{class:'field'},h('label',{},'Format'),fmtSel,xlNote),
+      h('div',{class:'field'},h('label',{},'Format'),fmtSel,xlNote,allBox),
       h('div',{class:'field'},h('span',{class:'flabel'},'Rows'),scopeBox),
       colSel?h('div',{class:'field'},h('span',{class:'flabel'},'Columns'),radio('cols','all','All columns',null,st.cols==='all',v=>st.cols=v),radio('cols','selected','Selected columns ('+Sel.cols.size+')',Sel.selectedCols().join(', '),st.cols==='selected',v=>st.cols=v)):null,
       h('div',{class:'field'},h('span',{class:'flabel'},'Options'),h('label',{class:'check'},h('input',{type:'checkbox',checked:st.header,onchange:e=>{st.header=e.target.checked}}),'Include header row'),guardBox,excelBox),
@@ -38,7 +39,7 @@ const ExportDialog={
     const d=Dialog.open({title:'Export',body,foot:[summary,
       h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:(st.format==='csv'||st.format==='xlsx')?'tsv':st.format,options:{header:st.header,formulaGuard:false}}));const sp=st.format==='csv'||st.format==='tsv'||st.format==='xlsx';const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(sp?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),'Copy'),
       h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{
-        if(st.format==='xlsx'){try{const r=await Busy.run('Building workbook',build);await Xlsx.write(r,fname.value.trim()||'weft-export.xlsx',(S.file||'Weft').replace(/\.[^.]+$/,''));Toast.show('Downloaded '+plural(r.rows,'row')+' as an Excel workbook');d.close(true)}catch(e){Toast.err('Could not build the workbook: '+e.message)}return}
+        if(st.format==='xlsx'){if(st.allTabs&&Tabs.list.length>1){d.close(true);await Tabs.exportWorkbook();return}try{const r=await Busy.run('Building workbook',build);await Xlsx.write(r,fname.value.trim()||'weft-export.xlsx',(S.file||'Weft').replace(/\.[^.]+$/,''));Toast.show('Downloaded '+plural(r.rows,'row')+' as an Excel workbook');d.close(true)}catch(e){Toast.err('Could not build the workbook: '+e.message)}return}
         const r=await Busy.run('Building file',build);const mime={csv:'text/csv',tsv:'text/tab-separated-values',json:'application/json',jsoncols:'application/json',ndjson:'application/x-ndjson',md:'text/markdown',lines:'text/plain'}[st.format];downloadText(fname.value.trim()||'weft-export.'+EXT[st.format],r.text,mime);Toast.show('Downloaded '+plural(r.rows,'row')+' ('+fmtBytes(r.bytes)+')');d.close(true)}},icon('download',16),'Download')]});
     refresh()
   }
@@ -194,6 +195,25 @@ async function convertManual(i){
   if(await setPipeline(steps,i,{viewIdx:i+1}))Toast.show('Step '+(i+1)+' is now a rule and will work on other files.',{undo:doUndo})
 }
 async function loadReference(after){
+  const others=Tabs.list.filter(t=>t.id!==Tabs.active);
+  if(!others.length)return loadReferenceFile(after);
+  const fromTab=async t=>{
+    try{
+      const x=await Busy.run('Reading '+t.name,()=>Engine.call('exportTable',{id:t.id,format:'tsv',options:{header:true}}));
+      const r=await Engine.call('refLoad',{text:x.text,name:t.name,replace:true,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true}}});
+      S.refs=(await Engine.call('refList',{})).refs;
+      Toast.show('Using table "'+r.name+'" as a reference · '+plural(r.n,'row')+' × '+plural(r.cols.length,'column'));
+      if(after)after(r.name)
+    }catch(e){Toast.err('Could not use that table: '+e.message)}
+  };
+  const body=h('div',{class:'dlg-body'},
+    h('div',{class:'field'},h('span',{class:'flabel'},'From a file'),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>{d.close(true);loadReferenceFile(after)}},icon('upload',16),'Choose a file…')),
+    h('div',{class:'field'},h('span',{class:'flabel'},'Other open tables'),
+      h('div',{style:{display:'flex',flexWrap:'wrap',gap:'6px'}},others.map(t=>h('button',{class:'btn btn-secondary',type:'button',onclick:()=>{d.close(true);fromTab(t)}},t.name))),
+      h('p',{class:'hint'},'Uses that table\'s result as it is now. Pick it again later to refresh.')));
+  const d=Dialog.open({title:'Load a reference',body,foot:[h('span',{class:'grow-1'}),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>d.close()},'Cancel')]})
+}
+async function loadReferenceFile(after){
   const inp=$('#refInput');
   inp.onchange=async()=>{
     const f=inp.files[0];inp.value='';if(!f)return;

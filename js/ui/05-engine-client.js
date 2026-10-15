@@ -1,6 +1,6 @@
 'use strict';
 const Engine={
-  worker:null,mode:'none',seq:0,pending:new Map(),gens:{},recovering:null,lastLoad:null,lastReading:null,lastActive:0,
+  worker:null,mode:'none',seq:0,pending:new Map(),gens:{},recovering:null,lastLoad:null,lastReading:null,lastActive:0,active:'t1',loads:{},readingsBy:{},
   init(){if(!this.ready)this.ready=this.init_().finally(()=>{this.ready_=true;const pp=document.getElementById('pageProgress');if(pp&&!Busy.n)pp.classList.add('hidden')});return this.ready},
   async init_(){
     const noWorker=/[?&]noworker=1/.test(location.search);
@@ -27,13 +27,24 @@ const Engine={
     if(reason!=='disabled'&&!sessionStorage.getItem('weft.noworker')){try{sessionStorage.setItem('weft.noworker','1')}catch(e){}setTimeout(()=>Toast.show('Running without a background worker. Large files may feel slow.'),600)}
   },
   replay(){
-    if(!this.lastLoad||typeof S==='undefined'||!S.loaded)return;
+    if(typeof S==='undefined'||!S.loaded)return;
     const H=W.Engine;
+    const tabs=typeof Tabs!=='undefined'?Tabs.list:[];
+    const ids=tabs.length?tabs.map(t=>t.id):[this.active];
+    const cur=tabs.length&&Tabs.active?Tabs.active:ids[0];
+    if(!ids.some(id=>this.loads[id]))return;
+    const stepsOf=id=>{if(id===cur)return S.steps;const t=tabs.find(x=>x.id===id);return t&&t.ui&&t.ui.steps||[]};
+    H.handle('tableReset',{id:ids[0]});
     H.handle('setCtx',{dateOrder:S.dateOrder});
-    if(this.lastLoad.__stress){H.handle('stageStress',{n:this.lastLoad.__stress});H.handle('loadStaged',{})}else H.handle('load',this.lastLoad);
-    if(this.lastReading)H.handle('chooseReading',{reading:this.lastReading});
+    ids.forEach((id,k)=>{
+      if(k)H.handle('tableNew',{id});
+      const L=this.loads[id];if(!L)return;
+      if(L.__stress){H.handle('stageStress',{n:L.__stress});H.handle('loadStaged',{})}else H.handle('load',L);
+      if(this.readingsBy[id])H.handle('chooseReading',{reading:this.readingsBy[id]})
+    });
     (S.refsRaw||[]).forEach(r=>H.handle('refLoad',r));
-    if(S.steps.length)H.handle('setPipeline',{steps:cleanSteps(S.steps),fromIndex:0});
+    ids.forEach(id=>{const st=stepsOf(id);if(st.length){H.handle('tableUse',{id});H.handle('setPipeline',{steps:cleanSteps(st),fromIndex:0})}});
+    H.handle('tableUse',{id:cur});
     const vf=S.vfilter||{};
     S.view=H.handle('setView',{stateIdx:S.viewIdx,sort:S.sort,search:S.search,filter:vf.filter||null,rowIds:vf.rowIds||null});
     Grid.pages.clear()
@@ -46,13 +57,17 @@ const Engine={
   },
   call(type,payload,channel){
     if(type!=='issues'&&type!=='ping')this.lastActive=performance.now();
-    if(type==='load'){this.lastLoad=payload;this.lastReading=null;S.refsRaw=S.refsRaw||[]}
-    if(type==='stageStress'){this.lastLoad={__stress:payload.n};this.lastReading=null}
-    if(type==='chooseReading')this.lastReading=payload.reading||(S.readings[payload.index]?{kind:S.readings[payload.index].kind,params:S.readings[payload.index].params}:null);
-    if(type==='refLoad')S.refsRaw=(S.refsRaw||[]).concat([payload]);
+    if(type==='tableReset'){this.active=payload.id;this.loads={};this.readingsBy={}}
+    const at=this.active;
+    if(type==='load'){this.lastLoad=payload;this.lastReading=null;this.loads[at]=payload;this.readingsBy[at]=null;S.refsRaw=S.refsRaw||[]}
+    if(type==='stageStress'){const L={__stress:payload.n};this.lastLoad=L;this.lastReading=null;this.loads[at]=L;this.readingsBy[at]=null}
+    if(type==='chooseReading'){const rd=payload.reading||(S.readings[payload.index]?{kind:S.readings[payload.index].kind,params:S.readings[payload.index].params}:null);this.lastReading=rd;this.readingsBy[at]=rd}
+    if(type==='refLoad')S.refsRaw=(S.refsRaw||[]).filter(x=>!(payload.replace&&x.name===payload.name)).concat([payload]);
     let gen=0;
     if(channel){gen=(this.gens[channel]||0)+1;this.gens[channel]=gen}
-    const p=this.mode==='worker'?new Promise((resolve,reject)=>{const id=++this.seq;this.pending.set(id,{resolve,reject,type,payload});this.worker.postMessage({id,type,payload})}):this.direct(type,payload);
+    let p=this.mode==='worker'?new Promise((resolve,reject)=>{const id=++this.seq;this.pending.set(id,{resolve,reject,type,payload});this.worker.postMessage({id,type,payload})}):this.direct(type,payload);
+    if(type==='tableNew'||type==='tableUse')p=p.then(r=>{this.active=payload.id;return r});
+    else if(type==='tableClose')p=p.then(r=>{this.active=r.active;delete this.loads[payload.id];delete this.readingsBy[payload.id];return r});
     if(!channel)return p;
     return p.then(r=>{if(this.gens[channel]!==gen)throw Object.assign(new Error('stale'),{stale:true});return r})
   }

@@ -9,6 +9,7 @@ const S={
   recent:lsGet('weft.recentCommands',[]),lastCmds:[],
   pendingRecipe:null,sessionDirty:false,sourceText:null
 };
+const TAB_FIELDS=['file','reading','readings','baseSchema','warnings','scan','hasHtml','lineCount','size','chosenIndex','steps','meta','states','viewIdx','view','search','vfilter','sort','undo','redo','sourceText','htmlTables','htmlCount','contract'];
 let stepSeq=0;
 const newStepId=()=>'s'+Date.now().toString(36)+(++stepSeq);
 const cleanSteps=steps=>steps.map(s=>({id:s.id||newStepId(),opId:s.opId,cfg:W.clone(s.cfg||{}),muted:!!s.muted}));
@@ -18,14 +19,18 @@ const colType=name=>{const c=S.view.schema.cols.find(x=>x.name===name);return c?
 const atEnd=()=>S.viewIdx>=S.steps.length;
 const finalN=()=>S.states.length?S.states[S.states.length-1].n:0;
 
+function loadState(r,opts){
+  opts=opts||{};
+  const o={loaded:true,file:r.fileName||opts.fileName||'',reading:r.reading,readings:r.readings,baseSchema:r.baseSchema,warnings:r.warnings||[],scan:r.scan,hasHtml:r.hasHtml,lineCount:r.lineCount,size:r.size,chosenIndex:r.chosenIndex,meta:r.stepsMeta,states:r.states};
+  if(!opts.keepSteps){o.steps=[];o.undo=[];o.redo=[];o.sort=[];o.search='';o.vfilter=null}
+  o.viewIdx=(opts.keepSteps?S.steps:o.steps).length;
+  return o
+}
+
 async function applyLoad(r,opts){
   opts=opts||{};
-  S.loaded=true;S.file=r.fileName||opts.fileName||'';S.reading=r.reading;S.readings=r.readings;S.baseSchema=r.baseSchema;
-  S.warnings=r.warnings||[];S.scan=r.scan;S.hasHtml=r.hasHtml;S.lineCount=r.lineCount;S.size=r.size;
-  S.chosenIndex=r.chosenIndex;
-  S.meta=r.stepsMeta;S.states=r.states;
-  if(!opts.keepSteps){S.steps=[];S.undo=[];S.redo=[];S.sort=[];S.search='';S.vfilter=null;Sel.clear(true);$('#searchInput').value=''}
-  S.viewIdx=S.steps.length;
+  Object.assign(S,loadState(r,opts));
+  if(!opts.keepSteps){Sel.clear(true);$('#searchInput').value=''}
   const wasHidden=$('#workspace').classList.contains('hidden');
   App.showWorkspace();
   if(wasHidden)await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
@@ -164,12 +169,21 @@ const Session={
   },
   get(){const s=lsGet('weft.session.v1',null);return s&&s.steps&&s.steps.length?s:null},
   discard(){try{localStorage.removeItem('weft.session.v1')}catch(e){}},
-  saveData:debounce(function(){if(Prefs.get('rememberData',false)&&S.sourceText)DataStore.put({text:S.sourceText.text,html:S.sourceText.html,fileName:S.file,steps:cleanSteps(S.steps),reading:S.reading,savedAt:Date.now()})},800)
+  saveData:debounce(function(){
+    if(!Prefs.get('rememberData',false))return;
+    if(typeof Tabs!=='undefined'&&Tabs.list.length>1){
+      Tabs.stash(true);
+      const keep=Tabs.list.filter(t=>t.payload&&!t.payload.__stress);
+      if(keep.length)DataStore.put({v:2,active:Tabs.active,activeIdx:Math.max(0,keep.findIndex(t=>t.id===Tabs.active)),savedAt:Date.now(),tabs:keep.map(t=>({name:t.name,origin:t.origin,payload:t.payload,steps:cleanSteps(t.id===Tabs.active?S.steps:(t.ui&&t.ui.steps)||[]),reading:t.id===Tabs.active?S.reading:t.ui&&t.ui.reading}))});
+      return
+    }
+    if(S.sourceText)DataStore.put({text:S.sourceText.text,html:S.sourceText.html,fileName:S.file,steps:cleanSteps(S.steps),reading:S.reading,savedAt:Date.now()})
+  },800)
 };
 
 const DataStore={
   db(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej(new Error('Storage unavailable'));const r=indexedDB.open('weft-data',1);r.onupgradeneeded=()=>r.result.createObjectStore('sessions');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
-  async put(v){try{const size=(v.text||'').length+JSON.stringify(v.html||'').length;if(size>50e6){Toast.show('This data is larger than 50 MB, so it was not stored in the browser.');return}const d=await this.db();d.transaction('sessions','readwrite').objectStore('sessions').put(v,'last')}catch(e){}},
+  async put(v){try{const size=v.v===2?v.tabs.reduce((a,t)=>a+((t.payload&&t.payload.text)||'').length+JSON.stringify((t.payload&&t.payload.htmlTables)||'').length,0):(v.text||'').length+JSON.stringify(v.html||'').length;if(size>50e6){Toast.show('This data is larger than 50 MB, so it was not stored in the browser.');return}const d=await this.db();d.transaction('sessions','readwrite').objectStore('sessions').put(v,'last')}catch(e){}},
   async get(){try{const d=await this.db();return await new Promise(res=>{const r=d.transaction('sessions').objectStore('sessions').get('last');r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)})}catch(e){return null}},
   async clear(){try{const d=await this.db();d.transaction('sessions','readwrite').objectStore('sessions').delete('last')}catch(e){}}
 };

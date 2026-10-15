@@ -100,6 +100,12 @@ async function addSteps(list,msg){
   if(ok)Toast.show(msg,{undo:doUndo});
   return ok
 }
+function selectionExportPayload(format){
+  const p={scope:'view',viewKey:S.view.key,format:format||'tsv',options:{header:true}};
+  if(Sel.kind==='rows'){p.scope='selected';p.selection=Sel.payload()}
+  else if(Sel.kind==='cols')p.columns=Sel.selectedCols();
+  return p
+}
 async function copySelection(){
   if(!S.loaded)return;
   const cols=curCols();
@@ -110,10 +116,8 @@ async function copySelection(){
     for(let s=r.r0;s<=r.r1;s+=512){const g=await Engine.call('getRows',{viewKey:S.view.key,start:s,count:Math.min(512,r.r1-s+1)});g.rows.forEach(row=>lines.push(row.slice(r.c0,r.c1+1).join('\t')))}
     text=lines.join('\n');await copyText(text,'Copied '+plural(Sel.cellCount(),'cell'));return
   }
-  const p={scope:'view',viewKey:S.view.key,format:'tsv',options:{header:true}};
-  if(Sel.kind==='rows'){p.scope='selected';p.selection=Sel.payload()}
-  else if(Sel.kind==='cols')p.columns=Sel.selectedCols();
-  else{const c=Sel.cursor;if(c.col>=0&&c.col<cols.length){const rr=Grid.rowAt(c.pos);if(rr){await copyText(rr.row[c.col],'Copied cell');return}}}
+  const p=selectionExportPayload('tsv');
+  if(Sel.kind!=='rows'&&Sel.kind!=='cols'){const c=Sel.cursor;if(c.col>=0&&c.col<cols.length){const rr=Grid.rowAt(c.pos);if(rr){await copyText(rr.row[c.col],'Copied cell');return}}}
   const r=await Engine.call('export',p);
   await copyText(r.text.replace(/\n$/,''),'Copied '+plural(r.rows,'row')+(p.columns?' × '+plural(p.columns.length,'column'):''))
 }

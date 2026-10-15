@@ -7,12 +7,28 @@ const App={
     $('#fileName').textContent=S.file||'Pasted text';$('#fileName').title=S.file||'Pasted text';
     Toolbar.render()
   },
-  reset(){
+  async reset(){
+    const gone=Engine.call('tableReset',{id:'t1'});
+    Tabs.list=[];Tabs.active=null;Tabs.groups={};S.refs=[];S.refsRaw=[];
     S.loaded=false;S.steps=[];S.meta=[];S.states=[];S.viewIdx=0;S.undo=[];S.redo=[];S.sort=[];S.search='';S.vfilter=null;S.sourceText=null;
     Sel.clear(true);Grid.pool.forEach(r=>r.el.remove());Grid.pool=[];
-    ['#workspace','#fileMeta','#searchBox','#btnExport','#btnRecipe','#btnNew','#readingBar','#toolbar','#scrub','#statusBar','#coach'].forEach(s=>$(s).classList.add('hidden'));
+    ['#workspace','#fileMeta','#searchBox','#btnExport','#btnRecipe','#btnNew','#tableTabs','#readingBar','#toolbar','#scrub','#statusBar','#coach'].forEach(s=>$(s).classList.add('hidden'));
     $('#emptyView').classList.remove('hidden');$('#pasteArea').value='';$('#searchInput').value='';
-    App.renderSession()
+    App.renderSession();
+    try{await gone}catch(e){}
+  },
+  async applyStoredReading(rd){
+    if(!rd||!rd.kind||!S.reading)return;
+    if(rd.kind!==S.reading.kind||JSON.stringify(rd.params||{})!==JSON.stringify(S.reading.params||{}))await chooseReading({kind:rd.kind,params:rd.params||{}})
+  },
+  async restore(d){
+    if(!d)return false;
+    if(d.v===2)return Tabs.restoreAll(d);
+    const ok=await Input.loadText(d.text||'',d.fileName||'',null,{single:true,htmlTables:d.html||null});
+    if(!ok)return false;
+    await this.applyStoredReading(d.reading);
+    if(d.steps&&d.steps.length)await setPipeline(d.steps,0,{noUndo:true});
+    return true
   },
   renderSession(){
     const el=$('#sessionBanner');const s=Session.get();
@@ -68,8 +84,9 @@ function onKey(e){
   if(mod&&key==='e'&&S.loaded){e.preventDefault();Commands.run('file.export');return}
   if(mod&&key==='h'&&S.loaded){e.preventDefault();Commands.run('text.replace');return}
   if(mod&&e.shiftKey&&key==='c'&&S.loaded){e.preventDefault();Commands.run('file.copyAll');return}
-  if(e.altKey&&(key==='ArrowLeft'||key==='ArrowRight')&&S.loaded&&document.activeElement===Grid.sc){e.preventDefault();Commands.run(key==='ArrowLeft'?'columns.moveLeft':'columns.moveRight');return}
-  if(S.loaded&&document.activeElement!==Grid.sc&&!e.target.closest('.rail,.inspector,.toolbar,.app-header,.reading-bar,.scrub,.coach')){
+  if(e.altKey&&e.shiftKey&&(key==='ArrowLeft'||key==='ArrowRight')&&S.loaded&&Tabs.list.length>1){e.preventDefault();Commands.run(key==='ArrowLeft'?'tables.prev':'tables.next');return}
+  if(e.altKey&&!e.shiftKey&&(key==='ArrowLeft'||key==='ArrowRight')&&S.loaded&&document.activeElement===Grid.sc){e.preventDefault();Commands.run(key==='ArrowLeft'?'columns.moveLeft':'columns.moveRight');return}
+  if(S.loaded&&document.activeElement!==Grid.sc&&!e.target.closest('.rail,.inspector,.toolbar,.app-header,.table-tabs,.reading-bar,.scrub,.coach')){
     if(key==='Delete'||key==='Backspace'){if(Sel.kind!=='none'){e.preventDefault();deleteSelection()}return}
     if(mod&&key==='a'){e.preventDefault();Sel.selectAllRows();return}
     if(mod&&key==='c'&&Sel.kind!=='none'){e.preventDefault();copySelection();return}
@@ -108,10 +125,8 @@ async function boot(){
   await readShareLink();
   if(Prefs.get('rememberData',false)){
     const d=await DataStore.get();
-    if(d&&(d.text||d.html)){
-      await Input.loadText(d.text,d.fileName,null);
-      if(d.steps&&d.steps.length)await setPipeline(d.steps,0,{noUndo:true});
-      Toast.show('Restored your data from this browser.')
+    if(d&&(d.text||d.html||d.v===2)){
+      if(await App.restore(d))Toast.show('Restored your data from this browser.')
     }
   }
   if(!S.loaded)setTimeout(()=>{const p=$('#pasteArea');if(p&&!matchMedia('(pointer:coarse)').matches)p.focus({preventScroll:true})},50)

@@ -20,6 +20,7 @@ const JUNK_ARTIFACT=/^(page \d+( of \d+)?|[-=_*]{3,}|\(\d+ rows?\))$/i;
 const TOTAL_RE=/^(total|totals|sum|grand total|subtotal|sub-total)\b/i;
 W.JUNK_ARTIFACT_SRC='^(page \\d+( of \\d+)?|[-=_*]{3,}|\\(\\d+ rows?\\))$';
 W.TOTAL_SRC='^(total|totals|sum|grand total|subtotal|sub-total)\\b';
+W.SEPARATOR_MD_SRC=SEPARATOR_MD.source;W.BOX_MYSQL_SRC=BOX_MYSQL.source;W.BOX_PSQL_SRC=BOX_PSQL.source;
 
 function looksNumOrDate(v){v=String(v).trim();return!!(W.parseNumber(v)||W.parseNumber(v,{locale:'eu'})||W.parseDate(v))}
 W.looksNumOrDate=looksNumOrDate;

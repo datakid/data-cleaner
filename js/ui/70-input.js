@@ -3,7 +3,7 @@ function extractHtmlTables(html){
   const doc=new DOMParser().parseFromString(html,'text/html');
   const out=[];
   const norm=s=>String(s||'').replace(/[\s\u00A0]+/g,' ').trim();
-  doc.querySelectorAll('table').forEach(tb=>{
+  doc.querySelectorAll('table').forEach((tb,docIndex)=>{
     const trs=Array.from(tb.rows);if(!trs.length)return;
     const grid=[];let spans=0;let thRows=0;
     trs.forEach((tr,ri)=>{
@@ -33,51 +33,71 @@ function extractHtmlTables(html){
     if(thRows>=1)rows[0]=W.dedupeColNames(rows[0].map((v,i)=>v||'column_'+(i+1)));
     rows=rows.filter(r=>r.some(v=>v!==''));
     if(rows.length<1||w<1)return;
-    out.push({rows,thHeader:thRows>=1,warnings:spans?[plural(spans,'cell')+' spanned several rows; their value was repeated down.']:[]})
+    out.push({rows,thHeader:thRows>=1,docIndex,caption:norm(tb.caption&&tb.caption.textContent),nested:!!(tb.parentElement&&tb.parentElement.closest('table')),warnings:spans?[plural(spans,'cell')+' spanned several rows; their value was repeated down.']:[]})
   });
   out.sort((a,b)=>b.rows.length*b.rows[0].length-a.rows.length*a.rows[0].length);
   return out
 }
 
 const Input={
-  async loadText(text,fileName,html){
+  async loadText(text,fileName,html,opts){
+    opts=opts||{};
     $('#parseErr').textContent='';
-    let htmlTables=null;
-    if(html&&/<table/i.test(html)){try{htmlTables=extractHtmlTables(html)}catch(e){htmlTables=null}}
-    if((!text||!text.trim())&&!(htmlTables&&htmlTables.length)){this.showErr('There is nothing to read. Paste some text or open a file.');return}
-    const hint=S.pendingRecipe?(W.textToSteps(S.pendingRecipe.text).source||null):null;
+    let htmlTables=opts.htmlTables||null;
+    if(!htmlTables&&html&&/<table/i.test(html)){try{htmlTables=extractHtmlTables(html)}catch(e){htmlTables=null}}
+    if((!text||!text.trim())&&!(htmlTables&&htmlTables.length)){this.showErr('There is nothing to read. Paste some text or open a file.');return false}
+    if(!opts.single&&!S.pendingRecipe){
+      let found=null;
+      try{found=await Busy.run('Looking for tables',()=>Engine.call('findTables',{text:text||'',htmlTables}))}catch(e){found=null}
+      if(found&&found.split)return!!(await Tabs.openFound({text:text||'',fileName:fileName||'',htmlTables},found,opts.target==='new'?'new':'replace'))
+    }
+    if(opts.target==='new'&&S.loaded){
+      Tabs.ensureFirst(S.file||'Pasted text');
+      const cur=Tabs.current();
+      const t=await Tabs.create({name:fileName||'Pasted text',origin:fileName?'file':'paste',payload:{text:text||'',htmlTables,fileName:fileName||''},activate:true,at:cur?Tabs.list.indexOf(cur)+1:null});
+      if(t){const msg='Opened in a new tab · Read as '+S.reading.label+' · '+plural(S.baseSchema.n,'row')+' × '+plural(S.baseSchema.cols.length,'column');Toast.show(msg);announce(msg)}
+      return!!t
+    }
+    const ok=await this.loadSingle(text,fileName,htmlTables,{hint:opts.hint});
+    if(ok)Tabs.noteLoaded(fileName||'Pasted text',fileName?'file':'paste');
+    return ok
+  },
+  async loadSingle(text,fileName,htmlTables,opts){
+    opts=opts||{};
+    const hint=opts.hint||(S.pendingRecipe?(W.textToSteps(S.pendingRecipe.text).source||null):null);
     let r;
     try{r=await Busy.run('Reading your data',()=>Engine.call('load',{text:text||'',htmlTables,fileName:fileName||'',hint}))}
-    catch(e){this.showErr(e.message);return}
+    catch(e){this.showErr(e.message);return false}
     S.sourceText={text,html:htmlTables};S.htmlTables=htmlTables;S.htmlCount=htmlTables?htmlTables.length:0;
     await applyLoad(r,{fileName});
-    const msg='Read as '+r.reading.label+' · '+plural(r.baseSchema.n,'row')+' × '+plural(r.baseSchema.cols.length,'column');
-    Toast.show(msg);announce(msg);
+    if(!opts.quiet){const msg='Read as '+r.reading.label+' · '+plural(r.baseSchema.n,'row')+' × '+plural(r.baseSchema.cols.length,'column');Toast.show(msg);announce(msg)}
     if(S.pendingRecipe){const p=S.pendingRecipe;S.pendingRecipe=null;await applyRecipeText(p.text,p.opts)}
+    return true
   },
   showErr(msg){if(S.loaded)Toast.err(msg);else{const el=$('#parseErr');clear(el).append(icon('alert',14),h('span',{},msg))}},
-  async loadFile(f){
+  async loadFile(f,opts){
     if(!f)return;
     if(f.size>300e6){this.showErr('That file is '+fmtBytes(f.size)+'. Weft cannot open files over 300 MB in a browser tab.');return}
     if(f.size>50e6&&!(await Dialog.confirm('Open a large file?','"'+f.name+'" is '+fmtBytes(f.size)+'. Reading it may take a while and use a lot of memory.','Open it')))return;
     if(Xlsx.isExcel(f.name)){
       let r;try{r=await Xlsx.readFile(f)}catch(e){this.showErr(e.message);return}
       if(!r)return;
-      await this.loadText(r.text,f.name+(r.sheets>1?' ▸ '+r.sheet:''));
+      await this.loadText(r.text,f.name+(r.sheets>1?' ▸ '+r.sheet:''),null,opts);
       if(r.merges)Toast.show('The sheet had '+plural(r.merges,'merged cell')+'. Only the top-left cell of each keeps its value; use Fill down to repeat it.');
       return
     }
     if(/\.(pdf|docx|zip|png|jpe?g|gif)$/i.test(f.name)){this.showErr('Weft reads spreadsheets and text files (Excel, CSV, TSV, JSON, logs, plain text). For '+f.name.split('.').pop().toUpperCase()+' files, copy the table and paste it here instead.');return}
     let text;try{text=await f.text()}catch(e){this.showErr('Could not read the file: '+e.message);return}
     if(/\.weft\.txt$/i.test(f.name)||/^#\s*(weft|sift) recipe v\d/i.test(text.slice(0,40))){applyRecipeText(text,{name:f.name});return}
-    if(/\.html?$/i.test(f.name))return this.loadText('',f.name,text);
-    await this.loadText(text,f.name)
+    if(/\.html?$/i.test(f.name))return this.loadText('',f.name,text,opts);
+    await this.loadText(text,f.name,null,opts)
   },
   async stageStress(n){return Busy.run('Generating '+fmtInt(n)+' rows',()=>Engine.call('stageStress',{n}))},
   async loadStaged(fileName){
     let r;try{r=await Busy.run('Reading your data',()=>Engine.call('loadStaged',{}))}catch(e){this.showErr(e.message);return}
     S.sourceText=null;S.htmlTables=null;S.htmlCount=0;
     await applyLoad(r,{fileName});
+    Tabs.noteLoaded(fileName||'Test data','paste');
     Toast.show('Read as '+r.reading.label+' · '+plural(r.baseSchema.n,'row')+' × '+plural(r.baseSchema.cols.length,'column'))
   },
   async loadSample(kind){
@@ -85,18 +105,19 @@ const Input={
     const s=W.makeSample(kind);
     await this.loadText(s.text,s.fileName,s.html)
   },
-  async pasteFromClipboard(){
+  async pasteFromClipboard(opts){
     try{
       if(navigator.clipboard.read){
         const items=await navigator.clipboard.read();let html='',text='';
         for(const it of items){if(it.types.indexOf('text/html')!==-1)html=await(await it.getType('text/html')).text();if(it.types.indexOf('text/plain')!==-1)text=await(await it.getType('text/plain')).text()}
-        return this.loadText(text,'',html)
+        return this.loadText(text,'',html,opts)
       }
-      const t=await navigator.clipboard.readText();return this.loadText(t,'')
+      const t=await navigator.clipboard.readText();return this.loadText(t,'',null,opts)
     }catch(e){Toast.err('The browser did not allow clipboard access. Press '+MOD+'V instead.')}
   },
   init(){
-    $('#fileInput').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';this.loadFile(f)});
+    $('#fileInput').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';const target=this.nextTarget||'replace';this.nextTarget=null;this.loadFile(f,{target})});
+    $('#fileInput').addEventListener('cancel',()=>{this.nextTarget=null});
     $('#recipeInput').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const t=await f.text();const p=W.textToSteps(t);if(!p.steps.length){Toast.err('No steps found in "'+f.name+'".');return}reviewRecipe(t,p)});
     $('#btnRead').addEventListener('click',()=>{const t=$('#pasteArea').value;this.loadText(t,'')});
     $('#btnOpen').addEventListener('click',()=>$('#fileInput').click());
@@ -108,7 +129,14 @@ const Input={
         const cd=e.clipboardData;if(!cd)return;const text=cd.getData('text/plain'),html=cd.getData('text/html');
         if(!text&&!html)return;
         e.preventDefault();
-        Dialog.confirm('Replace the current data?','You pasted '+(html&&/<table/i.test(html)?'a web table':plural(text.split('\n').length,'line'))+'. Read it as new data? Your recipe ('+plural(S.steps.length,'step')+') will be re-applied.','Read pasted data').then(async ok=>{if(!ok)return;const steps=cleanSteps(S.steps);await this.loadText(text,'',html);if(steps.length)await applyRecipeText(W.stepsToText(steps,null),{name:'current recipe'})});
+        const desc=html&&/<table/i.test(html)?'a web table':plural(text.split('\n').length,'line');
+        Dialog.choose('Where should the pasted data go?','You pasted '+desc+'. Replace this table'+(S.steps.length?' (its recipe, '+plural(S.steps.length,'step')+', will be re-applied)':'')+', or open the pasted data in a new tab.',[{id:'cancel',label:'Cancel',kind:'secondary'},{id:'replace',label:'Replace this table',kind:'secondary'},{id:'new',label:'Open in a new tab',kind:'primary'}]).then(async c=>{
+          if(!c||c==='cancel')return;
+          if(c==='new'){await this.loadText(text,'',html,{target:'new'});return}
+          const steps=cleanSteps(S.steps);
+          const ok=await this.loadText(text,'',html,{target:'replace'});
+          if(ok&&steps.length&&!S.steps.length)await applyRecipeText(W.stepsToText(steps,null),{name:'current recipe'})
+        });
         return
       }
       const cd=e.clipboardData;if(!cd)return;
@@ -121,6 +149,20 @@ const Input={
     document.addEventListener('dragenter',e=>{if(!e.dataTransfer||Array.from(e.dataTransfer.types||[]).indexOf('Files')===-1)return;depth++;ov.classList.add('on');const it=e.dataTransfer.items&&e.dataTransfer.items[0];$('#dropName').textContent=''});
     document.addEventListener('dragleave',()=>{depth=Math.max(0,depth-1);if(!depth)ov.classList.remove('on')});
     document.addEventListener('dragover',e=>{if(e.dataTransfer&&Array.from(e.dataTransfer.types||[]).indexOf('Files')!==-1)e.preventDefault()});
-    document.addEventListener('drop',async e=>{if(!e.dataTransfer||!e.dataTransfer.files.length)return;e.preventDefault();depth=0;ov.classList.remove('on');const f=e.dataTransfer.files[0];if(S.loaded&&!(await Dialog.confirm('Open "'+f.name+'"?','This replaces the current data. Your recipe ('+plural(S.steps.length,'step')+') will be re-applied.','Open file')))return;const steps=cleanSteps(S.steps);await this.loadFile(f);if(steps.length&&S.loaded&&!S.steps.length)await applyRecipeText(W.stepsToText(steps,null),{name:'current recipe'})})
+    document.addEventListener('drop',async e=>{
+      if(!e.dataTransfer||!e.dataTransfer.files.length)return;
+      e.preventDefault();depth=0;ov.classList.remove('on');
+      const f=e.dataTransfer.files[0];
+      let target='replace';
+      if(S.loaded){
+        const c=await Dialog.choose('Open "'+f.name+'"','Replace this table'+(S.steps.length?' (its recipe, '+plural(S.steps.length,'step')+', will be re-applied)':'')+', or open the file in a new tab.',[{id:'cancel',label:'Cancel',kind:'secondary'},{id:'replace',label:'Replace this table',kind:'secondary'},{id:'new',label:'Open in a new tab',kind:'primary'}]);
+        if(!c||c==='cancel')return;
+        target=c
+      }
+      if(target==='new'){await this.loadFile(f,{target:'new'});return}
+      const steps=cleanSteps(S.steps);
+      await this.loadFile(f,{target:'replace'});
+      if(steps.length&&S.loaded&&!S.steps.length)await applyRecipeText(W.stepsToText(steps,null),{name:'current recipe'})
+    })
   }
 };
