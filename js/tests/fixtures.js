@@ -68,6 +68,9 @@ const mAddr=(k)=>L(['Name: Person '+k,'Street: '+k+' Main St','City: Town '+k,'P
 const mHtmlT=(rows,docIndex,extra)=>Object.assign({rows,thHeader:true,warnings:[],docIndex},extra||{});
 const mMany=()=>{const out=[];for(let k=1;k<=13;k++)out.push(L(['h'+k+'a,h'+k+'b,h'+k+'c','Item '+k+',5,9.5','Item '+(k+1)+',6,10.5']));return out.join('\n\n')};
 const mSampleNames=()=>{const W=G.WeftCore;return Object.keys(W.SAMPLES).filter(k=>k!=='stress')};
+const mEmptyRowCsv=()=>L(['email_address,id','no,q','no,x y z','yes,q','','yes,','yes,q','no,"hello, world"','','yes,plain','no,"hello, world"','no,','no,a; b']);
+const mEmptyRowTsv=()=>L(['city\tamount','Lagos\t','\t','\t','Lima\tEdsger','\t','Cairo\tAda','Osaka\tAda Ken']);
+const mRagged=()=>{const names=['Alder','Birch','Cedar','Dogwood','Elm','Fir','Gum','Hazel','Ironwood','Juniper','Kauri','Larch','Maple','Nutmeg','Oak','Pine','Quince','Rowan'];const out=['version,codename,series,created,release,eol,eol-lts,eol-elts'];names.forEach((n,i)=>{const y=1993+i;let r=[(1+i/10).toFixed(1),n,n.toLowerCase(),y+'-08-16'];if(i>=4)r=r.concat([(y+1)+'-06-17',(y+2)+'-06-05']);if(i>=12)r=r.concat([(y+5)+'-06-30',(y+7)+'-06-30']);out.push(r.join(','))});return L(out)};
 G.WEFT_MULTI_FIXTURES=[
   {name:'M01 csv 3 cols then csv 4 cols',text:()=>mCsvA()+'\n\n'+mCsvB(),expect:{split:true,count:2}},
   {name:'M02 titled csv tables',text:()=>'Sales Q1\n'+mSales()+'\n\nReturns\n'+mReturns(),expect:{split:true,count:2,titles:['Sales Q1','Returns']}},
@@ -86,7 +89,13 @@ G.WEFT_MULTI_FIXTURES=[
   {name:'M15 html with a nested table',text:()=>'',html:[mHtmlT([['a','b'],['1','2'],['3','4']],0),mHtmlT([['a','b'],['1','2'],['3','4']],1,{nested:true})],expect:{split:false}},
   {name:'M16 thirteen tables are capped',text:mMany,expect:{split:true,count:12,truncated:true,total:13}},
   {name:'M17 empty input',text:()=>'',expect:{split:false}},
-  {name:'M17b whitespace only',text:()=>' \n \n',expect:{split:false}}
+  {name:'M17b whitespace only',text:()=>' \n \n',expect:{split:false}},
+  {name:'M18 one csv table with empty rows',text:mEmptyRowCsv,expect:{split:false}},
+  {name:'M19 one tsv table with empty rows',text:mEmptyRowTsv,expect:{split:false}},
+  {name:'M20 one csv table with ragged trailing columns',text:mRagged,expect:{split:false}},
+  {name:'M22 titles directly above markdown tables',text:()=>L(['Sales','| a | b |','|---|---|','| 1 | 2 |','| 3 | 4 |','Returns','| x | y | z |','|---|---|---|','| 1 | 2 | 3 |','| 4 | 5 | 6 |']),expect:{split:true,count:2,titles:['Sales','Returns'],kinds:['markdown-table','markdown-table']}},
+  {name:'M23 title directly above the second MySQL table',text:()=>myA()+'\nReturns\n'+myB(),expect:{split:true,count:2,titles:['Table 1','Returns']}},
+  {name:'M21 empty row inside the first of two tables',text:()=>mEmptyRowCsv()+'\n\n'+mCsvB(),expect:{split:true,count:2}}
 ];
 G.WEFT_SAMPLE_NAMES=mSampleNames;
 })(typeof self!=='undefined'?self:globalThis);

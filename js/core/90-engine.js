@@ -234,11 +234,14 @@ const H={
   removedIds(p){need();const i=p.stateIdx;if(i<1||i>=E.states.length)return{rowIds:[]};const a=E.states[i-1],b=E.states[i];const pm=W.posMap(b);const out=[];for(let r=0;r<a.n;r++)if(!pm.has(a.rowIds[r]))out.push(a.rowIds[r]);return{rowIds:out}},
   schema(p){const t=stateAt(p.stateIdx);return schemaOf(t)},
   load(p){
-    E.steps=[];E.states=[];E.meta=[];E.views.clear();
-    const L=loadSource(p);
-    const r=E.src.readings[L.chosen];
-    const warns=useReading(r);
-    return loadResult({chosenIndex:L.chosen,hintMismatch:L.hintMismatch})
+    const keep={src:E.src,base:E.base,steps:E.steps,states:E.states,meta:E.meta,views:E.views,nextRowId:E.nextRowId};
+    E.steps=[];E.states=[];E.meta=[];E.views=new Map();
+    try{
+      const L=loadSource(p);
+      const r=E.src.readings[L.chosen];
+      const warns=useReading(r);
+      return loadResult({chosenIndex:L.chosen,hintMismatch:L.hintMismatch})
+    }catch(e){Object.assign(E,keep);throw e}
   },
   chooseReading(p){
     if(!E.src)throw new Error('Load some data first.');

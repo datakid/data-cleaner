@@ -215,6 +215,64 @@ G.runCoreTests=function(){
     const c=E.handle('getRows',{viewKey:v.key,start:0,count:5}).rows[0][0];
     eq([c.length,c.slice(-1)],[1001,'…'])
   });
+  test('failed load keeps the table',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    E.handle('load',{text:'a,b\n1,2\n3,4'});E.handle('setPipeline',{steps:[{opId:'trim',cfg:{columns:['*'],collapse:true}}]});
+    const v0=E.handle('setView',{});
+    let th=false;try{E.handle('load',{text:'   \n  '})}catch(e){th=/nothing to read/.test(e.message)}
+    ok(th,'load did not throw');
+    eq([W.E.steps.length,W.E.states.length],[1,2]);
+    const v=E.handle('setView',{});
+    eq(E.handle('getRows',{viewKey:v.key,start:0,count:5}).rows,[['1','2'],['3','4']]);
+    let old=false;try{E.handle('getRows',{viewKey:v0.key,start:0,count:5});old=true}catch(e){old=false}
+    ok(old,'views from before the failed load were dropped')
+  });
+  test('refLoad refreshes joins in every table',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    E.handle('load',{text:'id,name\n1,Ann\n2,Bob'});
+    E.handle('refLoad',{text:'id,score\n1,90\n2,85',name:'scores'});
+    E.handle('setPipeline',{steps:[{opId:'join',cfg:{refName:'scores',type:'left',onLeft:['id'],onRight:['id'],columns:['score'],normTrim:true,normCaseFold:false,normNumeric:true,onDuplicate:'first'}}]});
+    E.handle('tableNew',{id:'t2'});E.handle('load',{text:'x\n1'});
+    E.handle('refLoad',{text:'id,score\n1,11\n2,22',name:'scores',replace:true});
+    const t=E.handle('exportTable',{id:'t1',format:'tsv',options:{header:true}}).text;
+    eq(t,'id\tname\tscore\n1\tAnn\t11\n2\tBob\t22\n');
+    eq(E.handle('tableList',{}).active,'t2')
+  });
+  test('table readers skip lines above the table',()=>{
+    const E=W.Engine;
+    const cases=[
+      ['markdown','Q2 report\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |',2,1],
+      ['markdown, two lines','Report\nQ2\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |',2,2],
+      ['markdown, underlined title','Title\n-----\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |',2,1],
+      ['mysql','Q2 report\n+---+---+\n| a | b |\n+---+---+\n| 1 | 2 |\n| 3 | 4 |\n+---+---+',2,1],
+      ['psql','Q2 report\n a | b\n---+---\n 1 | 2\n 3 | 4',2,1]
+    ];
+    cases.forEach(c=>{
+      const r=E.handle('load',{text:c[1]});
+      eq(r.baseSchema.cols.map(x=>x.name),['a','b'],c[0]+' columns');
+      eq(r.baseSchema.n,c[2],c[0]+' rows');
+      ok(r.warnings.some(w=>w==='Skipped '+c[3]+(c[3]===1?' line':' lines')+' above the table.'),c[0]+' warning: '+JSON.stringify(r.warnings))
+    })
+  });
+  test('table readers unchanged when nothing sits above the table',()=>{
+    const E=W.Engine;
+    const a=E.handle('load',{text:'| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\nSource: x'});
+    eq([a.baseSchema.cols.map(x=>x.name),a.baseSchema.n,a.warnings],[['a','b'],3,[]]);
+    const b=E.handle('load',{text:'plain one\nplain two\nplain three',hint:{kind:'markdown-table'}});
+    ok(b.warnings.every(w=>!/Skipped/.test(w)),'plain text got a skip warning');
+    const c=E.handle('load',{text:'+---+---+\n| a | b |\n+---+---+\n| 1 | 2 |\n+---+---+\n1 rows in set (0.00 sec)'});
+    eq([c.baseSchema.cols.map(x=>x.name),c.baseSchema.n,c.warnings.filter(w=>/Skipped/.test(w))],[['a','b'],2,[]])
+  });
+  test('titled markdown tables split cleanly',()=>{
+    const f=G.WEFT_MULTI_FIXTURES.find(x=>/^M22/.test(x.name));
+    const t=f.text(),lines=W.normalizeInput(t).split('\n'),r=W.findTables(t,{});
+    eq(r.tables.length,2);
+    const E=W.Engine;
+    const a=E.handle('load',{text:W.sliceLines(lines,r.tables[0].from,r.tables[0].to)});
+    const b=E.handle('load',{text:W.sliceLines(lines,r.tables[1].from,r.tables[1].to)});
+    eq([a.baseSchema.cols.map(x=>x.name),a.baseSchema.n],[['a','b'],2]);
+    eq([b.baseSchema.cols.map(x=>x.name),b.baseSchema.n],[['x','y','z'],2])
+  });
   test('reset tables',()=>{W.Engine.handle('tableReset',{id:'t1'})});
   return results
 };

@@ -64,6 +64,7 @@ W.modal=modal;
 
 function nonEmptyLines(lines){const o=[];for(const l of lines)if(l.trim()!=='')o.push(l);return o}
 
+const skipNote=n=>'Skipped '+n+(n===1?' line':' lines')+' above the table.';
 function splitMdRow(line){
   let s=line.trim();
   if(s[0]==='|')s=s.slice(1);
@@ -347,14 +348,18 @@ def('markdown-table',{
     return{confidence:0.95,params:{header:true},explain:'Lines are wrapped in | characters with a ---- separator under the header, like a Markdown table.'}
   },
   parse(text){
-    const out=[];
-    for(const l of text.split('\n')){
+    const ls=text.split('\n'),out=[];
+    const first=ls.findIndex(l=>l.indexOf('|')!==-1);
+    let skipped=0;
+    for(let i=0;i<ls.length;i++){
+      const l=ls[i];
       if(!l.trim())continue;
       if(SEPARATOR_MD.test(l)&&l.indexOf('-')!==-1)continue;
+      if(i<first){skipped++;continue}
       if(/^\s*\|.*\|\s*$/.test(l)||l.indexOf('|')!==-1)out.push(splitMdRow(l));
       else out.push([l.trim()])
     }
-    return{matrix:out,warnings:[]}
+    return{matrix:out,warnings:skipped?[skipNote(skipped)]:[]}
   }
 });
 
@@ -369,16 +374,19 @@ def('box-table',{
   },
   parse(text,params){
     const ls=text.split('\n');
-    const out=[];let pos=null;
-    for(const l of ls){
+    const out=[];let pos=null,skipped=0;
+    const first=ls.findIndex(l=>BOX_MYSQL.test(l)||BOX_PSQL.test(l)||l.indexOf('|')!==-1);
+    for(let i=0;i<ls.length;i++){
+      const l=ls[i];
       if(!l.trim())continue;
+      if(i<first){skipped++;continue}
       if(BOX_MYSQL.test(l)){if(!pos){pos=[];for(let i=0;i<l.length;i++)if(l[i]==='+')pos.push(i)}continue}
       if(BOX_PSQL.test(l)){if(!pos){pos=[-1];for(let i=0;i<l.length;i++)if(l[i]==='+')pos.push(i);pos.push(1e9)}continue}
       if(params.style==='mysql'&&/^\s*\|.*\|\s*$/.test(l)){out.push(splitMdRow(l));continue}
       if(params.style==='psql'&&l.indexOf('|')!==-1){out.push(l.split('|').map(s=>s.trim()));continue}
       out.push([l.trim()])
     }
-    return{matrix:out,warnings:[]}
+    return{matrix:out,warnings:skipped?[skipNote(skipped)]:[]}
   }
 });
 

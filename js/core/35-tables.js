@@ -2,11 +2,32 @@
 'use strict';
 const W=G.WeftCore;
 W.TABLE_KINDS=new Set(['delimited','markdown-table','box-table','fixed-width','whitespace-runs']);
-W.MULTI={maxBytes:20e6,maxBlocks:400,maxTables:12,minCols:2,minLines:2,titleMaxLines:3,titleMaxLen:80,widthScanMaxLines:50000,pieceSampleLines:2000};
+W.MULTI={maxBytes:20e6,maxBlocks:400,maxTables:12,minCols:2,minLines:2,minConfidence:0.85,titleMaxLines:3,titleMaxLen:80,widthScanMaxLines:50000,pieceSampleLines:2000};
 const NB=/\S/;
 const PSQL_END=/^\s*\(\d+ rows?\)\s*$/;
 const ROWS_IN_SET=/rows? in set/i;
 const fc=l=>{for(let i=0;i<l.length;i++){const c=l.charCodeAt(i);if(c!==32&&c!==9)return c}return 0};
+const STRUCTURED=new Set(['markdown-table','box-table']);
+const MD_SEP=new RegExp(W.SEPARATOR_MD_SRC),BOX_MY=new RegExp(W.BOX_MYSQL_SRC),BOX_PG=new RegExp(W.BOX_PSQL_SRC);
+const isRuleLine=l=>(l.indexOf('-')!==-1&&MD_SEP.test(l))||BOX_MY.test(l)||BOX_PG.test(l);
+function titleStart(lines,s,floor){
+  let k=0;
+  while(k<W.MULTI.titleMaxLines&&s-1>=floor){
+    const l=lines[s-1];
+    if(!NB.test(l)||l.indexOf('|')!==-1||l.trim().length>W.MULTI.titleMaxLen||isRuleLine(l)||W.isFooterText(l))break;
+    s--;k++
+  }
+  return s
+}
+const numericColumn=(rows,n)=>{
+  const m=Math.min(rows.length,300);
+  for(let c=0;c<n;c++){
+    let ne=0,nd=0;
+    for(let i=0;i<m;i++){const v=String(rows[i][c]==null?'':rows[i][c]).trim();if(!v)continue;ne++;if(W.looksNumOrDate(v))nd++}
+    if(ne&&nd/ne>=0.8)return true
+  }
+  return false
+};
 const names=a=>(a||[]).map(x=>String(x==null?'':x).trim().toLowerCase()).join('\u0001');
 
 W.sliceLines=function(lines,from,to){return lines.slice(from,to).join('\n')};
@@ -102,7 +123,7 @@ W.splitMarkdownTables=function(lines,from,to){
     const l=lines[i],c=fc(l);
     if((c===124||c===58||c===45)&&l.indexOf('-')!==-1&&sep.test(l))starts.push(i-1)
   }
-  return cutAt(from,to,starts.slice(1))
+  return cutAt(from,to,starts.slice(1).map(x=>titleStart(lines,x,from)))
 };
 
 W.splitBoxTables=function(lines,from,to){
@@ -113,7 +134,7 @@ W.splitBoxTables=function(lines,from,to){
       if(my.test(l)&&i+2<to&&my.test(lines[i+2])&&!my.test(lines[i+1])&&(i===from||fc(lines[i-1])!==124))starts.push(i)
     }else if(c===40&&PSQL_END.test(l)&&i+1<to)cuts.push(i+1)
   }
-  return cutAt(from,to,starts.slice(1).concat(cuts).sort((a,b)=>a-b))
+  return cutAt(from,to,starts.slice(1).map(x=>titleStart(lines,x,from)).concat(cuts).sort((a,b)=>a-b))
 };
 
 function structured(lines,p){
@@ -136,32 +157,55 @@ W.splitRegion=function(lines,block){
   })
 };
 
+function readPiece(lines,from,to){
+  const text=W.sliceLines(lines,from,Math.min(to,from+W.MULTI.pieceSampleLines));
+  let top;
+  try{top=W.detectReadings(text).readings[0]}catch(e){return null}
+  if(!top)return null;
+  try{return{top,rr:W.runReader(top.kind,text,top.params,{})}}catch(e){return{top,rr:null}}
+}
+
+function titleLine(lines,from,to,delim){
+  let i=from;
+  while(i<to&&!NB.test(lines[i]))i++;
+  const l=lines[i];
+  if(l===undefined||i+1>=to||l.indexOf(delim)!==-1||l.indexOf('"')!==-1||l.trim().length>W.MULTI.titleMaxLen)return null;
+  return lines[i+1].indexOf(delim)!==-1?i:null
+}
+
+function leadingTitle(lines,from,to){
+  const out=[];
+  for(let i=from;i<to;i++){
+    const l=lines[i];
+    if(!NB.test(l))continue;
+    if(l.indexOf('|')!==-1||BOX_MY.test(l)||BOX_PG.test(l))break;
+    if(isRuleLine(l))continue;
+    out.push(l.trim())
+  }
+  return out.length&&out.length<=W.MULTI.titleMaxLines&&out.every(l=>l.length<=W.MULTI.titleMaxLen)?out.join(' · '):null
+}
+
 W.classifyPiece=function(lines,part){
-  const text=W.sliceLines(lines,part.from,Math.min(part.to,part.from+W.MULTI.pieceSampleLines));
   const fail=kind=>({from:part.from,to:part.to,kind,tabular:false,lines:0,cols:0});
-  let det;
-  try{det=W.detectReadings(text)}catch(e){return fail()}
-  const top=det.readings[0];
-  if(!top)return fail();
-  let rr;
-  try{rr=W.runReader(top.kind,text,top.params,{})}catch(e){return fail(top.kind)}
-  let from=part.from,title=null,header=rr.header,colNames=rr.cols;
-  if(!rr.header&&rr.matrixKind){
-    const k=W.findJunk(rr.cols,rr.rows).headerRow;
-    if(k>0&&k<=W.MULTI.titleMaxLines&&rr.rows[k]){
-      const tl=[];let i=part.from;
-      for(;i<part.to&&tl.length<k;i++)if(NB.test(lines[i]))tl.push(lines[i]);
-      if(tl.length===k&&tl.every(l=>l.indexOf('"')===-1&&l.trim().length<=W.MULTI.titleMaxLen)){
-        title=rr.rows.slice(0,k).map(r=>r.map(x=>String(x==null?'':x).trim()).filter(Boolean).join(' ')).filter(Boolean).join(' · ')||null;
-        from=i;header=true;colNames=rr.rows[k].map(String)
-      }
+  let from=part.from,title=null;
+  let r=readPiece(lines,from,part.to);
+  if(!r)return fail();
+  if(!r.rr)return fail(r.top.kind);
+  if(r.top.kind==='delimited'&&r.top.params.delimiter){
+    const ti=titleLine(lines,from,part.to,r.top.params.delimiter);
+    if(ti!==null){
+      const r2=readPiece(lines,ti+1,part.to);
+      if(r2&&r2.rr&&r2.top.kind==='delimited'){title=lines[ti].trim();from=ti+1;r=r2}
     }
   }
+  const{top,rr}=r;
+  if(!title&&STRUCTURED.has(top.kind))title=leadingTitle(lines,part.from,part.to);
   let n=0;
   for(let i=from;i<part.to;i++)if(NB.test(lines[i]))n++;
-  const cols=rr.cols.length;
-  return{from,to:part.to,kind:top.kind,label:top.label,params:top.params,confidence:top.confidence,cols,colNames,header,title,lines:n,
-    tabular:W.TABLE_KINDS.has(top.kind)&&cols>=W.MULTI.minCols&&n>=(top.kind==='markdown-table'?3:W.MULTI.minLines)}
+  const cols=rr.cols.length,header=rr.header;
+  const strong=!!(header&&(STRUCTURED.has(top.kind)||numericColumn(rr.rows,cols)));
+  return{at:part.from,from,to:part.to,kind:top.kind,label:top.label,params:top.params,confidence:top.confidence,cols,colNames:rr.cols,header,strong,title,lines:n,
+    tabular:W.TABLE_KINDS.has(top.kind)&&top.confidence>=W.MULTI.minConfidence&&cols>=W.MULTI.minCols&&n>=(top.kind==='markdown-table'?3:W.MULTI.minLines)}
 };
 
 W.tableSignature=function(p){return p.kind+'|'+((p.params&&p.params.delimiter)||'')+'|'+p.cols};
@@ -178,18 +222,35 @@ W.isTitlePiece=function(lines,p){
   return ls.length>0&&ls.every(l=>l.trim().length<=W.MULTI.titleMaxLen)&&!W.isFooterText(ls.join('\n'))
 };
 
+function fitsTable(lines,p,t){
+  if(!t||t.kind!=='delimited'||!t.params||!t.params.delimiter)return false;
+  const st={q:false};let n=0;
+  for(let i=p.from;i<p.to;i++){
+    if(!NB.test(lines[i]))continue;
+    if(W.countFields(lines[i],t.params.delimiter,st).n!==t.cols)return false;
+    n++
+  }
+  return n>0
+}
+
 W.mergePieces=function(lines,pieces){
   const tables=[];let skipped=0,ttl=null,adj=false;
   for(let i=0;i<pieces.length;i++){
     const p=pieces[i],last=tables[tables.length-1];
     if(!p.tabular){
       const text=W.sliceLines(lines,p.from,p.to);
-      if(adj&&last&&W.isFooterText(text)){last.to=p.to;continue}
+      if(adj&&last&&(W.isFooterText(text)||fitsTable(lines,p,last))){last.to=p.to;continue}
       const nx=pieces[i+1];
       if(W.isTitlePiece(lines,p)&&nx&&nx.tabular){ttl=text.split('\n').map(l=>l.trim()).filter(Boolean).join(' · ');adj=false;continue}
       skipped++;ttl=null;adj=false;continue
     }
-    if(adj&&last&&!p.title&&W.tableSignature(last)===W.tableSignature(p)&&!(p.header&&(!last.header||names(last.colNames)!==names(p.colNames)))){last.to=p.to;continue}
+    const same=adj&&last&&W.tableSignature(last)===W.tableSignature(p);
+    if(same&&!p.title&&!(p.strong&&(!last.header||names(last.colNames)!==names(p.colNames)))){last.to=p.to;continue}
+    const touch=i>0&&p.at===pieces[i-1].to;
+    if(!same&&(!p.header||(touch&&!p.strong))){
+      if(adj&&last){last.to=p.to;continue}
+      skipped++;ttl=null;adj=false;continue
+    }
     tables.push({from:p.from,to:p.to,kind:p.kind,params:p.params,cols:p.cols,header:p.header,colNames:p.colNames,title:p.title||ttl});
     ttl=null;adj=true
   }

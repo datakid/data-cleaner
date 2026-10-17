@@ -87,6 +87,18 @@ async function run(){
     for(const k of Object.keys(W.SAMPLES).filter(k=>k!=='stress')){const sm=W.makeSample(k);const ht=sm.html?extractHtmlTables(sm.html):null;const f=await Engine.call('findTables',{text:sm.text||'',htmlTables:ht});if(f.split)spl.push(k)}
     ok('samples never split',!spl.length,spl.join(','));
     await App.reset();
+    await Input.loadText('email_address,id\nno,q\nno,x y z\nyes,q\n\nyes,\nyes,q\nno,"hello, world"\n\nyes,plain\nno,"hello, world"\nno,\nno,a; b','');
+    await until(()=>S.loaded&&Grid.pool.length>0);
+    ok('empty rows do not split one table',Tabs.list.length===1&&$('#tableTabs').classList.contains('hidden')&&S.baseSchema.cols.length===2,'tabs '+Tabs.list.length);
+    await App.reset();
+    await Input.loadText('Q2 report\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |','');
+    await until(()=>S.loaded&&Grid.pool.length>0);
+    ok('title above a markdown table is skipped',Tabs.list.length===1&&curCols().join('|')==='a|b'&&S.baseSchema.n===2&&S.warnings.some(w=>/Skipped 1 line above the table/.test(w)),curCols().join('|')+' '+S.baseSchema.n+' '+JSON.stringify(S.warnings));
+    await App.reset();
+    await Input.loadText('Sales\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\nReturns\n| x | y | z |\n|---|---|---|\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |','');
+    await until(()=>Tabs.list.length===2&&S.loaded&&Grid.pool.length>0);
+    ok('markdown titles name the tabs',Tabs.list.map(t=>t.name).join('|')==='Sales|Returns'&&curCols().join('|')==='a|b'&&S.baseSchema.n===2,Tabs.list.map(t=>t.name).join('|')+' '+curCols().join('|'));
+    await App.reset();
     await Input.loadText(M1,'');await until(()=>Tabs.list.length===2&&S.loaded&&Grid.pool.length>0);
     ok('multi paste opens tabs',Tabs.list.length===2&&!$('#tableTabs').classList.contains('hidden')&&Tabs.active===Tabs.list[0].id&&curCols().length===3,'tabs '+Tabs.list.length+' cols '+curCols().length);
     await Tabs.activate(Tabs.list[1].id);
