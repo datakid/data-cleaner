@@ -44,25 +44,32 @@ const Tabs={
     ReadingBar.render();Rail.render();Scrub.render();
     Inspector.refresh(true);Status.render();this.render()
   },
-  async activate(id){
+  async activate(id,opts){
+    if(opts&&opts.wait){await this.idle();while(this.switching)await new Promise(r=>setTimeout(r,30))}
+    if(this.switching)return;
     if(id===this.active)return;
     const t=this.get(id);if(!t||!t.ui)return;
     if(Busy.n>0){Toast.show('Wait for the current step to finish.');return}
-    this.stash();
-    try{await Engine.call('tableUse',{id})}catch(e){Toast.err(e.message);return}
-    this.active=id;
-    this.restore(t);
-    await this.paintAll(t);
-    Session.save();
-    announce(t.name+', '+plural(S.view.total,'row')+' × '+plural(curCols().length,'column'))
+    this.switching=true;
+    try{
+      this.stash();
+      try{await Engine.call('tableUse',{id})}catch(e){if(!isQuiet(e))Toast.err(e.message);return}
+      try{const pr=await Engine.call('pipelineInfo',{tableId:id});t.ui.meta=pr.stepsMeta;t.ui.states=pr.states}catch(e){}
+      this.active=id;
+      this.restore(t);
+      await this.paintAll(t);
+      Session.save();
+      announce(t.name+', '+plural(S.view.total,'row')+' × '+plural(curCols().length,'column'))
+    }finally{this.switching=false}
   },
   async create(o){
+    if(Tabs.switching){Toast.show('Wait for the table to finish switching.');return false}
     await this.idle();
     const reuse=!this.list.length;
     if(!reuse)this.stash();
     const keep=reuse?null:this.active;
     const id=reuse?Engine.active:'t'+(++this.seq)+Date.now().toString(36);
-    if(!reuse){try{await Engine.call('tableNew',{id})}catch(e){Toast.err(e.message);return null}}
+    if(!reuse){try{await Engine.call('tableNew',{id})}catch(e){if(!isQuiet(e))Toast.err(e.message);return null}}
     let r;
     try{r=await Busy.run('Reading '+o.name,()=>Engine.call('load',o.payload))}
     catch(e){
@@ -70,7 +77,7 @@ const Tabs={
         await Engine.call('tableClose',{id}).catch(()=>{});
         if(keep)await Engine.call('tableUse',{id:keep}).catch(()=>{})
       }
-      Toast.err(e.message);return null
+      if(!isQuiet(e))Toast.err(e.message);return null
     }
     const n=r.baseSchema.n,pl=o.payload;
     const ui=Object.assign(loadState(r,{fileName:pl.fileName}),{
@@ -98,6 +105,7 @@ const Tabs={
     return true
   },
   async drop(id){
+    if(Tabs.switching){Toast.show('Wait for the table to finish switching.');return false}
     const i=this.list.findIndex(t=>t.id===id);if(i<0)return;
     const was=id===this.active,g=this.list[i].group;
     this.list.splice(i,1);
@@ -115,7 +123,8 @@ const Tabs={
     const v=await Dialog.prompt('Rename table','Name',t.name,'Rename');
     if(!v)return;
     t.name=this.uniqueName(v,t);
-    this.render()
+    this.render();
+    Session.save()
   },
   async openFound(src,found,mode){
     const group='g'+Date.now().toString(36)+(++this.seq);
@@ -144,30 +153,32 @@ const Tabs={
       if(t){at=this.list.indexOf(t)+1;made++;if(!first)first=t}
     }
     this.groups[group]=src;
-    if(first&&first.id!==this.active)await this.activate(first.id);
+    if(first&&first.id!==this.active)await this.activate(first.id,{wait:true});
     this.render();
     const M=W.MULTI;
-    Toast.show('Found '+found.total+' tables. Each one opened in its own tab.'+(found.truncated?' Showing the first '+M.maxTables+'.':'')+(found.skipped?' '+plural(found.skipped,'text passage')+' between them were left out.':''),
-      {duration:9000,action:{label:'Keep as one table',fn:()=>Tabs.mergeBack(group,src)}});
+    Toast.show((made===found.total||found.truncated?'Found '+found.total+' tables. Each one opened in its own tab.':'Found '+found.total+' tables; '+made+' opened in tabs.')+(found.truncated?' Showing the first '+M.maxTables+'.':'')+(found.skipped?' '+plural(found.skipped,'text passage')+' between them were left out.':''),
+      {duration:9000,action:{label:src.htmlTables&&src.htmlTables.length?'Keep the largest table':'Keep as one table',fn:()=>Tabs.mergeBack(group,src)}});
     announce('Opened '+plural(made,'table')+' in separate tabs');
     return made>0
   },
   async mergeBack(group,src){
     src=src||this.groups[group];
     const ids=this.list.filter(t=>t.group===group);
-    if(!src||ids.length<2){Toast.show('This table was not split from a paste.');return}
+    if(!src||!ids.length){Toast.show('This table was not split from a paste.');return}
+    if(ids.length<2){Toast.show('Only one table from this paste is still open, so there is nothing to join.');return}
     if(Busy.n>0){Toast.show('Wait for the current step to finish.');return}
     this.stash(true);
     const steps=ids.reduce((a,t)=>a+((t.id===this.active?S.steps:t.ui&&t.ui.steps)||[]).length,0);
     if(steps&&!(await Dialog.confirm('Join these tables back into one?','The recipes on these '+plural(ids.length,'table')+' ('+plural(steps,'step')+') will be lost.','Join tables',true)))return;
-    if(this.active!==ids[0].id)await this.activate(ids[0].id);
+    if(this.active!==ids[0].id)await this.activate(ids[0].id,{wait:true});
     const ok=await Input.loadText(src.text||'',src.fileName||'',null,{single:true,target:'replace',htmlTables:src.htmlTables||null});
     if(!ok)return;
     for(const t of ids.slice(1))await this.drop(t.id);
     const c=this.current();
     if(c){c.group=null;c.origin='paste';c.name=this.uniqueName(src.fileName||'Pasted text',c)}
     delete this.groups[group];
-    this.render();Session.save()
+    this.render();Session.save();
+    if(src.htmlTables&&src.htmlTables.length)Toast.show('Kept the largest table from this page.')
   },
   async fromResult(name,origin,payload,at){
     this.ensureFirst(S.file||'Pasted text');
@@ -176,34 +187,59 @@ const Tabs={
   },
   async extractSelection(){
     if(!S.loaded||Sel.kind!=='rows'||!Sel.rowCount())return;
-    const r=await Busy.run('Copying rows',()=>Engine.call('export',selectionExportPayload('tsv')));
+    const r=await Busy.run('Copying rows',()=>withFreshView(()=>Engine.call('export',selectionExportPayload('tsv'))));
     this.ensureFirst(S.file||'Pasted text');
     const cur=this.current();
-    const t=await this.fromResult(cur.name+' · rows','extract',{text:r.text,fileName:S.file,htmlTables:null,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true}}});
+    const t=await this.fromResult(cur.name+' · rows','extract',{text:r.text,fileName:S.file,htmlTables:null,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}});
     if(t)Toast.show('Opened '+plural(r.rows,'row')+' as a new table')
+  },  async splitAtRow(){
+    if(!S.loaded)return;
+    if(this.switching||Busy.n>0){Toast.show('Wait for the current step to finish.');return}
+    if(S.sort.length||S.search||S.vfilter){Toast.err('Clear the sort, search and filter first, so the row position is clear.');return}
+    if(!atEnd()){Toast.err('View the final result first. The split works on the end of the recipe.');return}
+    const ids=Sel.kind==='rows'&&!Sel.rows.all&&Sel.rowCount()===1?Sel.rowIdsArray():[];
+    if(ids.length!==1){Toast.err('Select the one row where the second table starts.');return}
+    const p=await withFreshView(()=>Engine.call('positionOfRow',{viewKey:S.view.key,rowId:ids[0]}));
+    const pos=p.pos,n=S.view.n;
+    if(pos<1){Toast.err('Pick a row below the first row.');return}
+    if(pos>n-2){Toast.err('The second table needs its header row and at least one row under it.');return}
+    const rng=await withFreshView(()=>Engine.call('rowIdsForRange',{viewKey:S.view.key,a:pos,b:n-1}));
+    const r=await Busy.run('Splitting the table',()=>withFreshView(()=>Engine.call('export',{scope:'selected',viewKey:S.view.key,format:'tsv',selection:{kind:'rows',rows:{all:false,ids:rng.rowIds,except:[]},cols:[],rect:null},options:{header:false,formulaGuard:false}})));
+    this.ensureFirst(S.file||'Pasted text');
+    const cur=this.current();
+    const t=await this.create({name:cur.name+' (part 2)',origin:'extract',payload:{text:r.text,fileName:S.file,htmlTables:null,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}},activate:false,at:this.list.indexOf(cur)+1});
+    if(!t)return;
+    Sel.clear(true);
+    const done=await addStep('removeRowIds',{mode:'ids',rowIds:rng.rowIds},{msg:'Moved '+plural(rng.rowIds.length,'row')+' to "'+t.name+'"'});
+    if(done)announce('Split into two tables');
+    else{await this.close(t.id,true);Toast.err('The split could not be finished. Nothing was changed.')}
   },
+
   async duplicate(){
     if(!S.loaded)return;
     const r=await Busy.run('Copying the result',()=>Engine.call('export',{scope:'final',format:'tsv',options:{header:true}}));
     this.ensureFirst(S.file||'Pasted text');
     const cur=this.current();
-    const t=await this.fromResult(cur.name+' · copy','duplicate',{text:r.text,fileName:S.file,htmlTables:null,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true}}});
+    const t=await this.fromResult(cur.name+' · copy','duplicate',{text:r.text,fileName:S.file,htmlTables:null,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}});
     if(t)Toast.show('Opened a copy of the result as a new table')
   },
-  async exportWorkbook(){
+  async exportWorkbook(name){
     if(this.list.length<2)return;
+    if(Busy.n>0){Toast.show('Wait for the current step to finish.');return}
     this.stash(true);
     const sheets=[];
     for(const t of this.list){
       const r=await Busy.run('Building workbook',()=>Engine.call('exportTable',{id:t.id,format:'xlsx',options:{header:true}}));
       sheets.push({r,name:t.name})
     }
-    await Xlsx.writeBook(sheets,'weft-tables.xlsx');
+    let fn=String(name||'').trim()||'weft-tables.xlsx';if(!/\.xlsx$/i.test(fn))fn+='.xlsx';
+    await Xlsx.writeBook(sheets,fn);
     Toast.show('Downloaded '+plural(this.list.length,'table')+' as one workbook')
   },
   async restoreAll(d){
     const items=d.tabs||[];
     const map={};let n=0;
+    for(const r of (d.refs||[])){try{await Engine.call('refLoad',r)}catch(e){}}
     for(let k=0;k<items.length;k++){
       const x=items[k],p=x&&x.payload;
       if(!p||!((p.text&&p.text.trim())||(p.htmlTables&&p.htmlTables.length)))continue;
@@ -219,7 +255,7 @@ const Tabs={
     }
     if(!n)return false;
     const want=map[d.activeIdx];
-    if(want&&want!==this.active)await this.activate(want);
+    if(want&&want!==this.active)await this.activate(want,{wait:true});
     return true
   },
   size(t){
@@ -265,10 +301,10 @@ const Tabs={
     clear(el);
     this.list.forEach(t=>{
       const on=t.id===this.active;
-      el.append(h('button',{type:'button',class:'tt',role:'tab',id:'tab-'+t.id,'aria-selected':String(on),tabindex:on?'0':'-1','aria-controls':'workspace',title:t.name,dataset:{id:t.id}},
+      el.append(h('button',{type:'button',class:'tt',role:'tab',id:'tab-'+t.id,'aria-selected':String(on),tabindex:on?'0':'-1','aria-controls':'workspace',title:t.name+' (press Delete to close)',dataset:{id:t.id}},
         h('span',{class:'tt-name'},t.name),
         h('span',{class:'tt-size'},this.size(t)),
-        h('span',{class:'tt-x',role:'button','aria-label':'Close '+t.name},icon('close',12))))
+        h('span',{class:'tt-x','aria-hidden':'true','aria-label':'Close '+t.name},icon('close',12))))
     });
     el.append(h('button',{type:'button',class:'tt-add','aria-haspopup':'menu','aria-label':'Add a table',title:'Add a table'},icon('plus',16)));
     const a=$('.tt[aria-selected="true"]',el);

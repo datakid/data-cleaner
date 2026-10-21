@@ -36,7 +36,9 @@ const Inspector={
   async renderIssues(body){
     const key=S.view.stateIdx+'|'+S.steps.length+'|'+S.states.map(s=>s.n).join(',')+'|'+S.dateOrder;
     if(key!==this.issuesKey){
-      let r;try{r=await Engine.call('issues',{stateIdx:S.viewIdx},'issues')}catch(e){if(e.stale)return;r={issues:[]}}
+      const tab0=Tabs.active,vi0=S.viewIdx;
+      let r;try{r=await Engine.call('issues',{stateIdx:S.viewIdx},'issues')}catch(e){if(isQuiet(e))return;r={issues:[]}}
+      if(Tabs.active!==tab0||S.viewIdx!==vi0)return;
       this.issuesKey=key;
       this.issues=r.issues;
       $('#issueCount').textContent=this.issues.length?String(this.issues.length):'';
@@ -71,8 +73,9 @@ const Inspector={
     const col=this.col&&curCols().indexOf(this.col)!==-1?this.col:Sel.focusCol();
     clear(body);
     if(!col){body.append(h('p',{class:'insp-note'},'Click a column header or a cell to see its details.'));return}
+    const tab0=Tabs.active,vi0=S.viewIdx;
     let p;try{p=await Engine.call('profile',{stateIdx:S.viewIdx,col},'profile')}catch(e){return}
-    if(!p||this.tab!=='column')return;
+    if(!p||this.tab!=='column'||Tabs.active!==tab0||S.viewIdx!==vi0)return;
     clear(body);
     body.append(h('div',{class:'prof-head'},p.col),h('div',{class:'prof-sub'},(p.type==='number'?'Numbers':p.type==='date'?'Dates':'Text')+' · '+plural(p.n,'row')));
     const kv=[['Filled',fmtInt(p.filled)+' ('+Math.round(p.n?p.filled/p.n*100:0)+'%)'],['Empty',fmtInt(p.empty)],['Distinct values',fmtInt(p.distinct)]];
@@ -95,8 +98,9 @@ const Inspector={
     clear(body);
     const c=this.cell;
     if(!c||curCols().indexOf(c.col)===-1){body.append(h('p',{class:'insp-note'},'Click a cell to see its full value and how each step changed it.'));return}
+    const tab0=Tabs.active,vi0=S.viewIdx;
     const [v,lin]=await Promise.all([Engine.call('getCell',{stateIdx:S.viewIdx,rowId:c.rowId,col:c.col}),Engine.call('lineage',{rowId:c.rowId,col:c.col,uptoIdx:S.viewIdx})]).catch(()=>[null,null]);
-    if(!v||this.tab!=='cell')return;
+    if(!v||this.tab!=='cell'||Tabs.active!==tab0||S.viewIdx!==vi0)return;
     clear(body);
     body.append(h('div',{class:'prof-head'},'"'+c.col+'", row '+fmtInt(c.pos+1)));
     const box=h('div',{class:'cell-full'});

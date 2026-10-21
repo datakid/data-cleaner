@@ -113,7 +113,7 @@ W.describeCandidate=function dc(c){
     case'addSuffix':return'Add "'+p.suffix+'" at the end';case'removeSuffix':return'Remove "'+p.suffix+'" at the end';
     case'pad':return'Pad to '+p.width+' characters with "'+p.ch+'"';
     case'replaceLiteral':return'Replace "'+W.trunc(p.find,20)+'" with "'+W.trunc(p.replace,20)+'"';
-    case'mapValue':return'Change this exact value only';
+    case'mapValue':return p.label||'Change this exact value only';
     case'compose':return p.steps.map(dc).join(', then ')
   }
   return'Change'

@@ -23,7 +23,7 @@ const Sel={
     const lo=Math.min(a,b),hi=Math.max(a,b);
     if(lo===0&&hi>=S.view.n-1&&!additive){this.selectAllRows();return}
     if(hi-lo>50000)Toast.show('Large selection; this may take a moment.');
-    const r=await Engine.call('rowIdsForRange',{viewKey:S.view.key,a:lo,b:hi});
+    const r=await withFreshView(()=>Engine.call('rowIdsForRange',{viewKey:S.view.key,a:lo,b:hi}));
     if(this.kind!=='rows'||!additive){this.kind='rows';this.cols=new Set();this.rect=null;this.rows={all:false,ids:new Set(),except:new Set()}}
     if(this.rows.all)r.rowIds.forEach(id=>this.rows.except.delete(id));else r.rowIds.forEach(id=>this.rows.ids.add(id));
     this.cursor={pos:b,col:-1};this.changed()
@@ -65,7 +65,7 @@ async function ensureRowIdsForStep(){
   const r=Sel.rows;
   if(!r.all)return{mode:'ids',rowIds:Array.from(r.ids)};
   if(S.view.n===S.view.total)return{mode:'allExcept',rowIds:Array.from(r.except)};
-  const all=await Engine.call('rowIdsForView',{viewKey:S.view.key});
+  const all=await withFreshView(()=>Engine.call('rowIdsForView',{viewKey:S.view.key}));
   return{mode:'ids',rowIds:all.rowIds.filter(id=>!r.except.has(id))}
 }
 
@@ -81,7 +81,7 @@ async function deleteSelection(){
   }else if(Sel.kind==='cells'&&Sel.rect){
     const r=Sel.rect;const n=Sel.cellCount();
     if(n>20000){Toast.err('Select up to 20,000 cells to clear, or delete whole rows or columns instead.');return}
-    const ids=(await Engine.call('rowIdsForRange',{viewKey:S.view.key,a:r.r0,b:r.r1})).rowIds;
+    const ids=(await withFreshView(()=>Engine.call('rowIdsForRange',{viewKey:S.view.key,a:r.r0,b:r.r1}))).rowIds;
     const cols=curCols().slice(r.c0,r.c1+1);
     await addSteps(cols.map(c=>({opId:'cellOverride',cfg:{column:c,overrides:ids.map(id=>({rowId:id,value:''}))}})),'Cleared '+plural(n,'cell'));
   }else Toast.show('Select rows, columns or cells first.')
@@ -116,14 +116,14 @@ async function copySelection(){
     for(let s=r.r0;s<=r.r1;s+=512){const g=await Engine.call('getRows',{viewKey:S.view.key,start:s,count:Math.min(512,r.r1-s+1)});g.rows.forEach(row=>lines.push(row.slice(r.c0,r.c1+1).join('\t')))}
     text=lines.join('\n');await copyText(text,'Copied '+plural(Sel.cellCount(),'cell'));return
   }
-  const p=selectionExportPayload('tsv');
+  let p=selectionExportPayload('tsv');
   if(Sel.kind!=='rows'&&Sel.kind!=='cols'){const c=Sel.cursor;if(c.col>=0&&c.col<cols.length){const rr=Grid.rowAt(c.pos);if(rr){await copyText(rr.row[c.col],'Copied cell');return}}}
-  const r=await Engine.call('export',p);
+  const r=await withFreshView(()=>Engine.call('export',(p=selectionExportPayload('tsv'))));
   await copyText(r.text.replace(/\n$/,''),'Copied '+plural(r.rows,'row')+(p.columns?' × '+plural(p.columns.length,'column'):''))
 }
 async function selectedRowIdsList(limit){
   if(Sel.kind!=='rows')return[];
   const cfg=await ensureRowIdsForStep();
   if(cfg.mode==='ids')return cfg.rowIds.slice(0,limit||1e9);
-  const all=await Engine.call('rowIdsForView',{viewKey:S.view.key});const ex=new Set(cfg.rowIds);return all.rowIds.filter(id=>!ex.has(id)).slice(0,limit||1e9)
+  const all=await withFreshView(()=>Engine.call('rowIdsForView',{viewKey:S.view.key}));const ex=new Set(cfg.rowIds);return all.rowIds.filter(id=>!ex.has(id)).slice(0,limit||1e9)
 }

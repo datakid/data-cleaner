@@ -103,7 +103,7 @@ W.textToSteps=function(text){
 };
 W.stepColumns=function(step){
   const cfg=step.cfg||{};const out=new Set();
-  const add=v=>{if(Array.isArray(v))v.forEach(x=>{if(x&&x!=='*')out.add(x)});else if(typeof v==='string'&&v&&v!=='*')out.add(v)};
+  const add=v=>{if(Array.isArray(v))v.forEach(x=>{if(x&&x!=='*'&&x!=='@row')out.add(x)});else if(typeof v==='string'&&v&&v!=='*'&&v!=='@row')out.add(v)};
   ['column','columns','from','on','idColumns','valueColumns','keyColumn','valueColumn','groupBy','onLeft','keyColumns'].forEach(k=>add(cfg[k]));
   if(cfg.conditions)cfg.conditions.forEach(c=>add(c.col));
   if(cfg.keys)cfg.keys.forEach(k=>add(k.col));

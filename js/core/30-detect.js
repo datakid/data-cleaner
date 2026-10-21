@@ -18,7 +18,7 @@ const BOX_MYSQL=/^\s*\+[-+]+\+\s*$/;
 const BOX_PSQL=/^\s*-+(\+-+)+\s*$/;
 const JUNK_ARTIFACT=/^(page \d+( of \d+)?|[-=_*]{3,}|\(\d+ rows?\))$/i;
 const TOTAL_RE=/^(total|totals|sum|grand total|subtotal|sub-total)\b/i;
-W.JUNK_ARTIFACT_SRC='^(page \\d+( of \\d+)?|[-=_*]{3,}|\\(\\d+ rows?\\))$';
+W.JUNK_ARTIFACT_SRC='^(page \\d+( of \\d+)?|[-=_*]{3,}|\\(\\d+ rows?\\)|\\d+ rows? in set.*)$';
 W.TOTAL_SRC='^(total|totals|sum|grand total|subtotal|sub-total)\\b';
 W.SEPARATOR_MD_SRC=SEPARATOR_MD.source;W.BOX_MYSQL_SRC=BOX_MYSQL.source;W.BOX_PSQL_SRC=BOX_PSQL.source;
 
@@ -374,9 +374,10 @@ def('box-table',{
   },
   parse(text,params){
     const ls=text.split('\n');
-    const out=[];let pos=null,skipped=0;
+    const out=[];let pos=null,skipped=0,below=0,end=ls.length;
+    while(end>0){const l=ls[end-1];if(!l.trim()){end--;continue}if(/^\s*\d+ rows? in set\b/i.test(l)||/^\s*\(\d+ rows?\)\s*$/.test(l)){below++;end--;continue}break}
     const first=ls.findIndex(l=>BOX_MYSQL.test(l)||BOX_PSQL.test(l)||l.indexOf('|')!==-1);
-    for(let i=0;i<ls.length;i++){
+    for(let i=0;i<end;i++){
       const l=ls[i];
       if(!l.trim())continue;
       if(i<first){skipped++;continue}
@@ -386,7 +387,8 @@ def('box-table',{
       if(params.style==='psql'&&l.indexOf('|')!==-1){out.push(l.split('|').map(s=>s.trim()));continue}
       out.push([l.trim()])
     }
-    return{matrix:out,warnings:skipped?[skipNote(skipped)]:[]}
+    const warnings=[];if(skipped)warnings.push(skipNote(skipped));if(below)warnings.push('Skipped '+below+(below===1?' line':' lines')+' below the table.');
+    return{matrix:out,warnings}
   }
 });
 

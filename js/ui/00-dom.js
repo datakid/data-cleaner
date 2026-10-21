@@ -105,6 +105,7 @@ const Layers={
   has(id){return this.stack.some(l=>l.id===id)}
 };
 
+const isQuiet=e=>!!e&&(e.stale===true||e.code==='cancelled'||e.code==='tab-closed');
 const Toast={
   root:null,
   show(msg,o){

@@ -40,7 +40,7 @@ W.rewriteCells=function(t,cols,fn){
 W.addColumnAt=function(t,name,values,afterIdx){
   const cols=t.cols.slice(),data=t.data.slice();
   let nm=name,k=2;while(cols.indexOf(nm)!==-1){nm=name+'_'+k;k++}
-  const at=afterIdx==null||afterIdx<0?cols.length:afterIdx+1;
+  const at=afterIdx==null?cols.length:afterIdx+1;
   cols.splice(at,0,nm);data.splice(at,0,values);
   return{table:{cols,data,n:t.n,rowIds:t.rowIds},name:nm,index:at}
 };
@@ -57,7 +57,7 @@ W.COND_LABEL={};W.COND_OPS.forEach(o=>{W.COND_LABEL[o[0]]=o[1]});
 W.COND_KIND={};W.COND_OPS.forEach(o=>{W.COND_KIND[o[0]]=o[2]});
 
 W.describeCond=function(c){
-  const col=c.col==='*'?'any column':'"'+c.col+'"';
+  const col=c.col==='*'?'any column':c.col==='@row'?'row text':'"'+c.col+'"';
   const k=W.COND_KIND[c.op];
   let s=col+' '+(W.COND_LABEL[c.op]||c.op);
   if(k==='text'||k==='cmp')s+=' '+(c.op==='matches'?'/'+c.value+'/':'"'+W.trunc(c.value,30)+'"');
@@ -66,7 +66,7 @@ W.describeCond=function(c){
   return s
 };
 W.condToDsl=function(c){
-  const col=c.col==='*'?'any column':q(c.col);
+  const col=c.col==='*'?'any column':c.col==='@row'?'row text':q(c.col);
   const v=W.valDsl;
   let s;
   switch(c.op){
@@ -93,6 +93,7 @@ W.parseCond=function(cur){
   let col;
   if(cur.isWord('any')&&cur.isWord('column',1)){cur.i+=2;col='*'}
   else if(cur.isWord('*')){cur.i++;col='*'}
+  else if(cur.isWord('row')&&cur.isWord('text',1)){cur.i+=2;col='@row'}
   else col=cur.str();
   const c={col,op:null,caseSensitive:false};
   const x=cur.peek();
@@ -143,7 +144,7 @@ W.parseConds=function(cur){
 W.compileConds=function(t,conds,ctx){
   ctx=ctx||{};
   const matchers=conds.map(c=>{
-    const ci=c.col==='*'?-1:W.needCol(t,c.col);
+    const ci=c.col==='*'||c.col==='@row'?-1:W.needCol(t,c.col);
     const cs=!!c.caseSensitive;
     const norm=cs?(s=>s):(s=>s.toLowerCase());
     const val=norm(String(c.value==null?'':c.value));
@@ -180,6 +181,7 @@ W.compileConds=function(t,conds,ctx){
     const neg=c.op==='notContains'||c.op==='notEquals';
     if(ci!==-1){const col=t.data[ci];return r=>{const h=test(col[r]==null?'':String(col[r]));return neg?!h:h}}
     const nc=t.cols.length;
+    if(c.col==='@row')return r=>{const a=[];for(let k=0;k<nc;k++){const v=t.data[k][r];const x=v==null?'':String(v).trim();if(x)a.push(x)}const h=test(a.join(' '));return neg?!h:h};
     if(c.op==='isEmpty')return r=>{for(let k=0;k<nc;k++){const v=t.data[k][r];if(v!=null&&String(v).trim()!=='')return false}return true};
     return r=>{let any=false;for(let k=0;k<nc;k++){const v=t.data[k][r];if(test(v==null?'':String(v))){any=true;break}}return neg?!any:any}
   });
@@ -240,7 +242,8 @@ W.defineOp({
     {cfg:{mode:'keep',match:'all',conditions:[{col:'amount',op:'gt',value:'100',caseSensitive:false},{col:'region',op:'in',values:['EMEA','APAC'],caseSensitive:false}]},input:{cols:['amount','region'],rows:[['$1,200','emea'],['50','APAC'],['300','US']]},expect:{cols:['amount','region'],rows:[['$1,200','emea']]}},
     {cfg:{mode:'remove',match:'all',conditions:[{col:'*',op:'contains',value:'test',caseSensitive:false}]},input:{cols:['a','b'],rows:[['x','Test row'],['y','z']]},expect:{cols:['a','b'],rows:[['y','z']]}},
     {cfg:{mode:'keep',match:'all',conditions:[{col:'d',op:'between',value:'2025-01-01',value2:'2025-03-31',caseSensitive:false}]},input:{cols:['d'],rows:[['2025-02-10'],['2025-05-01'],['Jan 3, 2025']]},expect:{cols:['d'],rows:[['2025-02-10'],['Jan 3, 2025']]}},
-    {cfg:{mode:'remove',match:'all',conditions:[{col:'notes',op:'matches',value:'^ref \\d+$',caseSensitive:false}]},input:{cols:['notes'],rows:[['REF 12'],['ref x']]},expect:{cols:['notes'],rows:[['ref x']]}}
+    {cfg:{mode:'remove',match:'all',conditions:[{col:'notes',op:'matches',value:'^ref \\d+$',caseSensitive:false}]},input:{cols:['notes'],rows:[['REF 12'],['ref x']]},expect:{cols:['notes'],rows:[['ref x']]}},
+    {cfg:{mode:'remove',match:'all',conditions:[{col:'@row',op:'matches',value:'^page \\d+$',caseSensitive:false}]},input:{cols:['a','b'],rows:[['Page','2'],['x','y']]},expect:{cols:['a','b'],rows:[['x','y']]}}
   ]
 });
 

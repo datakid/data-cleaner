@@ -39,6 +39,12 @@ function pipelineResult(){
 }
 function extractHtmlWarnings(ht){return(ht||[]).map(t=>({rows:t.rows,thHeader:!!t.thHeader,warnings:t.warnings||[]}))}
 
+function forcedReading(hint,text){
+  const R=W.READERS[hint.kind];
+  const r={kind:hint.kind,params:Object.assign({},hint.params),confidence:1,strength:'Strong match',explain:'Read as exported by Weft.',label:(R.labelFor?R.labelFor(hint.params):R.label),preview:{cols:[],rows:[],total:0}};
+  try{const t=W.applyReading(text.split('\n',201).join('\n'),r,{htmlTables:null});r.preview={cols:t.cols.slice(),rows:W.tableRows(t).slice(0,50),total:t.n}}catch(e){}
+  return r
+}
 function loadSource(p){
   const text=W.normalizeInput(p.text||'');
   const htmlTables=p.htmlTables&&p.htmlTables.length?extractHtmlWarnings(p.htmlTables):null;
@@ -46,11 +52,15 @@ function loadSource(p){
   if(!det.readings.length)throw new Error('Weft could not read this input.');
   let chosen=0,hintMismatch=null;
   if(p.hint&&p.hint.kind){
-    const i=det.readings.findIndex(r=>r.kind===p.hint.kind);
+    let i=det.readings.findIndex(r=>r.kind===p.hint.kind);
+    if(i===-1&&p.hint.force&&W.READERS[p.hint.kind]){det.readings.push(forcedReading(p.hint,text));i=det.readings.length-1}
     if(i!==-1&&det.readings[i].confidence>=0.5){
       chosen=i;
       const merged=Object.assign({},det.readings[i].params,p.hint.params||{});
-      if(p.hint.kind==='delimited'||p.hint.kind==='html-table'||p.hint.kind==='fixed-width'&&p.hint.params&&p.hint.params.cuts)det.readings[i].params=merged
+      if(p.hint.kind==='delimited'||p.hint.kind==='html-table'||p.hint.kind==='fixed-width'&&p.hint.params&&p.hint.params.cuts){
+        det.readings[i].params=merged;
+        const RR=W.READERS[p.hint.kind];if(RR&&RR.labelFor)det.readings[i].label=RR.labelFor(merged)
+      }
     }else hintMismatch={expected:(W.READERS[p.hint.kind]||{}).label||p.hint.kind,detected:det.readings[0].label,hint:p.hint}
   }
   E.src={text,htmlTables,fileName:p.fileName||'',readings:det.readings,scan:det.scan,sampleLines:det.sampleLines,lineCount:det.lineCount,size:text.length};
@@ -82,11 +92,14 @@ function loadResult(extra){
   },pipelineResult(),extra||{})
 }
 
+const SEARCH_KEEP=[];
 function searchIndex(t){
   if(!t._search){
     const n=t.n,w=t.cols.length,idx=new Array(n);
     for(let r=0;r<n;r++){let x='';for(let c=0;c<w;c++){const v=t.data[c][r];if(v!=null&&v!=='')x+=String(v).toLowerCase()+'\u0001'}idx[r]=x}
-    t._search=idx
+    t._search=idx;
+    SEARCH_KEEP.push(t);
+    while(SEARCH_KEEP.length>2){const old=SEARCH_KEEP.shift();if(old!==t)delete old._search}
   }
   return t._search
 }
@@ -189,7 +202,7 @@ function buildExport(p){
     const types=W.typesOf(t,E.ctx);
     const loc=ci.map(c=>{const sm=[];for(let r=0;r<t.n&&sm.length<300;r++){const v=t.data[c][r];if(v)sm.push(v)}return W.detectNumberLocale(sm)});
     const rows=new Array(pos.length);for(let i=0;i<pos.length;i++)rows[i]=row(pos[i]);
-    push(JSON.stringify({cols,rows,types:ci.map(c=>types[c]),locales:loc}))
+    push(JSON.stringify({cols,rows,types:ci.map(c=>types[c]),locales:loc,header}))
   }else throw new Error('Unknown format "'+fmt+'".');
   chunks.push(buf);
   const text=chunks.join('');
@@ -200,7 +213,7 @@ const H={
   ping:()=>({version:W.version}),
   setCtx(p){
     Object.assign(CTX,p||{});
-    T.map.forEach(x=>{x.states.forEach(t=>{t._types=null});if(x.base)withSession(x,()=>recompute(0))});
+    T.map.forEach(x=>{x.states.forEach(t=>{t._types=null});x.views.clear();if(x.base)withSession(x,()=>recompute(0))});
     return E.base?pipelineResult():{}
   },
   tableNew(p){if(T.map.has(p.id))throw new Error('A table with that id is already open.');const x=newSession();T.map.set(p.id,x);useSession(p.id);return{id:p.id}},
@@ -298,7 +311,7 @@ const H={
     if(err)return{error:err};
     let res;try{res=d.apply(t,p.step.cfg,engineCtx())}catch(e){return{error:e.message}}
     const o=res.table;const pm=W.posMap(o);
-    const removed=[];for(let r=0;r<t.n&&removed.length<5;r++)if(!pm.has(t.rowIds[r]))removed.push(W.tableRows({cols:t.cols,data:t.data.map(c=>[c[r]]),n:1})[0]);
+    const removed=[];if(d.category!=='reshape')for(let r=0;r<t.n&&removed.length<5;r++)if(!pm.has(t.rowIds[r]))removed.push(W.tableRows({cols:t.cols,data:t.data.map(c=>[c[r]]),n:1})[0]);
     let keptIdx=[];
     if(res.touched&&res.touched.size){const set=new Set();res.touched.forEach(v=>{if(v===true){for(let r=0;r<Math.min(o.n,5);r++)set.add(r)}else v.forEach(x=>set.add(x))});keptIdx=Array.from(set).sort((a,b)=>a-b).slice(0,6)}
     else keptIdx=W.identity(Math.min(o.n,5));
@@ -342,7 +355,7 @@ const H={
     const text=W.normalizeInput(p.text||'');
     const det=W.detectReadings(text,{htmlTables:p.htmlTables});
     let rd=det.readings[0];
-    if(p.hint&&p.hint.kind){const hi=det.readings.findIndex(r=>r.kind===p.hint.kind);if(hi!==-1&&det.readings[hi].confidence>=0.5){rd=det.readings[hi];rd.params=Object.assign({},rd.params,p.hint.params||{})}}
+    if(p.hint&&p.hint.kind){let hi=det.readings.findIndex(r=>r.kind===p.hint.kind);if(hi===-1&&p.hint.force&&W.READERS[p.hint.kind]){det.readings.push(forcedReading(p.hint,text));hi=det.readings.length-1}if(hi!==-1&&det.readings[hi].confidence>=0.5){rd=det.readings[hi];rd.params=Object.assign({},rd.params,p.hint.params||{})}}
     const t=W.applyReading(text,rd,{htmlTables:p.htmlTables});
     let name=p.name||'reference';let k=2;const base=name;while(E.refs[name]&&!p.replace){name=base+' ('+k+')';k++}
     E.refs[name]=t;
@@ -350,7 +363,7 @@ const H={
     return{name,cols:t.cols,n:t.n,reading:rd.label}
   },
   refList:()=>({refs:Object.keys(E.refs).map(k=>({name:k,cols:E.refs[k].cols,n:E.refs[k].n}))}),
-  refRemove(p){delete E.refs[p.name];return{}},
+  refRemove(p){delete E.refs[p.name];T.map.forEach(x=>{if(!x.base)return;const i=x.steps.findIndex(s=>(s.opId==='join'||s.opId==='diff')&&s.cfg&&s.cfg.refName===p.name);if(i!==-1)withSession(x,()=>recompute(i))});return{}},
   contract(p){const t=stateAt(p.stateIdx);return{contract:W.shapeContract(t)}},
   drift(p){const t=stateAt(p.stateIdx);return{drift:W.diffContracts(p.contract,W.shapeContract(t))}},
   parseRecipe(p){return W.textToSteps(p.text)},
@@ -359,7 +372,8 @@ const H={
     const t=stateAt(p.stateIdx);const ci=t.cols.indexOf(p.col);if(ci===-1)return{rowIds:[]};
     const out=[];const v=s(p.value).trim();for(let r=0;r<t.n;r++)if(s(t.data[ci][r]).trim()===v)out.push(t.rowIds[r]);return{rowIds:out}
   },
-  stats(){return{states:E.states.length,rows:E.base?E.base.n:0}}
+  stats(){return{states:E.states.length,rows:E.base?E.base.n:0}},
+  pipelineInfo(){need();return pipelineResult()}
 };
 function stats(cells,count){
   let n=0,sum=0,mn=Infinity,mx=-Infinity;
@@ -367,7 +381,17 @@ function stats(cells,count){
   for(const c of cells){const p=W.parseNumber(c,{locale:loc});if(p){n++;sum+=p.value;if(p.value<mn)mn=p.value;if(p.value>mx)mx=p.value}}
   return{count,numericCount:n,sum:n?sum:null,avg:n?sum/n:null,min:n?mn:null,max:n?mx:null}
 }
-W.Engine={handle(type,payload){const f=H[type];if(!f)throw new Error('Unknown request type "'+type+'".');return f(payload||{})},H};
+const GLOBAL_TYPES=new Set(['ping','setCtx','tableNew','tableUse','tableClose','tableReset','tableList','exportTable','findTables','sample','parseRecipe']);
+W.Engine={handle(type,payload){
+  const f=H[type];if(!f)throw new Error('Unknown request type "'+type+'".');
+  const p=payload||{};
+  if(p.tableId&&!GLOBAL_TYPES.has(type)){
+    const x=T.map.get(p.tableId);
+    if(!x)throw Object.assign(new Error('That table is no longer open.'),{code:'tab-closed'});
+    return withSession(x,()=>f(p))
+  }
+  return f(p)
+},H,GLOBAL_TYPES};
 W.hostWorker=function(scope){
   scope.onmessage=function(e){
     const m=e.data||{};

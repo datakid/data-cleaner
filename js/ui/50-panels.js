@@ -109,7 +109,7 @@ const ReadingBar={
 };
 async function chooseReading(indexOrReading){
   const payload=typeof indexOrReading==='number'?{index:indexOrReading}:{reading:indexOrReading};
-  let r;try{r=await Busy.run('Re-reading the input',()=>Engine.call('chooseReading',payload))}catch(e){Toast.err(e.message);return}
+  let r;try{r=await Busy.run('Re-reading the input',()=>Engine.call('chooseReading',payload))}catch(e){if(!isQuiet(e))Toast.err(e.message);return}
   const steps=S.steps;
   await applyLoad(r,{keepSteps:true});
   if(steps.length){
@@ -139,7 +139,9 @@ const Status={
   selStats:debounce(async function(){
     const el=$('#selStats');if(!el)return;
     if(!(Sel.kind==='cols'||(Sel.kind==='cells'&&Sel.cellCount()>1))){el.textContent='';return}
-    let r;try{r=await Engine.call('selectionStats',{viewKey:S.view.key,selection:Sel.payload()},'selstats')}catch(e){return}
+    const tab0=Tabs.active,vi0=S.viewIdx;
+    let r;try{r=await withFreshView(()=>Engine.call('selectionStats',{viewKey:S.view.key,selection:Sel.payload()},'selstats'))}catch(e){return}
+    if(Tabs.active!==tab0||S.viewIdx!==vi0)return;
     if(!r.numericCount){el.textContent='';return}
     el.textContent='Sum '+W.fmtNum(r.sum)+' · Avg '+W.fmtNum(r.avg)+' · Min '+W.fmtNum(r.min)+' · Max '+W.fmtNum(r.max)
   },120),

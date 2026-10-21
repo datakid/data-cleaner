@@ -12,7 +12,7 @@ const ReadingDialog={
     const pv=h('div',{class:'mini-wrap',style:{maxHeight:'300px'}});const pvInfo=h('div',{class:'pv-line',style:{margin:'4px 0 8px'}});
     let t=null;
     const preview=()=>{clearTimeout(t);t=setTimeout(async()=>{
-      let r;try{r=await Engine.call('previewReading',{reading:{kind:readings[sel].kind,params:clean(params)}},'readprev')}catch(e){if(e.stale)return;clear(pv).append(h('div',{class:'pv-err',style:{padding:'8px'}},e.message));pvInfo.textContent='';return}
+      let r;try{r=await Engine.call('previewReading',{reading:{kind:readings[sel].kind,params:clean(params)}},'readprev')}catch(e){if(isQuiet(e))return;clear(pv).append(h('div',{class:'pv-err',style:{padding:'8px'}},e.message));pvInfo.textContent='';return}
       pvInfo.textContent=plural(r.cols.length,'column')+' · '+plural(r.n,'row')+(r.n>=3999?' in the first part':'');
       const show=r.cols.slice(0,12);
       clear(pv).append(h('table',{class:'mini-table'},h('thead',{},h('tr',{},show.map(c=>h('th',{title:c},c)))),h('tbody',{},r.rows.map(row=>h('tr',{},show.map((c,i)=>h('td',{title:row[i]||''},row[i]||'')))))))

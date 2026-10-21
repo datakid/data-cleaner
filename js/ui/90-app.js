@@ -9,9 +9,11 @@ const App={
   },
   async reset(){
     const gone=Engine.call('tableReset',{id:'t1'});
-    Tabs.list=[];Tabs.active=null;Tabs.groups={};S.refs=[];S.refsRaw=[];
-    S.loaded=false;S.steps=[];S.meta=[];S.states=[];S.viewIdx=0;S.undo=[];S.redo=[];S.sort=[];S.search='';S.vfilter=null;S.sourceText=null;
+    Tabs.list=[];Tabs.active=null;Tabs.groups={};Tabs.seq=1;
+    Object.assign(S,defaultTabState());
+    Inspector.cell=null;Inspector.col=null;
     Sel.clear(true);Grid.pool.forEach(r=>r.el.remove());Grid.pool=[];
+    Grid.pages.clear();Grid.lru=[];Grid.inflight.clear();
     ['#workspace','#fileMeta','#searchBox','#btnExport','#btnRecipe','#btnNew','#tableTabs','#readingBar','#toolbar','#scrub','#statusBar','#coach'].forEach(s=>$(s).classList.add('hidden'));
     $('#emptyView').classList.remove('hidden');$('#pasteArea').value='';$('#searchInput').value='';
     App.renderSession();
@@ -24,6 +26,7 @@ const App={
   async restore(d){
     if(!d)return false;
     if(d.v===2)return Tabs.restoreAll(d);
+    for(const r of (d.refs||[])){try{await Engine.call('refLoad',r)}catch(e){}}
     const ok=await Input.loadText(d.text||'',d.fileName||'',null,{single:true,htmlTables:d.html||null});
     if(!ok)return false;
     await this.applyStoredReading(d.reading);
@@ -95,7 +98,7 @@ function onKey(e){
 
 async function boot(){
   window.addEventListener('error',e=>{if(!e.message||/ResizeObserver/.test(e.message))return;reportError(e.message,e.error&&e.error.stack)});
-  window.addEventListener('unhandledrejection',e=>{const r=e.reason;if(r&&r.stale)return;reportError(r&&r.message||String(r),r&&r.stack)});
+  window.addEventListener('unhandledrejection',e=>{const r=e.reason;if(isQuiet(r))return;reportError(r&&r.message||String(r),r&&r.stack)});
   document.addEventListener('keydown',onKey,true);
   document.addEventListener('mousedown',e=>{if(Menus.el&&!e.target.closest('.menu')&&!e.target.closest('[aria-haspopup="menu"]'))Menus.close();if(Halo.el&&!e.target.closest('.halo'))Halo.close()});
   window.addEventListener('beforeunload',e=>{if(S.loaded&&S.steps.length&&S.sessionDirty){e.preventDefault();e.returnValue=''}});

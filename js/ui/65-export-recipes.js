@@ -27,7 +27,7 @@ const ExportDialog={
       summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?Sel.cols.size:(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
     };
     const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;refresh()}},[['xlsx','Excel workbook (.xlsx)'],['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0]},o[1])));
-    const xlNote=h('p',{class:'hint hidden',style:{marginTop:'-6px'}},'Numbers and ISO dates are stored as real Excel values. The header row is frozen with filters turned on. Formulas are never created.');
+    const xlNote=h('p',{class:'hint hidden',style:{marginTop:'-6px'}},'Numbers and ISO dates are stored as real Excel values. Filters are turned on for the header row. Formulas are never created.');
     const allBox=h('label',{class:'check hidden'},h('input',{type:'checkbox',onchange:e=>{st.allTabs=e.target.checked}}),'Include every open table (one sheet each)');
     const body=h('div',{class:'dlg-body'},
       h('div',{class:'field'},h('label',{},'Format'),fmtSel,xlNote,allBox),
@@ -35,11 +35,11 @@ const ExportDialog={
       colSel?h('div',{class:'field'},h('span',{class:'flabel'},'Columns'),radio('cols','all','All columns',null,st.cols==='all',v=>st.cols=v),radio('cols','selected','Selected columns ('+Sel.cols.size+')',Sel.selectedCols().join(', '),st.cols==='selected',v=>st.cols=v)):null,
       h('div',{class:'field'},h('span',{class:'flabel'},'Options'),h('label',{class:'check'},h('input',{type:'checkbox',checked:st.header,onchange:e=>{st.header=e.target.checked}}),'Include header row'),guardBox,excelBox),
       h('div',{class:'field'},h('label',{},'File name'),fname));
-    const build=()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'&&st.scope!=='final'?Sel.selectedCols():(st.cols==='selected'?Sel.selectedCols():null),format:st.format,options:{header:st.header,formulaGuard:st.guard,excel:st.excel}});
+    const build=()=>withFreshView(()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:st.format,options:{header:st.header,formulaGuard:st.guard,excel:st.excel}}));
     const d=Dialog.open({title:'Export',body,foot:[summary,
-      h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:(st.format==='csv'||st.format==='xlsx')?'tsv':st.format,options:{header:st.header,formulaGuard:false}}));const sp=st.format==='csv'||st.format==='tsv'||st.format==='xlsx';const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(sp?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),'Copy'),
+      h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>withFreshView(()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:(st.format==='csv'||st.format==='xlsx')?'tsv':st.format,options:{header:st.header,formulaGuard:st.guard}})));const sp=st.format==='csv'||st.format==='tsv'||st.format==='xlsx';const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(sp?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),'Copy'),
       h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{
-        if(st.format==='xlsx'){if(st.allTabs&&Tabs.list.length>1){d.close(true);await Tabs.exportWorkbook();return}try{const r=await Busy.run('Building workbook',build);await Xlsx.write(r,fname.value.trim()||'weft-export.xlsx',(S.file||'Weft').replace(/\.[^.]+$/,''));Toast.show('Downloaded '+plural(r.rows,'row')+' as an Excel workbook');d.close(true)}catch(e){Toast.err('Could not build the workbook: '+e.message)}return}
+        if(st.format==='xlsx'){if(st.allTabs&&Tabs.list.length>1){d.close(true);await Tabs.exportWorkbook(fname.value);return}try{const r=await Busy.run('Building workbook',build);await Xlsx.write(r,fname.value.trim()||'weft-export.xlsx',(S.file||'Weft').replace(/\.[^.]+$/,''));Toast.show('Downloaded '+plural(r.rows,'row')+' as an Excel workbook');d.close(true)}catch(e){if(!isQuiet(e))Toast.err('Could not build the workbook: '+e.message)}return}
         const r=await Busy.run('Building file',build);const mime={csv:'text/csv',tsv:'text/tab-separated-values',json:'application/json',jsoncols:'application/json',ndjson:'application/x-ndjson',md:'text/markdown',lines:'text/plain'}[st.format];downloadText(fname.value.trim()||'weft-export.'+EXT[st.format],r.text,mime);Toast.show('Downloaded '+plural(r.rows,'row')+' ('+fmtBytes(r.bytes)+')');d.close(true)}},icon('download',16),'Download')]});
     refresh()
   }
@@ -50,7 +50,7 @@ const Recipes={
   lib(){return lsGet('weft.library.v2',[])},
   setLib(v){if(!lsSet('weft.library.v2',v))Toast.err('Could not save. Browser storage is full or blocked.')},
   migrate(){
-    if(localStorage.getItem('weft.library.v2')!=null)return;
+    try{if(localStorage.getItem('weft.library.v2')!=null)return}catch(e){return}
     const old=lsGet('sift_library_v1',null);
     if(!Array.isArray(old)){return}
     const out=[];
@@ -100,7 +100,7 @@ const Recipes={
 };
 
 async function applyRecipeText(text,opts){
-  opts=opts||{};
+  opts=Object.assign({foreign:true},opts||{});
   const p=W.textToSteps(text);
   if(p.errors.length&&!p.steps.length){Toast.err('This recipe could not be read: line '+p.errors[0].line+': '+p.errors[0].message);return false}
   if(!S.loaded){S.pendingRecipe={text,opts};Toast.show('Recipe ready. Load a file and it will be applied.');return false}
@@ -109,13 +109,15 @@ async function applyRecipeText(text,opts){
     const has=S.readings.findIndex(r=>r.kind===p.source.kind);
     const use=await Dialog.confirm('Which reading should the recipe use?','This recipe expects '+exp.toLowerCase()+', but this file looks like '+(S.reading.label||'').toLowerCase()+'. Use the recipe\'s reading or the detected one?','Use the recipe\'s reading');
     if(use){
-      try{const r=await Engine.call('chooseReading',{reading:p.source});await applyLoad(r,{keepSteps:true})}catch(e){Toast.err('The recipe\'s reading did not work on this file: '+e.message)}
-    }else if(has<0){}
+      try{const r=await Engine.call('chooseReading',{reading:p.source});await applyLoad(r,{keepSteps:true})}catch(e){if(!isQuiet(e))Toast.err('The recipe\'s reading did not work on this file: '+e.message)}
+    }
   }
   const cols=curCols();
   const want=new Set();p.steps.forEach(s=>W.stepColumns(s).forEach(c=>want.add(c)));
   const dict=W.matchColumns(Array.from(want),S.baseSchema.cols.map(c=>c.name));
   const steps=Object.keys(dict).length?p.steps.map(s=>W.remapStep(s,dict)):p.steps;
+  let m=0;
+  if(opts.foreign)steps.forEach(st=>{if(W.OPS[st.opId]&&W.OPS[st.opId].portable===false){st.muted=true;m++}});
   const start=S.steps.length?S.steps:[];
   const combined=opts.replace===false?start.concat(steps):steps;
   const ok=await setPipeline(combined,0,{label:'Applying recipe'});
@@ -123,6 +125,7 @@ async function applyRecipeText(text,opts){
   const bad=S.meta.filter(m=>m.error).length;
   let msg='Applied '+(opts.name?'"'+opts.name+'" · ':'')+plural(steps.length,'step');
   if(Object.keys(dict).length)msg+=' · matched '+plural(Object.keys(dict).length,'renamed column');
+  if(m)msg+='. '+plural(m,'manual step')+(m===1?' was muted because it points':' were muted because they point')+' at rows of the original file. Unmute '+(m===1?'it':'them')+' in the recipe panel if this is the same data.';
   if(bad)Toast.err(msg+'. '+plural(bad,'step')+' could not run and are marked in red.',{undo:doUndo});
   else Toast.show(msg,{undo:doUndo});
   if(p.errors.length)Toast.err(plural(p.errors.length,'line')+' of the recipe could not be read and were skipped.');
@@ -164,7 +167,7 @@ async function readShareLink(){
 }
 function reviewRecipe(text,p){
   const body=h('div',{class:'dlg-body'},h('p',{class:'dlg-note'},'Someone shared a recipe with '+plural(p.steps.length,'step')+'. Review what it will do before it touches your data. Recipes can only change the table in this tab. They cannot send data anywhere.'),
-    h('ol',{class:'review-list'},p.steps.map(s=>h('li',{},(s.muted?'(muted) ':'')+W.describeStep(s)))),
+    h('ol',{class:'review-list'},p.steps.map(s=>h('li',{},(s.muted?'(muted) ':'')+W.describeStep(s)+(!s.muted&&W.OPS[s.opId]&&W.OPS[s.opId].portable===false?' (will be muted)':'')))),
     p.errors.length?h('div',{class:'warn-box'},plural(p.errors.length,'line')+' could not be read and will be skipped.'):null);
   const d=Dialog.open({title:'Review shared recipe',body,foot:[h('span',{class:'grow-1'}),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>d.close()},'Don\'t apply'),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>{const l=Recipes.lib();l.unshift({id:'r'+Date.now().toString(36),name:'Shared recipe '+new Date().toLocaleDateString(),text,savedAt:Date.now()});Recipes.setLib(l);Toast.show('Saved to your recipe library')}},'Save to library'),h('button',{class:'btn btn-primary',type:'button',onclick:()=>{d.close(true);applyRecipeText(text,{name:'shared recipe'})}},S.loaded?'Apply recipe':'Apply to the next file')]})
 }
@@ -200,11 +203,11 @@ async function loadReference(after){
   const fromTab=async t=>{
     try{
       const x=await Busy.run('Reading '+t.name,()=>Engine.call('exportTable',{id:t.id,format:'tsv',options:{header:true}}));
-      const r=await Engine.call('refLoad',{text:x.text,name:t.name,replace:true,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true}}});
+      const r=await Engine.call('refLoad',{text:x.text,name:t.name,replace:true,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}});
       S.refs=(await Engine.call('refList',{})).refs;
       Toast.show('Using table "'+r.name+'" as a reference · '+plural(r.n,'row')+' × '+plural(r.cols.length,'column'));
       if(after)after(r.name)
-    }catch(e){Toast.err('Could not use that table: '+e.message)}
+    }catch(e){if(!isQuiet(e))Toast.err('Could not use that table: '+e.message)}
   };
   const body=h('div',{class:'dlg-body'},
     h('div',{class:'field'},h('span',{class:'flabel'},'From a file'),h('button',{class:'btn btn-secondary',type:'button',onclick:()=>{d.close(true);loadReferenceFile(after)}},icon('upload',16),'Choose a file…')),
@@ -218,11 +221,11 @@ async function loadReferenceFile(after){
   inp.onchange=async()=>{
     const f=inp.files[0];inp.value='';if(!f)return;
     if(f.size>300e6){Toast.err('That file is larger than 300 MB. Weft cannot open files that big in a browser tab.');return}
-    let text;
-    if(Xlsx.isExcel(f.name)){try{const x=await Xlsx.readFile(f);if(!x)return;text=x.text}catch(e){Toast.err(e.message);return}}
+    let text,hint;
+    if(Xlsx.isExcel(f.name)){try{const x=await Xlsx.readFile(f);if(!x)return;text=x.text;hint={kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}}catch(e){Toast.err(e.message);return}}
     else text=await f.text();
-    try{const r=await Busy.run('Reading reference file',()=>Engine.call('refLoad',{text,name:f.name}));S.refs=(await Engine.call('refList',{})).refs;Toast.show('Loaded reference "'+r.name+'" · '+plural(r.n,'row')+' × '+plural(r.cols.length,'column'));if(after)after(r.name)}
-    catch(e){Toast.err('Could not read the reference file: '+e.message)}
+    try{const r=await Busy.run('Reading reference file',()=>Engine.call('refLoad',{text,name:f.name,hint}));S.refs=(await Engine.call('refList',{})).refs;Toast.show('Loaded reference "'+r.name+'" · '+plural(r.n,'row')+' × '+plural(r.cols.length,'column'));if(after)after(r.name)}
+    catch(e){if(!isQuiet(e))Toast.err('Could not read the reference file: '+e.message)}
   };
   inp.click()
 }
@@ -235,7 +238,7 @@ const HelpSheet={
       clear(grid);const f=q.value.trim().toLowerCase();
       const extra={Grid:[['Move the cursor','Arrows'],['Extend a selection','Shift + arrows'],['Edit a cell','Enter or F2'],['Select a row','Space on a row, or click its number'],['Select rows in range','Shift+click row numbers'],['Toggle one row',MOD+'click a row number'],['Select the rows of a cell range','Shift+Space'],['Select the columns of a cell range',MOD+'Space'],['Rename a column','Double-click its header'],['Search rows','/'],['Close the top menu or dialog','Esc']]};
       Object.keys(extra).forEach(g=>{const rows=extra[g].filter(x=>!f||(x[0]+x[1]).toLowerCase().indexOf(f)!==-1);if(rows.length)grid.append(h('div',{class:'help-sec'},h('h3',{},'In the grid'),rows.map(x=>h('div',{class:'help-row'},h('span',{},x[0]),h('span',{class:'kbd'},x[1])))))});
-      GROUPS.forEach(g=>{const cs=Commands.list.filter(c=>c.group===g&&Commands.visible(c)&&(all||c.shortcut||true)).filter(c=>!f||(c.title+' '+c.keywords.join(' ')+' '+(c.description||'')).toLowerCase().indexOf(f)!==-1);if(!cs.length)return;grid.append(h('div',{class:'help-sec'},h('h3',{},g),cs.map(c=>h('div',{class:'help-row'},h('span',{},c.title,c.description?h('small',{},c.description):null),c.shortcut?h('span',{class:'kbd'},fmtShortcut(c.shortcut)):null))))})
+      GROUPS.forEach(g=>{const cs=Commands.list.filter(c=>c.group===g&&Commands.visible(c)).filter(c=>!f||(c.title+' '+c.keywords.join(' ')+' '+(c.description||'')).toLowerCase().indexOf(f)!==-1);if(!cs.length)return;grid.append(h('div',{class:'help-sec'},h('h3',{},g),cs.map(c=>h('div',{class:'help-row'},h('span',{},c.title,c.description?h('small',{},c.description):null),c.shortcut?h('span',{class:'kbd'},fmtShortcut(c.shortcut)):null))))})
     };
     q.addEventListener('input',draw);draw();
     Dialog.open({title:all?'What Weft can do':'Keyboard shortcuts and commands',wide:true,body:h('div',{class:'dlg-body'},q,grid)})

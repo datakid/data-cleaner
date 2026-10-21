@@ -54,7 +54,7 @@ const Input={
     if(opts.target==='new'&&S.loaded){
       Tabs.ensureFirst(S.file||'Pasted text');
       const cur=Tabs.current();
-      const t=await Tabs.create({name:fileName||'Pasted text',origin:fileName?'file':'paste',payload:{text:text||'',htmlTables,fileName:fileName||''},activate:true,at:cur?Tabs.list.indexOf(cur)+1:null});
+      const t=await Tabs.create({name:fileName||'Pasted text',origin:fileName?'file':'paste',payload:Object.assign({text:text||'',htmlTables,fileName:fileName||''},opts.hint?{hint:opts.hint}:{}),activate:true,at:cur?Tabs.list.indexOf(cur)+1:null});
       if(t){const msg='Opened in a new tab · Read as '+S.reading.label+' · '+plural(S.baseSchema.n,'row')+' × '+plural(S.baseSchema.cols.length,'column');Toast.show(msg);announce(msg)}
       return!!t
     }
@@ -67,7 +67,7 @@ const Input={
     const hint=opts.hint||(S.pendingRecipe?(W.textToSteps(S.pendingRecipe.text).source||null):null);
     let r;
     try{r=await Busy.run('Reading your data',()=>Engine.call('load',{text:text||'',htmlTables,fileName:fileName||'',hint}))}
-    catch(e){this.showErr(e.message);return false}
+    catch(e){if(!isQuiet(e))this.showErr(e.message);return false}
     S.sourceText={text,html:htmlTables};S.htmlTables=htmlTables;S.htmlCount=htmlTables?htmlTables.length:0;
     await applyLoad(r,{fileName});
     if(!opts.quiet){const msg='Read as '+r.reading.label+' · '+plural(r.baseSchema.n,'row')+' × '+plural(r.baseSchema.cols.length,'column');Toast.show(msg);announce(msg)}
@@ -82,19 +82,19 @@ const Input={
     if(Xlsx.isExcel(f.name)){
       let r;try{r=await Xlsx.readFile(f)}catch(e){this.showErr(e.message);return}
       if(!r)return;
-      await this.loadText(r.text,f.name+(r.sheets>1?' ▸ '+r.sheet:''),null,opts);
+      await this.loadText(r.text,f.name+(r.sheets>1?' ▸ '+r.sheet:''),null,Object.assign({},opts,{single:true,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}}));
       if(r.merges)Toast.show('The sheet had '+plural(r.merges,'merged cell')+'. Only the top-left cell of each keeps its value; use Fill down to repeat it.');
       return
     }
     if(/\.(pdf|docx|zip|png|jpe?g|gif)$/i.test(f.name)){this.showErr('Weft reads spreadsheets and text files (Excel, CSV, TSV, JSON, logs, plain text). For '+f.name.split('.').pop().toUpperCase()+' files, copy the table and paste it here instead.');return}
     let text;try{text=await f.text()}catch(e){this.showErr('Could not read the file: '+e.message);return}
-    if(/\.weft\.txt$/i.test(f.name)||/^#\s*(weft|sift) recipe v\d/i.test(text.slice(0,40))){applyRecipeText(text,{name:f.name});return}
+    if(/\.weft\.txt$/i.test(f.name)||/^#\s*(weft|sift) recipe v\d/i.test(text.slice(0,40))){const p=W.textToSteps(text);if(!p.steps.length){Toast.err('No steps found in "'+f.name+'".');return}reviewRecipe(text,p);return}
     if(/\.html?$/i.test(f.name))return this.loadText('',f.name,text,opts);
     await this.loadText(text,f.name,null,opts)
   },
   async stageStress(n){return Busy.run('Generating '+fmtInt(n)+' rows',()=>Engine.call('stageStress',{n}))},
   async loadStaged(fileName){
-    let r;try{r=await Busy.run('Reading your data',()=>Engine.call('loadStaged',{}))}catch(e){this.showErr(e.message);return}
+    let r;try{r=await Busy.run('Reading your data',()=>Engine.call('loadStaged',{}))}catch(e){if(!isQuiet(e))this.showErr(e.message);return}
     S.sourceText=null;S.htmlTables=null;S.htmlCount=0;
     await applyLoad(r,{fileName});
     Tabs.noteLoaded(fileName||'Test data','paste');
@@ -106,14 +106,15 @@ const Input={
     await this.loadText(s.text,s.fileName,s.html)
   },
   async pasteFromClipboard(opts){
-    try{
-      if(navigator.clipboard.read){
-        const items=await navigator.clipboard.read();let html='',text='';
-        for(const it of items){if(it.types.indexOf('text/html')!==-1)html=await(await it.getType('text/html')).text();if(it.types.indexOf('text/plain')!==-1)text=await(await it.getType('text/plain')).text()}
-        return this.loadText(text,'',html,opts)
-      }
-      const t=await navigator.clipboard.readText();return this.loadText(t,'',null,opts)
-    }catch(e){Toast.err('The browser did not allow clipboard access. Press '+MOD+'V instead.')}
+    let items=null;
+    if(navigator.clipboard&&navigator.clipboard.read){try{items=await navigator.clipboard.read()}catch(e){items=null}}
+    if(items){
+      let html='',text='';
+      try{for(const it of items){if(it.types.indexOf('text/html')!==-1)html=await(await it.getType('text/html')).text();if(it.types.indexOf('text/plain')!==-1)text=await(await it.getType('text/plain')).text()}}catch(e){items=null}
+      if(items)return this.loadText(text,'',html,opts)
+    }
+    try{const t=await navigator.clipboard.readText();return this.loadText(t,'',null,opts)}
+    catch(e){Toast.err('The browser did not allow clipboard access. Press '+MOD+'V instead.')}
   },
   init(){
     $('#fileInput').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';const target=this.nextTarget||'replace';this.nextTarget=null;this.loadFile(f,{target})});
@@ -123,6 +124,7 @@ const Input={
     $('#btnOpen').addEventListener('click',()=>$('#fileInput').click());
     $('#pasteArea').addEventListener('keydown',e=>{if(e.key==='Enter'&&(isMac?e.metaKey:e.ctrlKey)){e.preventDefault();$('#btnRead').click()}});
     document.addEventListener('paste',e=>{
+      if(Layers.stack.some(l=>/^dlg\d+$/.test(l.id)))return;
       const t=e.target;const inArea=t&&t.id==='pasteArea';
       if(isEditable(t)&&!inArea)return;
       if(S.loaded&&!inArea){
@@ -130,7 +132,7 @@ const Input={
         if(!text&&!html)return;
         e.preventDefault();
         const desc=html&&/<table/i.test(html)?'a web table':plural(text.split('\n').length,'line');
-        Dialog.choose('Where should the pasted data go?','You pasted '+desc+'. Replace this table'+(S.steps.length?' (its recipe, '+plural(S.steps.length,'step')+', will be re-applied)':'')+', or open the pasted data in a new tab.',[{id:'cancel',label:'Cancel',kind:'secondary'},{id:'replace',label:'Replace this table',kind:'secondary'},{id:'new',label:'Open in a new tab',kind:'primary'}]).then(async c=>{
+        Dialog.choose('Where should the pasted data go?','You pasted '+desc+'. Replace this table'+(S.steps.length?' (its recipe, '+plural(S.steps.length,'step')+', will be re-applied)':'')+', or open the pasted data in a new tab.'+(Recipes.manualCount()?' Manual edits will be muted.':''),[{id:'cancel',label:'Cancel',kind:'secondary'},{id:'replace',label:'Replace this table',kind:'secondary'},{id:'new',label:'Open in a new tab',kind:'primary'}]).then(async c=>{
           if(!c||c==='cancel')return;
           if(c==='new'){await this.loadText(text,'',html,{target:'new'});return}
           const steps=cleanSteps(S.steps);
@@ -146,23 +148,25 @@ const Input={
       else if(inArea&&text&&!t.value.trim()){setTimeout(()=>{if(t.value.trim()===text.trim())this.loadText(t.value,'')},0)}
     });
     let depth=0;const ov=$('#dropOverlay');
-    document.addEventListener('dragenter',e=>{if(!e.dataTransfer||Array.from(e.dataTransfer.types||[]).indexOf('Files')===-1)return;depth++;ov.classList.add('on');const it=e.dataTransfer.items&&e.dataTransfer.items[0];$('#dropName').textContent=''});
+    document.addEventListener('dragenter',e=>{if(!e.dataTransfer||Array.from(e.dataTransfer.types||[]).indexOf('Files')===-1)return;depth++;ov.classList.add('on')});
     document.addEventListener('dragleave',()=>{depth=Math.max(0,depth-1);if(!depth)ov.classList.remove('on')});
     document.addEventListener('dragover',e=>{if(e.dataTransfer&&Array.from(e.dataTransfer.types||[]).indexOf('Files')!==-1)e.preventDefault()});
     document.addEventListener('drop',async e=>{
       if(!e.dataTransfer||!e.dataTransfer.files.length)return;
       e.preventDefault();depth=0;ov.classList.remove('on');
-      const f=e.dataTransfer.files[0];
+      const f=e.dataTransfer.files[0];const many=e.dataTransfer.files.length>1;
       let target='replace';
       if(S.loaded){
-        const c=await Dialog.choose('Open "'+f.name+'"','Replace this table'+(S.steps.length?' (its recipe, '+plural(S.steps.length,'step')+', will be re-applied)':'')+', or open the file in a new tab.',[{id:'cancel',label:'Cancel',kind:'secondary'},{id:'replace',label:'Replace this table',kind:'secondary'},{id:'new',label:'Open in a new tab',kind:'primary'}]);
+        const c=await Dialog.choose('Open "'+f.name+'"','Replace this table'+(S.steps.length?' (its recipe, '+plural(S.steps.length,'step')+', will be re-applied)':'')+', or open the file in a new tab.'+(Recipes.manualCount()?' Manual edits will be muted.':''),[{id:'cancel',label:'Cancel',kind:'secondary'},{id:'replace',label:'Replace this table',kind:'secondary'},{id:'new',label:'Open in a new tab',kind:'primary'}]);
         if(!c||c==='cancel')return;
         target=c
       }
-      if(target==='new'){await this.loadFile(f,{target:'new'});return}
+      const note=()=>{if(many)Toast.show('Opened "'+f.name+'". Drop one file at a time.')};
+      if(target==='new'){await this.loadFile(f,{target:'new'});note();return}
       const steps=cleanSteps(S.steps);
       await this.loadFile(f,{target:'replace'});
-      if(steps.length&&S.loaded&&!S.steps.length)await applyRecipeText(W.stepsToText(steps,null),{name:'current recipe'})
+      if(steps.length&&S.loaded&&!S.steps.length)await applyRecipeText(W.stepsToText(steps,null),{name:'current recipe'});
+      note()
     })
   }
 };

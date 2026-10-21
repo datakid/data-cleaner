@@ -1,7 +1,7 @@
 (function(G){
 'use strict';
 const W=G.WeftCore||(G.WeftCore={});
-W.version='2.6.0';
+W.version='2.6.1';
 W.OPS=W.OPS||{};
 W.OP_ORDER=W.OP_ORDER||[];
 
@@ -12,12 +12,12 @@ W.fmtInt=function(n){
 };
 W.fmtNum=function(x){
   if(x==null||!isFinite(x))return'';
-  const a=Math.abs(x);
-  if(Number.isInteger(x))return W.fmtInt(x);
-  const d=a>=1000?2:a>=1?2:4;
-  const s=x.toFixed(d).replace(/0+$/,'').replace(/\.$/,'');
-  const parts=s.split('.');
-  return W.fmtInt(Number(parts[0]))+(parts[1]?'.'+parts[1]:'')
+  if(x===0)return'0';
+  const neg=x<0,a=Math.abs(x);let s;
+  if(Number.isInteger(a))s=W.fmtInt(a);
+  else if(a<0.0001)s=String(Number(a.toPrecision(2)));
+  else{const t=a.toFixed(a>=1?2:4).replace(/0+$/,'').replace(/\.$/,'');const p=t.split('.');s=W.fmtInt(Number(p[0]))+(p[1]?'.'+p[1]:'')}
+  return(neg&&s!=='0'?'-':'')+s
 };
 W.plural=function(n,word,pl){return W.fmtInt(n)+' '+(n===1?word:(pl||word+'s'))};
 W.trunc=function(s,n){s=String(s==null?'':s);return s.length>n?s.slice(0,Math.max(1,n-1))+'…':s};
@@ -39,12 +39,33 @@ W.dedupeColNames=function(cols){
   })
 };
 
+function regexNesting(src){
+  const root={risky:false},st=[root];let last=null,i=0;const n=src.length;
+  while(i<n){
+    const c=src[i];
+    if(c==='\\'){i+=2;last=null;continue}
+    if(c==='['){i++;while(i<n&&src[i]!==']'){if(src[i]==='\\')i++;i++}i++;last=null;continue}
+    if(c==='('){st.push({risky:false});i++;const m=/^\?(:|=|!|<=|<!|<[A-Za-z_$][\w$]*>)/.exec(src.slice(i,i+40));if(m)i+=m[0].length;last=null;continue}
+    if(c==='|'){st[st.length-1].risky=true;i++;last=null;continue}
+    if(c===')'){if(st.length>1){const g=st.pop();if(g.risky)st[st.length-1].risky=true;last=g}else last=null;i++;continue}
+    let rep=false,len=0;
+    if(c==='*'||c==='+'){rep=true;len=1}
+    else if(c==='?')len=1;
+    else if(c==='{'){const m=/^\{(\d+)(,(\d*))?\}/.exec(src.slice(i,i+24));if(m){len=m[0].length;if(m[2]!==undefined&&(m[3]===''||+m[3]>1))rep=true}}
+    if(len){
+      if(rep){if(last&&last.risky)return true;st[st.length-1].risky=true}
+      i+=len;if(src[i]==='?'||src[i]==='+')i++;last=null;continue
+    }
+    i++;last=null
+  }
+  return false
+}
 W.isUnsafeRegexSource=function(src){
   if(typeof src!=='string'||!src)return true;
   if(src.length>200)return true;
   if(/\([^()]*[+*][^()]*\)\s*[+*{]/.test(src))return true;
   if(/\\[1-9]/.test(src))return true;
-  return false
+  return regexNesting(src)
 };
 W.compileRegex=function(src,flags){
   if(W.isUnsafeRegexSource(src))throw new Error('That pattern is too long or could freeze the page (nested repetition). Simplify it.');
@@ -156,7 +177,7 @@ Cursor.prototype.optP=function(p){if(this.isP(p)){this.i++;return true}return fa
 Cursor.prototype.p=function(p){if(!this.optP(p))throw new Error('Expected "'+p+'"'+this.near()+'.')};
 Cursor.prototype.strList=function(){const out=[this.str()];while(this.optP(','))out.push(this.str());return out};
 Cursor.prototype.cols=function(){if(this.isWord('*')){this.i++;return['*']}return this.strList()};
-Cursor.prototype.re=function(){const x=this.peek();if(!x||x.t!=='re')throw new Error('Expected a /pattern/'+this.near()+'.');this.i++;return{src:x.v,flags:x.flags}};
+Cursor.prototype.re=function(){const x=this.peek();if(!x||x.t!=='re')throw new Error('Expected a /pattern/'+this.near()+'.');if(W.isUnsafeRegexSource(x.v))throw new Error('That pattern is too long or could freeze the page. Simplify it.');this.i++;return{src:x.v,flags:x.flags}};
 Cursor.prototype.end=function(){if(!this.done())throw new Error('Unexpected text'+this.near()+'.')};
 W.Cursor=Cursor;
 W.cursor=function(line){return new Cursor(line)};

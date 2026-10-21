@@ -68,6 +68,7 @@ W.parseNumber=function(raw,opts){
   s=s.replace(/[\s\u00A0\u202F']/g,'');
   if(!s)return null;
   if(locale==='eu'){
+    if(/^0\d*\./.test(s))return null;
     if(!/^\d{1,3}(\.\d{3})*(,\d+)?$|^\d+(,\d+)?$/.test(s))return null;
     s=s.replace(/\./g,'').replace(',','.')
   }else{
@@ -83,8 +84,13 @@ W.detectNumberLocale=function(values){
   for(const raw of values){
     const s=String(raw==null?'':raw).trim().replace(CUR,'').replace(/[\s()%+-]/g,'');
     if(!s)continue;
-    if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)||/^\d+\.\d{1,2}$/.test(s))us++;
-    else if(/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)||/^\d+,\d{1,2}$/.test(s))eu++
+    if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s))us++;
+    else if(/^\d+\.\d{1,2}$/.test(s))us++;
+    else if(/^0\.\d+$/.test(s))us++;
+    else if(/^\d+\.\d{4,}$/.test(s))us++;
+    else if(/^\d{1,3}(\.\d{3}){2,}(,\d+)?$/.test(s))eu++;
+    else if(/^\d{1,3}(\.\d{3})+,\d+$/.test(s))eu++;
+    else if(/^\d+,\d{1,2}$/.test(s))eu++
   }
   return eu>us?'eu':'us'
 };

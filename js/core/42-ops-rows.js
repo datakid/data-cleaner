@@ -157,12 +157,11 @@ W.defineOp({
   apply(t,cfg,ctx){
     const ci=W.needCol(t,cfg.column);
     const outs=t.cols.map(()=>[]);const ids=[];let added=0;
-    let next=ctx&&ctx.nextRowId!=null?ctx.nextRowId:(Math.max(-1,...t.rowIds.slice(0,1))+1);
+    let next=ctx&&ctx.nextRowId!=null?ctx.nextRowId:t.n;
     for(let r=0;r<t.n;r++){
       const v=String(t.data[ci][r]==null?'':t.data[ci][r]);
       let parts=v.split(cfg.delimiter);if(cfg.trim!==false)parts=parts.map(s=>s.trim());
-      const nonEmpty=parts.filter(p=>p!=='');
-      if(nonEmpty.length>1)parts=nonEmpty;
+      const ne=parts.filter(p=>p!=='');parts=ne.length?ne:[''];
       parts.forEach((p,k)=>{for(let c=0;c<t.cols.length;c++)outs[c].push(c===ci?p:t.data[c][r]);if(k===0)ids.push(t.rowIds[r]);else{ids.push(next++);added++}})
     }
     if(ctx)ctx.nextRowId=next;
@@ -173,7 +172,8 @@ W.defineOp({
   fromDsl(line){const cur=W.cursor(line);cur.word('split');const column=cur.str();cur.word('on');const delimiter=cur.str();cur.word('into','rows');let trim=true;if(cur.optWord('keep')){cur.word('spaces');trim=false}cur.end();return{column,delimiter,trim}},
   examples:[
     {cfg:{column:'tags',delimiter:';',trim:true},input:{cols:['id','tags'],rows:[['1','a; b'],['2','']]},expect:{cols:['id','tags'],rows:[['1','a'],['1','b'],['2','']]}},
-    {cfg:{column:'tags',delimiter:',',trim:true},input:{cols:['tags'],rows:[['ü,ö,']]},expect:{cols:['tags'],rows:[['ü'],['ö']]}}
+    {cfg:{column:'tags',delimiter:',',trim:true},input:{cols:['tags'],rows:[['ü,ö,']]},expect:{cols:['tags'],rows:[['ü'],['ö']]}},
+    {cfg:{column:'tags',delimiter:';',trim:true},input:{cols:['tags'],rows:[['a;']]},expect:{cols:['tags'],rows:[['a']]}}
   ]
 });
 })(typeof self!=='undefined'?self:globalThis);

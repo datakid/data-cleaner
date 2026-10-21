@@ -28,6 +28,142 @@ G.runCoreTests=function(){
   test('mixed and/or rejected',()=>{let th=false;try{W.parseStepLine('keep rows where "a" is "1" and "b" is "2" or "c" is "3"')}catch(e){th=/either/.test(e.message)}ok(th)});
   test('recipe v2 parse',()=>{const r=W.textToSteps('# weft recipe v2\n@source {"kind":"delimited","params":{"delimiter":","}}\ntrim *\n#! remove empty rows\n# comment\nbogus line');eq(r.steps.length,2);eq(r.steps[1].muted,true);eq(r.source.kind,'delimited');eq(r.errors.length,1)});
   test('parseNumber variants',()=>{eq(W.parseNumber('1.234,50',{locale:'eu'}).value,1234.5);eq(W.parseNumber('(12.5)').value,-12.5);ok(Math.abs(W.parseNumber('12%').value-0.12)<1e-9);ok(W.parseNumber('12abc')===null)});
+  test('A1 three-decimal values are not European thousands',()=>{
+    eq(W.detectNumberLocale(['1.234','2.500','0.125']),'us');
+    eq(W.detectNumberLocale(['1.234.567','2.500,50']),'eu');
+    eq(W.parseNumber('0.125',{locale:'eu'}),null);
+    const t=W.tableFromRows(['k','v'],[['a','1.250'],['a','0.125']]);
+    const r=W.OPS.aggregate.apply(t,{groupBy:['k'],metrics:['v:sum']},{});
+    eq(W.tableRows(r.table),[['a','1.375']])
+  });
+  test('A5 aggregate and longToWide give new rows fresh ids',()=>{
+    const b=W.tableFromRows(['k','v'],[['a','1;2'],['a','3'],['b','4']]);
+    const r=W.runPipeline(b,[{opId:'splitToRows',cfg:{column:'v',delimiter:';',trim:true}},{opId:'aggregate',cfg:{groupBy:['k'],metrics:['count']}}],{},0);
+    const base=new Set(r.states[0].rowIds);const fin=r.states[r.states.length-1].rowIds;
+    ok(fin.length===2&&!fin.some(i=>base.has(i)),'final ids '+fin.join(',')+' base '+Array.from(base).join(','));
+    const b2=W.tableFromRows(['id','k','v'],[['1','x','5'],['1','y','6'],['2','x','7']]);
+    const r2=W.runPipeline(b2,[{opId:'longToWide',cfg:{idColumns:['id'],keyColumn:'k',valueColumn:'v',duplicatePolicy:'error'}}],{},0);
+    const base2=new Set(r2.states[0].rowIds);const fin2=r2.states[1].rowIds;
+    ok(fin2.length===2&&!fin2.some(i=>base2.has(i)),'wide ids '+fin2.join(',')+' base '+Array.from(base2).join(','))
+  });
+  test('A6 splitToRows never creates blank rows',()=>{
+    const run=(v,d)=>W.tableRows(W.OPS.splitToRows.apply(W.tableFromRows(['c'],[[v]]),{column:'c',delimiter:d,trim:true},{nextRowId:10}).table);
+    eq(run('a;',';'),[['a']]);
+    eq(run(',,',','),[['']]);
+    eq(run('a,,b',','),[['a'],['b']])
+  });
+  test('A8 suggestion fixes remove exactly the counted rows',()=>{
+    const bad=[];let seen=0;
+    (G.WEFT_FIXTURES||[]).forEach(f=>{
+      let t;try{const text=f.text();const det=W.detectReadings(text,{htmlTables:f.html||null});t=W.applyReading(text,det.readings[0],{htmlTables:f.html||null})}catch(e){return}
+      W.issues(t,{}).forEach(i=>{
+        if(!i.fix||['header','title','totals','repeatedHeader','artifacts','emptyRows','duplicates','caseVariants'].indexOf(i.kind)===-1)return;
+        let r;try{r=W.OPS[i.fix.opId].apply(t,W.clone(i.fix.cfg),{nextRowId:t.n+1000})}catch(e){bad.push(f.name+':'+i.kind+' threw '+e.message);return}
+        seen++;
+        if(i.kind==='caseVariants'){const ci=t.cols.indexOf(i.column);let ch=0;for(let k=0;k<t.n;k++)if(t.data[ci][k]!==r.table.data[ci][k])ch++;if(ch!==i.count)bad.push(f.name+':'+i.kind+' count '+i.count+' changed '+ch);return}
+        const removed=t.n-r.table.n;
+        if(removed!==i.count)bad.push(f.name+':'+i.kind+' count '+i.count+' removed '+removed)
+      })
+    });
+    ok(seen>0,'no issues exercised');
+    eq(bad,[],'mismatches')
+  });
+  test('A8 artifacts fix removes the detected rows only',()=>{
+    const rows=[];for(let i=1;i<=10;i++)rows.push(['item '+i,String(i)]);
+    rows.splice(3,0,['Page','2']);rows.splice(7,0,['---','data']);
+    const t=W.tableFromRows(['a','b'],rows);
+    const i=W.issues(t,{}).find(x=>x.kind==='artifacts');
+    ok(i&&i.fix,'artifacts issue');
+    const r=W.OPS[i.fix.opId].apply(t,W.clone(i.fix.cfg),{nextRowId:100});
+    const left=W.tableRows(r.table).map(x=>x.join('|'));
+    eq(t.n-r.table.n,i.count,'removed vs count');
+    ok(left.indexOf('Page|2')===-1&&left.indexOf('---|data')!==-1,'removed '+JSON.stringify(left))
+  });
+  test('A8 totals fix removes only the bottom totals',()=>{
+    const rows=[];for(let i=1;i<=10;i++)rows.push(['item '+i,String(i)]);
+    rows.splice(4,0,['Total shipping','5']);rows.push(['Total','100']);
+    const t=W.tableFromRows(['name','amount'],rows);
+    const i=W.issues(t,{}).find(x=>x.kind==='totals');
+    ok(i&&i.fix,'totals issue');
+    const r=W.OPS[i.fix.opId].apply(t,W.clone(i.fix.cfg),{nextRowId:100});
+    const left=W.tableRows(r.table).map(x=>x.join('|'));
+    eq(t.n-r.table.n,i.count,'removed vs count');
+    ok(left.indexOf('Total shipping|5')!==-1&&left.indexOf('Total|100')===-1,'left '+JSON.stringify(left))
+  });
+  test('A8 case variants are unified to the most common spelling',()=>{
+    const v=[];for(let k=0;k<4;k++)v.push('USA','Paris');v.push('usa','usa','paris','paris');
+    const t=W.tableFromRows(['place'],v.map(x=>[x]));
+    const i=W.issues(t,{}).find(x=>x.kind==='caseVariants');
+    ok(i&&i.fix,'caseVariants issue');
+    const r=W.OPS[i.fix.opId].apply(t,W.clone(i.fix.cfg),{nextRowId:100});
+    let changed=0;for(let k=0;k<t.n;k++)if(t.data[0][k]!==r.table.data[0][k])changed++;
+    eq(changed,i.count,'changed vs count');
+    eq(Array.from(new Set(r.table.data[0])).sort(),['Paris','USA']);
+    eq(W.describeStep(i.fix),'Unify capitals (2 values) in "place"')
+  });
+  test('A8 row text condition round-trips',()=>{
+    const cfg={mode:'remove',match:'all',conditions:[{col:'@row',op:'matches',value:'^page \\d+$',caseSensitive:false}]};
+    eq(W.parseStepLine(W.OPS.filterRows.toDsl(cfg)).cfg,cfg);
+    eq(W.missingCols(W.tableFromRows(['a'],[]),['@row']),[])
+  });
+  test('A9 title case does not capitalise after every apostrophe',()=>{
+    eq(W.titleCase('don\'t stop'),'Don\'t Stop');
+    eq(W.titleCase('o\'brien'),'O\'Brien');
+    eq(W.titleCase('it\'s'),'It\'s');
+    eq(W.titleCase('ADA lovelace-byron'),'Ada Lovelace-Byron')
+  });
+  test('A10 merge with drop originals keeps the first column position',()=>{
+    const t=W.tableFromRows(['a','b','c'],[['x','y','z']]);
+    const r=W.OPS.merge.apply(t,{columns:['a','b'],joiner:' ',into:'ab',skipBlank:true,keepOriginal:false},{nextRowId:10});
+    eq(r.table.cols,['ab','c']);
+    eq(W.tableRows(r.table),[['x y','z']]);
+    const k=W.OPS.merge.apply(t,{columns:['a','b'],joiner:' ',into:'ab',skipBlank:true,keepOriginal:true},{nextRowId:10});
+    eq(k.table.cols,['a','b','ab','c'])
+  });
+  test('A11 database row-count footers are skipped with a warning',()=>{
+    ['07 MySQL box','08 psql table'].forEach(nm=>{
+      const f=(G.WEFT_FIXTURES||[]).find(x=>x.name===nm);const text=f.text();
+      const t=W.applyReading(text,W.detectReadings(text,{}).readings[0],{});
+      eq(t.n,3,nm+' rows');
+      ok((t.warnings||[]).some(w=>/Skipped 1 line below the table/.test(w)),nm+' warnings '+JSON.stringify(t.warnings))
+    });
+    const rows=[];for(let i=1;i<=8;i++)rows.push(['item '+i,String(i)]);rows.push(['5 rows in set (0.01 sec)','']);
+    const i=W.issues(W.tableFromRows(['a','b'],rows),{}).find(x=>x.kind==='artifacts');
+    ok(i&&i.count===1,'artifact issue '+JSON.stringify(i&&i.count))
+  });
+  test('A12 fmtNum keeps the minus sign and tiny numbers',()=>{
+    eq(W.fmtNum(-0.5),'-0.5');
+    eq(W.fmtNum(0.00001),'0.00001');
+    eq(W.fmtNum(1234.5),'1,234.5');
+    eq(W.fmtNum(-1234.567),'-1,234.57');
+    eq(W.fmtNum(0),'0');
+    eq(W.fmtNum(-3),'-3')
+  });
+  test('A13 regex safety scanner',()=>{
+    ['(a|aa)+$','((a+))+','(?:(\\w+))*$','(a{1,})+','(?<n>a|b)*','(a|b){2,}'].forEach(x=>ok(W.isUnsafeRegexSource(x),'should be unsafe: '+x));
+    ['\\d{4}-\\d{2}-\\d{2}','^(\\d{3})-(\\d{4})$','^(total|totals|sum)\\b','(foo|bar)','(?:ab)?c','[(a|b)+]x','\\(a|b\\)+'].forEach(x=>ok(!W.isUnsafeRegexSource(x),'should be safe: '+x));
+    ok(!W.isUnsafeRegexSource(W.JUNK_ARTIFACT_SRC)&&!W.isUnsafeRegexSource(W.TOTAL_SRC),'built-in patterns');
+    let msg='';try{W.parseStepLine('remove rows where "a" matches /(a|aa)+$/')}catch(e){msg=e.message}
+    ok(/freeze/.test(msg),'recipe import rejects it: '+msg)
+  });
+  test('C3 formula guard skips numbers but still guards formulas',()=>{
+    const g=v=>W.toDelimited(null,[[v]],',',{formulaGuard:true});
+    ['-12.50','+44 20 7946 0958','-1,234.5','+5'].forEach(v=>ok(g(v)===(v.indexOf(',')!==-1?'\"'+v+'\"':v),'should not be prefixed: '+v+' -> '+g(v)));
+    ['=1+1','@SUM(A1)','+cmd','-2+3','+1+1'].forEach(v=>ok(g(v).charAt(0)==='\''||g(v).slice(0,2)==='\"\''||g(v).indexOf('\'')===0,'should be prefixed: '+v+' -> '+g(v)));
+    eq(W.toDelimited(null,[['=1+1']],',',{formulaGuard:false}),'=1+1')
+  });
+  test('C5 replace validates the pattern as it will run',()=>{
+    const v=(wholeCell,n)=>W.OPS.replace.validate({columns:['*'],find:'a'.repeat(n),replace:'',regex:true,wholeCell,matchCase:false},null);
+    eq(v(false,197),null);
+    ok(v(true,197)!==null,'a whole-cell pattern that grows past 200 characters must be refused');
+    eq(v(true,190),null);
+    let threw=false;try{W.OPS.replace.apply(W.tableFromRows(['c'],[['x']]),{columns:['*'],find:'a'.repeat(197),replace:'',regex:true,wholeCell:true,matchCase:false},{})}catch(e){threw=true}
+    ok(threw,'running it does throw, which is why validate must catch it')
+  });
+  test('C8 convertType and dead-code removals keep behaviour',()=>{
+    const conv=(v,frac)=>W.tableRows(W.OPS.convertType.apply(W.tableFromRows(['c'],[[v]]),{column:'c',to:'number',locale:'us',percentAsFraction:!!frac},{}).table)[0][0];
+    eq([conv('12%',false),conv('12%',true),conv('1,234.5',false)],['12','0.12','1234.5']);
+  });
   test('parseDate variants',()=>{eq(W.parseDate('12/10/95').y,1995);eq(W.parseDate('01/02/2025',{order:'dmy'}).mo,2);eq(W.parseDate('2025-06-01T10:00:00Z').d,1)});
   test('unsafe regex',()=>{ok(W.isUnsafeRegexSource('(a+)+'));ok(!W.isUnsafeRegexSource('[\\w.]+@'))});
   test('synthesis trim',()=>{const r=W.synthesize([{before:'  Hi  ',after:'Hi'}],['  Hi  ',' x ']);eq(r[0].c.type,'trim')});
@@ -167,16 +303,25 @@ G.runCoreTests=function(){
   test('setCtx reaches every session',()=>{
     const E=W.Engine;
     E.handle('tableReset',{id:'t1'});E.handle('setCtx',{dateOrder:'mdy'});
-    const txt='d,n\n13/4/2025,1\n14/5/2025,2\n15/6/2025,3';
-    E.handle('load',{text:txt});E.handle('tableNew',{id:'t2'});E.handle('load',{text:txt});
-    const before=[E.handle('schema',{}).cols[0].type];
-    E.handle('tableUse',{id:'t1'});before.push(E.handle('schema',{}).cols[0].type);
+    const txt='d,n\n01/02/2025,1\n03/04/2025,2\n13/4/2025,3\n14/5/2025,4';
+    const conv=[{id:'c',opId:'convertType',cfg:{column:'d',to:'date',locale:'auto',percentAsFraction:false},muted:false}];
+    E.handle('load',{text:txt});E.handle('setPipeline',{steps:conv,fromIndex:0});
+    E.handle('tableNew',{id:'t2'});E.handle('load',{text:txt});E.handle('setPipeline',{steps:conv,fromIndex:0});
+    const info=()=>{
+      const ty=E.handle('schema',{}).cols[0].type;
+      const i=E.handle('issues',{stateIdx:0}).issues.find(x=>x.kind==='ambiguousDates');
+      const v=E.handle('setView',{stateIdx:1,search:'',sort:[],filter:null,rowIds:null});
+      const cell=E.handle('getRows',{viewKey:v.key,start:0,count:1}).rows[0][0];
+      return ty+'|'+(i?(/read as month\/day/.test(i.detail)?'mdy':/read as day\/month/.test(i.detail)?'dmy':'?'):'none')+'|'+cell
+    };
+    const before=[info()];
+    E.handle('tableUse',{id:'t1'});before.push(info());
     E.handle('setCtx',{dateOrder:'dmy'});
-    const after=[E.handle('schema',{}).cols[0].type];
-    E.handle('tableUse',{id:'t2'});after.push(E.handle('schema',{}).cols[0].type);
+    const after=[info()];
+    E.handle('tableUse',{id:'t2'});after.push(info());
     E.handle('setCtx',{dateOrder:'mdy'});
-    eq(after,['date','date']);
-    ok(before.join()!==after.join()||true)
+    eq(before,['date|mdy|2025-01-02','date|mdy|2025-01-02']);
+    eq(after,['date|dmy|2025-02-01','date|dmy|2025-02-01'])
   });
   test('exportTable keeps active',()=>{
     const E=W.Engine;
@@ -261,7 +406,7 @@ G.runCoreTests=function(){
     const b=E.handle('load',{text:'plain one\nplain two\nplain three',hint:{kind:'markdown-table'}});
     ok(b.warnings.every(w=>!/Skipped/.test(w)),'plain text got a skip warning');
     const c=E.handle('load',{text:'+---+---+\n| a | b |\n+---+---+\n| 1 | 2 |\n+---+---+\n1 rows in set (0.00 sec)'});
-    eq([c.baseSchema.cols.map(x=>x.name),c.baseSchema.n,c.warnings.filter(w=>/Skipped/.test(w))],[['a','b'],2,[]])
+    eq([c.baseSchema.cols.map(x=>x.name),c.baseSchema.n,c.warnings.filter(w=>/above the table/.test(w))],[['a','b'],1,[]])
   });
   test('titled markdown tables split cleanly',()=>{
     const f=G.WEFT_MULTI_FIXTURES.find(x=>/^M22/.test(x.name));
@@ -272,6 +417,51 @@ G.runCoreTests=function(){
     const b=E.handle('load',{text:W.sliceLines(lines,r.tables[1].from,r.tables[1].to)});
     eq([a.baseSchema.cols.map(x=>x.name),a.baseSchema.n],[['a','b'],2]);
     eq([b.baseSchema.cols.map(x=>x.name),b.baseSchema.n],[['x','y','z'],2])
+  });
+  test('A14 date order change drops stale views and refreshes issues',()=>{
+    const E=W.Engine;
+    E.handle('tableReset',{id:'t1'});E.handle('setCtx',{dateOrder:'mdy'});
+    E.handle('load',{text:'date,n\n01/02/2024,1\n31/01/2024,2\n15/02/2024,3\n03/04/2024,4\n12/12/2024,5\n20/03/2024,6\n25/04/2024,7\n05/06/2024,8\n07/08/2024,9\n09/10/2024,10'});
+    const v=E.handle('setView',{stateIdx:0,sort:[],search:'',filter:null,rowIds:null});
+    const amb=()=>{const i=E.handle('issues',{stateIdx:0}).issues.find(x=>x.kind==='ambiguousDates');return i?i.detail:''};
+    ok(/read as month\/day/.test(amb()),'before '+amb());
+    E.handle('setCtx',{dateOrder:'dmy'});
+    let stale=false;try{E.handle('getRows',{viewKey:v.key,start:0,count:5})}catch(e){stale=/out of date/.test(e.message)}
+    ok(stale,'old view should be gone');
+    ok(/read as day\/month/.test(amb()),'after '+amb());
+    E.handle('setCtx',{dateOrder:'mdy'})
+  });
+  test('B11 removing a reference re-runs the steps that use it',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    E.handle('load',{text:'id,name\n1,Ada\n2,Bob'});
+    E.handle('refLoad',{text:'id,city\n1,Cairo',name:'cities_b11',replace:true});
+    const cfg={refName:'cities_b11',type:'left',onLeft:['id'],onRight:['id'],columns:['city'],normTrim:true,normCaseFold:false,normNumeric:false,onDuplicate:'first'};
+    const r=E.handle('setPipeline',{steps:[{id:'j',opId:'join',cfg,muted:false}],fromIndex:0});
+    ok(!r.stepsMeta[0].error,'join error before: '+r.stepsMeta[0].error);
+    E.handle('refRemove',{name:'cities_b11'});
+    const info=E.handle('pipelineInfo',{});
+    ok(/not loaded/.test(info.stepsMeta[0].error||''),'after removal: '+JSON.stringify(info.stepsMeta[0].error));
+    E.handle('tableReset',{id:'t1'})
+  });
+  test('C1 reshape previews do not list removed rows',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    E.handle('load',{text:'k,v\na,1\na,2\nb,3\nb,4'});
+    const agg=E.handle('preview',{step:{opId:'aggregate',cfg:{groupBy:['k'],metrics:['count']}}});
+    ok(!agg.error&&agg.n1<agg.n0&&agg.removedSample.length===0,'aggregate sample '+JSON.stringify(agg.removedSample)+' '+agg.error);
+    const rm=E.handle('preview',{step:{opId:'filterRows',cfg:{mode:'remove',match:'all',conditions:[{col:'k',op:'equals',value:'a',caseSensitive:false}]}}});
+    ok(!rm.error&&rm.removedSample.length===2,'filter sample '+JSON.stringify(rm.removedSample)+' '+rm.error);
+    E.handle('tableReset',{id:'t1'})
+  });
+  test('C2 only the two newest search indexes are kept',()=>{
+    const E=W.Engine;E.handle('tableReset',{id:'t1'});
+    E.handle('load',{text:'a,b\n x ,1\ny,2\nz,3'});
+    E.handle('setPipeline',{steps:[{id:'a',opId:'trim',cfg:{columns:['*'],collapse:true},muted:false},{id:'b',opId:'case',cfg:{columns:['a'],mode:'upper'},muted:false}],fromIndex:0});
+    for(let i=0;i<3;i++)for(const q of ['x','y'])E.handle('setView',{stateIdx:i,search:q,sort:[],filter:null,rowIds:null});
+    const st=W.E.states;
+    ok(st.length===3&&!st[0]._search&&!!st[1]._search&&!!st[2]._search,'indexes '+st.map(t=>!!t._search).join(','));
+    const r=E.handle('setView',{stateIdx:0,search:'x',sort:[],filter:null,rowIds:null});
+    ok(r.n===1,'search still works on the oldest state: '+r.n);
+    E.handle('tableReset',{id:'t1'})
   });
   test('reset tables',()=>{W.Engine.handle('tableReset',{id:'t1'})});
   return results

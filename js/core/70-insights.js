@@ -116,13 +116,16 @@ function issuesRaw(t,ctx){
   }
   if(junk.totals.length){
     const p=junk.totals[0];let col='*';for(let c=0;c<w;c++)if(TOTAL_RE.test(s(t.data[c][p]).trim())){col=t.cols[c];break}
-    push({kind:'totals',severity:'high',title:junk.totals.length>1?W.plural(junk.totals.length,'totals row')+' at the bottom':'Totals row at the bottom',detail:'A row starting with "'+W.trunc(s(t.data[t.cols.indexOf(col)>=0?t.cols.indexOf(col):0][p]).trim(),24)+'" would be counted as data.',count:junk.totals.length,showRows:{rowIds:idsAt(junk.totals)},fix:{opId:'filterRows',cfg:{mode:'remove',match:'all',conditions:[{col,op:'matches',value:W.TOTAL_SRC,caseSensitive:false}]}}})
+    let totFix={opId:'filterRows',cfg:{mode:'remove',match:'all',conditions:[{col,op:'matches',value:W.TOTAL_SRC,caseSensitive:false}]}};
+    const totTest=W.rowTester(t,totFix.cfg,ctx);let totHits=0;for(let r=0;r<n&&totHits<=junk.totals.length;r++)if(totTest(r))totHits++;
+    if(totHits>junk.totals.length)totFix={opId:'skipRows',cfg:{top:0,bottom:n-junk.totals[0]}};
+    push({kind:'totals',severity:'high',title:junk.totals.length>1?W.plural(junk.totals.length,'totals row')+' at the bottom':'Totals row at the bottom',detail:'A row starting with "'+W.trunc(s(t.data[t.cols.indexOf(col)>=0?t.cols.indexOf(col):0][p]).trim(),24)+'" would be counted as data.',count:junk.totals.length,showRows:{rowIds:idsAt(junk.totals)},fix:totFix})
   }
   if(junk.repeated.length&&junk.headerRow<0){
     push({kind:'repeatedHeader',severity:'high',title:W.plural(junk.repeated.length,'repeated header row'),detail:'These rows repeat the column names, which usually happens at page breaks.',count:junk.repeated.length,showRows:{rowIds:idsAt(junk.repeated.slice(0,5000))},fix:{opId:'removeRepeatedHeaders',cfg:{}}})
   }
   if(junk.artifacts.length){
-    push({kind:'artifacts',severity:'medium',title:W.plural(junk.artifacts.length,'page artifact row'),detail:'Rows like "Page 2 of 5" or lines of dashes.',count:junk.artifacts.length,showRows:{rowIds:idsAt(junk.artifacts.slice(0,5000))},fix:{opId:'filterRows',cfg:{mode:'remove',match:'any',conditions:[{col:'*',op:'matches',value:W.JUNK_ARTIFACT_SRC,caseSensitive:false}]}}})
+    push({kind:'artifacts',severity:'medium',title:W.plural(junk.artifacts.length,'page artifact row'),detail:'Rows like "Page 2 of 5" or lines of dashes.',count:junk.artifacts.length,showRows:{rowIds:idsAt(junk.artifacts.slice(0,5000))},fix:{opId:'filterRows',cfg:{mode:'remove',match:'any',conditions:[{col:'@row',op:'matches',value:W.JUNK_ARTIFACT_SRC,caseSensitive:false}]}}})
   }
   let emptyRows=0;
   const blankStr=v=>{if(v==null||v==='')return true;const x=typeof v==='string'?v:String(v);const c0=x.charCodeAt(0);if(c0>32&&c0!==160)return false;return x.trim()===''};
@@ -212,9 +215,11 @@ function issuesRaw(t,ctx){
         let variants=0,rows=0;const allVar=new Map();
         groups.forEach(g=>{if(g.size>1){variants++;g.forEach((cnt,val)=>{allVar.set(val,cnt)});let tot=0;g.forEach(x=>tot+=x);rows+=tot-Math.max.apply(null,Array.from(g.values()))}});
         if(variants){
-          let low=0,up=0,tit=0;allVar.forEach((cnt,v)=>{if(v===v.toLowerCase())low+=cnt;else if(v===v.toUpperCase())up+=cnt;else tit+=cnt});
-          const mode=low>=up&&low>=tit?'lower':up>=tit?'upper':'title';
-          push({kind:'caseVariants',severity:'medium',title:'Same values with different capitals in "'+name+'"',detail:'For example '+Array.from(allVar.keys()).slice(0,3).map(v=>'"'+v+'"').join(', ')+'. They would be counted as different values.',count:rows,column:name,showRows:null,fix:{opId:'case',cfg:{columns:[name],mode}}})
+          const common=new Map();groups.forEach((g,k)=>{if(g.size>1){let best=null,bc=-1;g.forEach((cnt,val)=>{if(cnt>bc){bc=cnt;best=val}});common.set(k,best)}});
+          const nv=x=>x.indexOf('  ')===-1&&x.indexOf('\t')===-1&&x.indexOf('\n')===-1?x:x.replace(/\s+/g,' ');
+          const vmap=[],seenRaw=new Set();
+          for(let q=0;q<tr.length;q++){const tv=nv(tr[q]);const cm=common.get(tv.toLowerCase());if(cm!==undefined&&tv!==cm&&!seenRaw.has(ne[q])){seenRaw.add(ne[q]);vmap.push([ne[q],cm])}}
+          push({kind:'caseVariants',severity:'medium',title:'Same values with different capitals in "'+name+'"',detail:'For example '+Array.from(allVar.keys()).slice(0,3).map(v=>'"'+v+'"').join(', ')+'. They would be counted as different values.',count:rows,column:name,showRows:null,fix:{opId:'infer',cfg:{column:name,candidate:{type:'mapValue',params:{map:vmap,label:'Unify capitals ('+W.plural(vmap.length,'value')+')'}}}}})
         }
       }
       const st=looksStructured(ne.slice(0,2000));

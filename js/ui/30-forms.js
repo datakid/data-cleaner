@@ -126,7 +126,7 @@ function PreviewBox(){
   return{el,update(opId,cfg,stateIdx){
     clearTimeout(t);const my=++seq;
     t=setTimeout(async()=>{
-      let r;try{r=await Engine.call('preview',{stateIdx,step:{opId,cfg}},'preview')}catch(e){if(e.stale)return;r={error:e.message}}
+      let r;try{r=await Engine.call('preview',{stateIdx,step:{opId,cfg}},'preview')}catch(e){if(isQuiet(e))return;r={error:e.message}}
       if(my!==seq)return;
       clear(el);
       if(r.error){el.append(h('div',{class:'pv-err'},r.error));return}

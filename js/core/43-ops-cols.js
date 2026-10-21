@@ -333,7 +333,7 @@ W.defineOp({
     else{
       cur.word('split');cfg.column=cur.str();cur.word('by');
       const x=cur.anyWord().toLowerCase();
-      if(x==='fixed-width'){cfg.kind='fixed-width';if(cur.optWord('at')){const w=cur.anyWord();cfg.params.cuts=w.split(',').map(Number).filter(n=>!isNaN(n))}}
+      if(x==='fixed-width'){cfg.kind='fixed-width';if(cur.optWord('at')){cfg.params.cuts=[cur.num()];while(cur.optP(','))cfg.params.cuts.push(cur.num())}}
       else if(x==='pattern'){cfg.kind='pattern';const r=cur.re();cfg.params.pattern=r.src;if(r.flags.indexOf('i')===-1)cfg.params.caseSensitive=true}
       else if(x==='key-value'){cfg.kind='key-value';if(cur.optWord('sep'))cfg.params.sep=cur.str()}
       else if(x==='character'){cfg.kind='delimited';cfg.params.delimiter=cur.str()}
@@ -346,6 +346,7 @@ W.defineOp({
   examples:[
     {cfg:{column:'line',kind:'whitespace-runs',params:{},into:['name','status'],keepOriginal:false},input:{cols:['id','line'],rows:[['1','web-1   running'],['2','db    stopped']]},expect:{cols:['id','name','status'],rows:[['1','web-1','running'],['2','db','stopped']]}},
     {cfg:{column:'p',kind:'json',params:{},into:[],keepOriginal:false},input:{cols:['p'],rows:[['{"a":1,"b":{"c":"x"}}'],['oops']]},expect:{cols:['a','b.c','_unparsed'],rows:[['1','x',''],['','','oops']]}},
+    {cfg:{column:'l',kind:'fixed-width',params:{cuts:[0,6]},into:[],keepOriginal:false},input:{cols:['l'],rows:[['ab12  cd'],['xy34  ef']]},expect:{cols:['l_1','l_2'],rows:[['ab12','cd'],['xy34','ef']]}},
     {cfg:{column:'l',kind:'logfmt',params:{},into:[],keepOriginal:false},input:{cols:['l'],rows:[['level=info msg="hi there" id=7']]},expect:{cols:['level','msg','id'],rows:[['info','hi there','7']]}},
     {cfg:{column:'l',kind:'pattern',params:{pattern:'(?<d>\\d{4}-\\d\\d-\\d\\d) (?<rest>.*)'},into:[],keepOriginal:false},input:{cols:['l'],rows:[['2025-01-02 boot ok'],['x']]},expect:{cols:['d','rest'],rows:[['2025-01-02','boot ok'],['','']]}}
   ]

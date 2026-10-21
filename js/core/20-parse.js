@@ -60,7 +60,7 @@ W.toDelimited=function(cols,rows,delim,opts){
   const guard=opts.formulaGuard;
   const q=v=>{
     let s=String(v==null?'':v);
-    if(guard&&/^[=+\-@\t\r]/.test(s)&&!/^-?\d+(\.\d+)?$/.test(s))s="'"+s;
+    if(guard&&/^[=+\-@\t\r]/.test(s)&&W.parseNumber(s)===null)s="'"+s;
     return(s.indexOf(delim)!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1||s.indexOf('\r')!==-1)?'"'+s.replace(/"/g,'""')+'"':s
   };
   const out=[];
@@ -179,7 +179,7 @@ W.resolveCols=function(t,names){
 };
 W.missingCols=function(t,names){
   if(!names)return[];
-  return names.filter(c=>c!=='*'&&t.cols.indexOf(c)===-1)
+  return names.filter(c=>c!=='*'&&c!=='@row'&&t.cols.indexOf(c)===-1)
 };
 W.cow=function(t,idx){
   const s=idx instanceof Set?idx:new Set(idx);

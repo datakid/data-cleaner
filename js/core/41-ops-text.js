@@ -72,7 +72,7 @@ W.defineOp({
   ]
 });
 
-function titleCase(s){return s.toLowerCase().replace(/(^|[\s\-'(\/])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase())}
+function titleCase(s){s=s.toLowerCase().replace(/(^|[\s\-(\/])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());return s.replace(/(^|[\s\-(\/])(\p{L})'(\p{L})/gu,(m,a,b,c)=>a+b.toUpperCase()+"'"+c.toUpperCase())}
 W.titleCase=titleCase;
 W.defineOp({
   id:'case',label:'Change case',category:'rewrite',
@@ -99,7 +99,7 @@ W.defineOp({
   keywords:['replace','find','substitute','swap','regex','change'],
   fields:[{key:'columns',type:'columns',label:'Columns',allowAll:true},{key:'find',type:'text',label:'Find',placeholder:'text to find'},{key:'replace',type:'text',label:'Replace with',placeholder:'leave blank to remove'},{key:'regex',type:'checkbox',label:'Find is a pattern (regular expression)'},{key:'wholeCell',type:'checkbox',label:'Only when it is the whole cell'},{key:'matchCase',type:'checkbox',label:'Match case'}],
   defaults:()=>({columns:['*'],find:'',replace:'',regex:false,wholeCell:false,matchCase:false}),
-  validate:cfg=>!cfg.find?'Enter something to find.':(cfg.regex&&W.isUnsafeRegexSource(cfg.find))?'That pattern is too long or could freeze the page. Simplify it.':null,
+  validate:cfg=>!cfg.find?'Enter something to find.':(cfg.regex&&W.isUnsafeRegexSource(cfg.wholeCell?'^(?:'+cfg.find+')$':cfg.find))?'That pattern is too long or could freeze the page. Simplify it.':null,
   describe:cfg=>(cfg.find&&!cfg.replace?'Remove ':'Replace ')+(cfg.regex?'/'+W.trunc(cfg.find,20)+'/':'"'+W.trunc(cfg.find,20)+'"')+(cfg.replace?' with "'+W.trunc(cfg.replace,20)+'"':'')+' in '+colsText(cfg.columns),
   apply(t,cfg){
     W.needCols(t,cfg.columns);
@@ -168,9 +168,7 @@ W.defineOp({
       if(cfg.to==='number'){
         const p=W.parseNumber(s,{locale,percentAsFraction:!!cfg.percentAsFraction});
         if(!p){failed++;return v}
-        let out=W.canonicalNumber(p.value);
-        if(p.isPercent&&!cfg.percentAsFraction)out=W.canonicalNumber(p.value);
-        return out
+        return W.canonicalNumber(p.value)
       }
       const d=W.parseDate(s,{order:ctx&&ctx.dateOrder,yearPivot:ctx&&ctx.yearPivot});
       if(!d){failed++;return v}

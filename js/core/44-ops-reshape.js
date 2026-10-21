@@ -64,7 +64,7 @@ W.defineOp({
   fields:[{key:'idColumns',type:'columns',label:'Group rows by',allowAll:true},{key:'keyColumn',type:'column',label:'Column whose values become new columns'},{key:'valueColumn',type:'column',label:'Column that fills the new columns'},{key:'duplicatePolicy',type:'select',label:'When a cell gets more than one value',options:[['error','Stop and tell me'],['first','Use the first'],['last','Use the last'],['sum','Add them up'],['count','Count them'],['average','Average them'],['min','Smallest'],['max','Largest'],['concat','List them all']]}],
   defaults:s=>({idColumns:[s.cols[0]],keyColumn:s.cols[1]||s.cols[0],valueColumn:s.cols[s.cols.length-1],duplicatePolicy:'error'}),
   describe:cfg=>'Turn values of "'+cfg.keyColumn+'" into columns filled from "'+cfg.valueColumn+'"'+(cfg.duplicatePolicy&&cfg.duplicatePolicy!=='error'?' ('+cfg.duplicatePolicy+' duplicates)':''),
-  apply(t,cfg){
+  apply(t,cfg,ctx){
     const ki=W.needCol(t,cfg.keyColumn),vi=W.needCol(t,cfg.valueColumn);W.needCols(t,cfg.idColumns);
     const idIdx=W.resolveCols(t,cfg.idColumns).filter(i=>i!==ki&&i!==vi);
     const groups=new Map(),keys=[],seenK=new Set();let blank=0;
@@ -83,7 +83,11 @@ W.defineOp({
     const names=W.dedupeColNames(idIdx.map(i=>t.cols[i]).concat(keys));
     const data=names.map(()=>[]);
     for(const g of groups.values()){g.ids.forEach((v,k)=>data[k].push(v));keys.forEach((kv,k)=>data[idIdx.length+k].push(g.vals[kv]?reduceVals(g.vals[kv],policy):''))}
-    const res={table:{cols:names,data,n:groups.size,rowIds:W.identity(groups.size,(t.nextIdBase||0))},stats:{removed:t.n-groups.size,addedCols:keys.length}};
+    let next=ctx&&ctx.nextRowId!=null?ctx.nextRowId:t.n;
+    const ids=new Array(groups.size);
+    for(let i=0;i<groups.size;i++)ids[i]=next++;
+    if(ctx)ctx.nextRowId=next;
+    const res={table:{cols:names,data,n:groups.size,rowIds:ids},stats:{removed:t.n-groups.size,addedCols:keys.length}};
     const notes=[];if(dup)notes.push(W.plural(dup,'cell')+' had several values, combined with "'+policy+'".');if(blank)notes.push(W.plural(blank,'row')+' had an empty key and went under "(blank)".');
     if(notes.length)res.warning=notes.join(' ');
     return res
@@ -118,7 +122,7 @@ W.defineOp({
   defaults:(s,x)=>{const g=x&&x.cols&&x.cols.length?[x.cols[0]]:[s.cols[0]];const num=s.cols.find((c,i)=>s.types&&s.types[i]==='number'&&g.indexOf(c)===-1);return{groupBy:g,metrics:['count'].concat(num?[num+':sum']:[])}},
   validate:cfg=>!cfg.groupBy||!cfg.groupBy.length?'Pick at least one column to group by.':(!cfg.metrics||!cfg.metrics.length?'Add at least one calculation.':(cfg.metrics.some(m=>!W.parseMetric(m))?'Write calculations like amount:sum or count.':null)),
   describe:cfg=>'Group by '+cfg.groupBy.map(c=>'"'+c+'"').join(', ')+' and calculate '+cfg.metrics.join(', '),
-  apply(t,cfg){
+  apply(t,cfg,ctx){
     W.needCols(t,cfg.groupBy);
     const gi=cfg.groupBy.map(c=>t.cols.indexOf(c));
     const ms=cfg.metrics.map(W.parseMetric);
@@ -153,7 +157,11 @@ W.defineOp({
         data[gi.length+j].push(v)
       })
     }
-    return{table:{cols:names,data,n:order.length,rowIds:W.identity(order.length)},stats:{removed:t.n-order.length}}
+    let next=ctx&&ctx.nextRowId!=null?ctx.nextRowId:t.n;
+    const ids=new Array(order.length);
+    for(let i=0;i<order.length;i++)ids[i]=next++;
+    if(ctx)ctx.nextRowId=next;
+    return{table:{cols:names,data,n:order.length,rowIds:ids},stats:{removed:t.n-order.length}}
   },
   toDsl:cfg=>'group by '+cfg.groupBy.map(q).join(', ')+' calculate '+cfg.metrics.map(q).join(', '),
   dslPattern:/^(group by|aggregate group by)\b/i,

@@ -11,12 +11,33 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `index.html` | The app |
 | `index.html#r=<code>` | Opens a shared recipe. The review dialog appears before anything runs. `#p=` links from Sift are also accepted. |
 | `index.html?noworker=1` | Forces the engine onto the main thread (for debugging) |
+| `file://` | Opening `index.html` straight from disk works, but the background worker cannot start (the engine runs on the main thread) and the browser blocks the font files. Serve the folder over http for the full experience. |
 | `index.html?theme=dark` / `?theme=light` / `?theme=system` | Forces a theme for this visit (doesn't change the saved choice) |
 | `index.html?contrast=high` / `?contrast=normal` | Forces a contrast level for this visit |
-| `tests.html` | Engine tests: 295 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, 24 multi-table fixtures, parser parity, sort stability, suggestions scans, date shapes, search index, isolated tables) |
-| `ui-test.html` | Runs the full UI end to end (71 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs and restore) and logs results to the console |
+| `tests.html` | Engine tests: 321 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, 24 multi-table fixtures, parser parity, sort stability, suggestions scans, date shapes, search index, isolated tables) |
+| `ui-test.html` | Runs the full UI end to end (109 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs and restore) and logs results to the console |
 | `perf-test.html` | Runs the 200,000-row performance test automatically and logs the timings |
 | `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
+
+## What's new in 2.6.1
+- **Numbers:** a value such as `1.250` or `0.125` is no longer read as a European thousands separator, so sums and conversions keep their size.
+- **Recipes:** manual row and cell steps are muted when a recipe runs on another file, and a recipe file you drop is shown for review before it runs.
+- **Recipe text:** fixed-width splits with a cut list such as `at 0,6,12` can be read back, and a pattern that could freeze the page is refused when a recipe is imported.
+- **Row IDs:** Group and summarize and Long to wide give their new rows fresh IDs, so a manual step can no longer hit the wrong row.
+- **Split to rows:** a trailing delimiter no longer creates a blank row.
+- **Excel export:** ZIP codes and other values with leading zeros stay text, dates are real dates, the header option is respected, and sheet names are valid. The vendored library cannot write a frozen header row, so Weft no longer claims to.
+- **Suggestions:** the fixes for page numbers, totals rows and capital-letter variants now change exactly the rows they counted; MySQL and psql row-count footers are skipped with a note.
+- **Title case:** an apostrophe no longer capitalises the next letter ("Don't", not "Don'T"; "O'Brien" is still right).
+- **Merge columns:** merging from the first column keeps the new column in place.
+- **Number display:** negative numbers keep their minus sign and very small numbers no longer show as 0.
+- **Date order:** changing the date order refreshes old views and every open table.
+- **Safer engine:** a request that takes more than 20 seconds offers "Keep waiting" or "Stop it", and stopping restarts the engine and restores your last good recipe; a failed load, undo or restore no longer corrupts what Weft remembers.
+- **Tabs:** calls are tied to the table they were made for, new steps are refused while a tab is switching, steps added together are queued, hidden tables show fresh results when opened, renaming is saved, and "Reset" clears everything from the old file.
+- **One-column tables:** duplicating, extracting or importing a one-column table, including from Excel, keeps its header row.
+- **Remember my data:** reference files come back too, the browser database connection is reused, and a failed save tells you once.
+- **Small fixes:** removing a reference re-runs the steps that use it, the workbook export waits for a running step and uses the file name you typed, "Keep as one table" on a web page says it keeps the largest table, an old view is never answered from the current one, and several dropped files open the first with a note.
+- **Polish:** step previews for reshape steps no longer list "removed" rows, only two search indexes are kept in memory, Copy now follows the formula-protection setting and no longer prefixes numbers, blocked browser storage no longer breaks start-up, and the tab close control is no longer a button inside a button.
+- **New: Split table at selected row.** Select the first row of a second table that stayed in the same tab and run "Split table at selected row"; that row and everything below it open in a new tab with the row as the header, and the original tab gets a step that removes them.
 
 ## What's new in 2.6
 - **Several tables in one paste, each in its own tab.** Paste text or a copied web page that holds more than one table and Weft opens each table in a tab above the "Read as" bar. Tables are found by blank lines, by a change in column count with a new header, by markdown and database (MySQL, psql) output, and by document order for web tables. A short line above a table becomes its tab name, and footers such as "3 rows in set" stay with their table. A new table only starts on a clear header (markdown and database tables, or a header over numeric or date columns), so a single table with empty rows or ragged trailing columns stays in one tab. JSON, logs, address blocks and every built-in sample are never split. Up to 12 tables open at once. A message after the split says how many were found and has **Keep as one table** to undo it.
@@ -85,7 +106,7 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 ### Excel
 - Opens .xlsx, .xlsm, .xlsb, .xls and .ods files using SheetJS 0.20.3 (`vendor/xlsx.full.min.js`). The library loads only when an Excel file is opened or exported, so startup is unaffected.
 - Multi-sheet workbooks ask which sheet to clean. Merged cells are reported.
-- "Download as Excel workbook" (and the Excel option in Export) writes numbers and ISO dates as real Excel values, freezes the header row, turns on filters and sizes the columns. Text that starts with = + - @ is stored as text, so no formulas are ever created.
+- "Download as Excel workbook" (and the Excel option in Export) writes numbers and ISO dates as real Excel values, turns on filters and sizes the columns. Text that starts with = + - @ is stored as text, so no formulas are ever created.
 - Reference files for join and compare can also be Excel files.
 
 ### Performance
@@ -132,7 +153,7 @@ js/tests/*.js                fixtures, engine tests, UI drive test
   - `weft.library.v2`: saved recipes. Old `sift_library_v1` entries are migrated automatically.
   - `weft.prefs.v1`: settings, including `theme` (`system`, `light` or `dark`; missing means `system`), `contrast` (`system`, `high` or `normal`), density, date order and column widths.
   - `weft.recentCommands`, `weft.tips.v1`.
-- **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data". With several tabs open it stores each tab's source text, recipe and reading (`v: 2`); with one tab it keeps the older single-table shape.
+- **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data". With several tabs open it stores each tab's source text, recipe and reading (`v: 2`); with one tab it keeps the older single-table shape. Both shapes also keep the reference files used by joins and diffs.
 
 ## Measured performance
 Help ▸ Measure performance, 200,000 rows (18.7 MB), background engine on, run in the shared preview browser:
@@ -166,5 +187,4 @@ Freezes: Weft's own code no longer runs longer than about 50 ms at a time.
 - **High contrast:** View ▸ Contrast offers Match device (default, following the operating system's "increase contrast" setting), High or Standard. It works with Light, Dark and System, uses the same design tokens, and is applied before first paint. `?contrast=high` forces it for one visit.
 
 ## Not done yet
-- `favicon.ico` has to be added by hand because this editor can't write binary files. `index.html` already links to it, and modern browsers use `favicon.svg` until then. To add it, open `tools/favicon.html` from the project and press "Download favicon.ico". If nothing downloads, right-click the link that appears and choose "Save link as…". Put the file in the project root next to `index.html`. The builder now draws every size from `favicon.svg`, so the `.ico` always matches the icon. (It previously failed because the page pointed to a script path that doesn't exist.)
 - High contrast passed its automated check, but hasn't been looked over by eye on every screen yet.

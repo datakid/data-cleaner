@@ -37,7 +37,8 @@ const Xlsx={
     })
   },
   sheetName(n,used){
-    let base=String(n||'').replace(/[\\\/?*\[\]:]/g,' ').trim().slice(0,31).trim()||'Sheet';
+    let base=String(n||'').replace(/[\\\/?*\[\]:]/g,' ').replace(/^'+|'+$/g,'').trim().slice(0,31).trim()||'Sheet';
+    if(base.toLowerCase()==='history')base='History (1)';
     let name=base,k=2;
     while(used.has(name.toLowerCase())){const suf=' ('+k+')';name=base.slice(0,31-suf.length).trim()+suf;k++}
     used.add(name.toLowerCase());
@@ -45,21 +46,21 @@ const Xlsx={
   },
   sheet(X,result){
     const data=JSON.parse(result.text);
-    const aoa=[data.cols].concat(data.rows);
+    const hdr=data.header!==false;const aoa=hdr?[data.cols].concat(data.rows):data.rows.slice();
     const ws=X.utils.aoa_to_sheet(aoa,{cellDates:false});
     const types=data.types||[];
+    const safeNum=data.cols.map((_,C)=>types[C]==='number'&&!data.rows.some(r=>{const v=String(r[C]==null?'':r[C]).trim();return/^[+-]?0\d/.test(v)||v.replace(/\D/g,'').length>15||/e/i.test(v)}));
     if(ws['!ref']){
       const r=X.utils.decode_range(ws['!ref']);
-      for(let R=1;R<=r.e.r;R++)for(let C=0;C<=r.e.c;C++){
+      for(let R=hdr?1:0;R<=r.e.r;R++)for(let C=0;C<=r.e.c;C++){
         const a=X.utils.encode_cell({r:R,c:C});const cell=ws[a];if(!cell)continue;
         const v=String(cell.v);
-        if(types[C]==='number'){const p=W.parseNumber(v,{locale:data.locales[C]||'us'});if(p&&v.trim()!==''){cell.t='n';cell.v=p.value;if(p.isPercent)cell.z='0.00%'}}
-        else if(types[C]==='date'&&/^\d{4}-\d{2}-\d{2}$/.test(v.trim())){cell.t='d';cell.v=v.trim();cell.z='yyyy-mm-dd'}
+        if(safeNum[C]){const p=W.parseNumber(v,{locale:data.locales[C]||'us'});if(p&&v.trim()!==''){cell.t='n';cell.v=p.value;if(p.isPercent)cell.z='0.00%'}}
+        else if(types[C]==='date'&&/^\d{4}-\d{2}-\d{2}$/.test(v.trim())){const[y,m,d]=v.trim().split('-').map(Number);const u=new Date(Date.UTC(y,m-1,d));if(u.getUTCFullYear()===y&&u.getUTCMonth()===m-1&&u.getUTCDate()===d){cell.t='n';cell.v=Date.UTC(y,m-1,d)/864e5+25569;cell.z='yyyy-mm-dd'}}
         else if(/^[=+\-@]/.test(v)&&!/^-?\d/.test(v)){cell.t='s'}
       }
       ws['!cols']=data.cols.map((c,i)=>{let w=String(c).length;for(let k=0;k<Math.min(200,data.rows.length);k++){const l=String(data.rows[k][i]==null?'':data.rows[k][i]).length;if(l>w)w=l}return{wch:Math.min(60,Math.max(8,w+2))}});
-      ws['!autofilter']={ref:ws['!ref']};
-      ws['!freeze']={xSplit:0,ySplit:1}
+      if(hdr)ws['!autofilter']={ref:ws['!ref']}
     }
     return ws
   },
