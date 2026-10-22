@@ -149,7 +149,7 @@ function placeFloating(el,x,y,opts){
   if(top+r.height>vh-8)top=opts.flipY!=null?Math.max(8,opts.flipY-r.height):vh-8-r.height;
   el.style.left=Math.max(8,left)+'px';el.style.top=Math.max(8,top)+'px'
 }
-function isEditable(t){return!!t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable)}
+function isEditable(t){return!!t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable||(!!t.classList&&t.classList.contains('dd-trigger')))}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 const yieldChan=typeof MessageChannel==='function'?new MessageChannel():null;const yieldQ=[];
 if(yieldChan)yieldChan.port1.onmessage=()=>{const f=yieldQ.shift();f&&f()};

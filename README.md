@@ -15,9 +15,12 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `index.html?theme=dark` / `?theme=light` / `?theme=system` | Forces a theme for this visit (doesn't change the saved choice) |
 | `index.html?contrast=high` / `?contrast=normal` | Forces a contrast level for this visit |
 | `tests.html` | Engine tests: 321 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, 24 multi-table fixtures, parser parity, sort stability, suggestions scans, date shapes, search index, isolated tables) |
-| `ui-test.html` | Runs the full UI end to end (109 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs and restore) and logs results to the console |
+| `ui-test.html` | Runs the full UI end to end (119 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs and restore) and logs results to the console |
 | `perf-test.html` | Runs the 200,000-row performance test automatically and logs the timings |
 | `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
+
+## What's new in 2.6.2
+- **App-styled controls:** every dropdown opens an in-app menu instead of the browser's own list, checkboxes and radio buttons are drawn by Weft, number fields have Weft steppers, the search box has its own clear button, and the "Examples of steps" disclosure uses an app chevron. The underlying form fields are unchanged, so values, events and keyboard use work as before.
 
 ## What's new in 2.6.1
 - **Numbers:** a value such as `1.250` or `0.125` is no longer read as a European thousands separator, so sums and conversions keep their size.

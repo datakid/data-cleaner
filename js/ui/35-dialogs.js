@@ -12,7 +12,7 @@ const Dialog={
       o.foot?h('div',{class:'dlg-foot'},o.foot):null);
     scrim.addEventListener('mousedown',()=>api.close());
     document.body.append(scrim,box);
-    const trap=e=>{if(e.key!=='Tab')return;const f=$$('button:not([disabled]),input:not([disabled]),select,textarea,[tabindex="0"],a[href]',box).filter(x=>x.offsetParent!==null);if(!f.length)return;const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}};
+    const trap=e=>{if(e.key!=='Tab')return;const f=$$('button:not([disabled]):not([tabindex="-1"]),input:not([disabled]):not([tabindex="-1"]),select:not([tabindex="-1"]),textarea,[tabindex="0"],a[href]',box).filter(x=>x.offsetParent!==null);if(!f.length)return;const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}};
     box.addEventListener('keydown',trap);
     let closed=false;
     const api={el:box,body:box.querySelector('.dlg-body'),close(silent){if(closed)return;closed=true;Layers.pop(id);scrim.remove();box.remove();if(prevFocus&&prevFocus.focus&&document.contains(prevFocus))prevFocus.focus({preventScroll:true});if(!silent&&o.onClose)o.onClose()}};

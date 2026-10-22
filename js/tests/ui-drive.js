@@ -451,6 +451,36 @@ async function run(){
       await doUndo();
       ok('F1 undo in the first tab restores the removed rows',finalN()===f1n&&S.steps.length===0,'rows '+finalN()+' want '+f1n);
     }finally{Toast.err=f1err}
+    {
+      const g=h('select',{class:'select','aria-label':'Pick one'},h('option',{value:'a'},'Alpha'),h('option',{value:'b',selected:true},'Beta'),h('option',{value:'c'},'Gamma'));
+      let seen=null;g.addEventListener('change',e=>{seen=e.target.value});
+      const host=h('div',{style:{position:'fixed',left:'20px',top:'20px',zIndex:'5'}},g);document.body.appendChild(host);await wait(60);
+      const trg=host.querySelector('.dd-trigger');
+      ok('G1 a select gets an app-styled trigger and keeps its value',!!trg&&g.classList.contains('dd-native')&&g.value==='b'&&trg.textContent.indexOf('Beta')!==-1,trg&&trg.textContent);
+      trg.click();await wait(40);
+      const lst=$('.dd-list');
+      ok('G1 the list opens as an app menu with the current choice marked',!!lst&&lst.querySelectorAll('.dd-opt').length===3&&lst.querySelector('[aria-selected="true"]').textContent.indexOf('Beta')!==-1&&Layers.has('dd'));
+      keyOn(document.activeElement,'ArrowDown');keyOn(document.activeElement,'Enter');await wait(40);
+      ok('G1 keyboard choice sets the value, fires change and closes the list',g.value==='c'&&seen==='c'&&!$('.dd-list')&&!Layers.has('dd')&&trg.textContent.indexOf('Gamma')!==-1,g.value+' '+seen);
+      g.value='a';ok('G1 setting the value from code updates the trigger',trg.textContent.indexOf('Alpha')!==-1);
+      g.appendChild(h('option',{value:'d'},'Delta'));await wait(30);
+      trg.click();await wait(40);
+      ok('G1 options added later appear in the list',$$('.dd-opt').length===4);
+      keyOn(document.activeElement,'Escape');await wait(30);
+      ok('G1 Escape closes only the list',!$('.dd-list')&&!Layers.has('dd'));
+      const nm=h('input',{class:'input',type:'number',min:'0',value:'2'});let nseen=0;nm.addEventListener('input',()=>nseen++);
+      host.appendChild(nm);await wait(60);
+      const up=host.querySelector('.num-up');up.click();
+      ok('G2 the number stepper raises the value and fires input',nm.value==='3'&&nseen===1,nm.value+' '+nseen);
+      host.querySelector('.num-down').click();host.querySelector('.num-down').click();host.querySelector('.num-down').click();host.querySelector('.num-down').click();
+      ok('G2 the number stepper stops at the minimum',nm.value==='0',nm.value);
+      const si=$('#searchInput'),sc=$('.search-clear');
+      si.value='abc';si.dispatchEvent(new Event('input',{bubbles:true}));
+      ok('G3 the search box shows its own clear control when it has text',!!sc&&!sc.classList.contains('hidden'));
+      sc.click();
+      ok('G3 the clear control empties the search box and hides itself',si.value===''&&sc.classList.contains('hidden'));
+      host.remove()
+    }
     let blocked=false;try{await fetch('data:,x')}catch(e){blocked=true}ok('csp blocks fetch',blocked);
   }catch(e){log('ERROR '+e.message+' '+e.stack)}
   const f=results.filter(r=>!r[1]);log('DONE '+(results.length-f.length)+'/'+results.length);
