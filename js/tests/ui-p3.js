@@ -1,0 +1,166 @@
+(function(){
+(window.WEFT_UI_MODULES=window.WEFT_UI_MODULES||[]).push(async function(T){
+  const {ok,until,wait}=T;
+  const STA=['paid','pending','refunded'];
+  const rows=[];
+  for(let i=0;i<60;i++)rows.push({status:STA[i%3],amount:10+i*5,id:1000+i,budget:i%2?500:100,name:['alice','BOB','carol smith'][i%3]});
+  const csv='Status,Amount,Order ID,Budget,Name\n'+rows.map(r=>[r.status,r.amount,r.id,r.budget,r.name].join(',')).join('\n');
+  const count=f=>rows.filter(f).length;
+  const si=()=>document.getElementById('searchInput');
+  const toasts=()=>document.querySelectorAll('#toastRoot .toast.err').length;
+  const settled=()=>S.view&&S.view.key&&!Grid.body.querySelector('.gc.pending');
+  const typeQ=async q=>{
+    const el=si();el.focus();el.value=q;el.dispatchEvent(new Event('input',{bubbles:true}));
+    await until(()=>S.search===q&&S.view.query&&S.view.query.src===q,4000);await wait(150)
+  };
+  const fresh=async()=>{
+    await App.reset();
+    await Input.loadText(csv,'orders.csv');
+    await until(()=>S.loaded&&Grid.pool.length>0&&S.view.n>0);await wait(300);
+    await Engine.call('setCtx',{today:null})
+  };
+  const dlg=()=>document.querySelector('.dialog');
+  const fxInput=()=>dlg()&&dlg().querySelector('.fx-input');
+  const okBtn=()=>dlg()&&dlg().querySelector('.btn-primary');
+  const setText=(el,v)=>{el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))};
+  const nameInput=()=>dlg().querySelector('[data-key="name"] input');
+  const col=name=>curCols().indexOf(name);
+  const cells=async(name,n)=>{const r=await Engine.call('getRows',{viewKey:S.view.key,start:0,count:n||5});const c=col(name);return r.rows.map(x=>x[c])};
+  const closeAll=()=>{while(Layers.closeTop());};
+  const openFormula=async()=>{Commands.run('columns.formula');await until(()=>fxInput(),3000);await wait(100)};
+
+  await fresh();
+  const cmd=Commands.get('columns.formula');
+  ok('P3 the command is named Add column from formula…',!!cmd&&cmd.title==='Add column from formula…',cmd&&cmd.title);
+  ok('P3 the command has the synonyms calculate, compute, expression and excel formula',['calculate','compute','expression','excel formula'].every(k=>cmd.keywords.indexOf(k)!==-1),cmd.keywords.join());
+  ok('P3 the command is in the column header menu and the Columns toolbar',Commands.byContext('colHeader').some(c=>c.id==='columns.formula')&&Commands.byContext('toolbar:Columns').some(c=>c.id==='columns.formula'));
+
+  await openFormula();
+  ok('P3 the dialog opens with a formula box and the Add button disabled while it is empty',!!fxInput()&&okBtn().disabled,okBtn()&&okBtn().disabled);
+  ok('P3 no step dialog shows the stray text "null"',!/(^|\n)null(\n|$)/.test(dlg().innerText),dlg().innerText.slice(0,80));
+  ok('P3 the dialog offers column and function pickers and examples',dlg().querySelectorAll('.fx-pick').length===2&&dlg().querySelectorAll('.fx-examples button').length>=3);
+  setText(fxInput(),'1 + FOO()');await wait(300);
+  const caret=dlg().querySelector('.fx-caret');
+  ok('P3 an unknown function shows the line with a caret under it',!caret.classList.contains('hidden')&&caret.textContent.split('\n')[1].indexOf('^')===4,JSON.stringify(caret.textContent));
+  ok('P3 the error message says what is wrong and where, and Add stays disabled',/Unknown function FOO at position 5/.test(dlg().querySelector('.pv-err').textContent)&&okBtn().disabled,dlg().querySelector('.pv-err').textContent);
+  ok('P3 the formula box is marked invalid for assistive tech',fxInput().getAttribute('aria-invalid')==='true');
+  setText(fxInput(),'[Missing] + 1');await wait(300);
+  ok('P3 a missing column is named in the message',/Column "Missing" not found/.test(dlg().querySelector('.pv-err').textContent)&&okBtn().disabled,dlg().querySelector('.pv-err').textContent);
+  setText(fxInput(),'1 +');await wait(300);
+  ok('P3 an unfinished formula points at the end',!dlg().querySelector('.fx-caret').classList.contains('hidden')&&okBtn().disabled);
+  setText(fxInput(),'[Amount] * 2');await wait(500);
+  ok('P3 a valid formula clears the caret, lists the columns it uses and enables Add',dlg().querySelector('.fx-caret').classList.contains('hidden')&&/Uses Amount/.test(dlg().querySelector('.fx-msg').textContent)&&!okBtn().disabled,dlg().querySelector('.fx-msg').textContent);
+  await until(()=>dlg().querySelector('.preview-box .mini-table'),3000);
+  const pvCols=Array.from(dlg().querySelectorAll('.preview-box th')).map(x=>x.textContent);
+  ok('P3 the live preview shows the new column and a sample of rows',pvCols.indexOf('Calculated')!==-1&&dlg().querySelectorAll('.preview-box tbody tr').length>=3,pvCols.join());
+  const firstPv=dlg().querySelector('.preview-box tbody tr').children[pvCols.indexOf('Calculated')].textContent;
+  ok('P3 the preview computes the value',firstPv==='20',firstPv);
+  const before=fxInput().value;
+  fxInput().focus();fxInput().dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await wait(100);
+  ok('P3 Enter in the formula box neither adds a newline nor closes the dialog',!!dlg()&&fxInput().value===before&&!/\n/.test(fxInput().value));
+  setText(fxInput(),'');await wait(100);
+  const colPick=dlg().querySelector('select[aria-label="Insert a column"]');
+  colPick.value='Order ID';colPick.dispatchEvent(new Event('change',{bubbles:true}));await wait(150);
+  ok('P3 the column picker inserts a bracketed name',fxInput().value==='[Order ID]',fxInput().value);
+  const fnPick=dlg().querySelector('select[aria-label="Insert a function"]');
+  fxInput().setSelectionRange(0,fxInput().value.length);
+  fnPick.value='SUM';fnPick.dispatchEvent(new Event('change',{bubbles:true}));await wait(150);
+  ok('P3 the function picker inserts the name and a bracket',fxInput().value==='SUM(',fxInput().value);
+  dlg().querySelector('.fx-examples button').click();await wait(150);
+  ok('P3 an example fills the formula box',fxInput().value==='[Qty] * [Price]',fxInput().value);
+  ok('P3 an example that uses missing columns is flagged until edited',okBtn().disabled);
+  setText(fxInput(),'[Amount] * 2');setText(nameInput(),'Double');await wait(500);
+  okBtn().click();
+  await until(()=>S.steps.length===1,4000);await until(settled,3000);await wait(300);
+  ok('P3 adding the step records a formulaColumn step',S.steps[0].opId==='formulaColumn'&&S.steps[0].cfg.name==='Double'&&S.steps[0].cfg.expr==='[Amount] * 2',JSON.stringify(S.steps[0]));
+  ok('P3 the new column appears after the existing ones with the right values',curCols().join()==='Status,Amount,Order ID,Budget,Name,Double'&&(await cells('Double',3)).join()==='20,30,40',curCols().join());
+  ok('P3 the step card describes the formula',/Add column "Double" = \[Amount\] \* 2/.test(W.describeStep(S.steps[0])));
+  ok('P3 the recipe text uses the brief syntax and the v3 header',/^# weft recipe v3\nadd column "Double" = \[Amount\] \* 2$/.test(W.stepsToText(S.steps,null)),W.stepsToText(S.steps,null));
+
+  editStep(0);await until(()=>fxInput(),3000);await wait(150);
+  ok('P3 editing opens the same form with the formula filled in',fxInput().value==='[Amount] * 2'&&/Edit step 1/.test(dlg().querySelector('.dlg-title,.dlg-head h2,h2').textContent),fxInput().value);
+  setText(fxInput(),'[Amount] * 3');await wait(500);
+  okBtn().click();
+  await until(()=>S.steps[0].cfg.expr==='[Amount] * 3',4000);await until(settled,3000);await wait(300);
+  ok('P3 updating the step re-runs it',(await cells('Double',3)).join()==='30,45,60',(await cells('Double',3)).join());
+
+  await setPipeline([],0,{noUndo:true});await wait(300);
+  await openFormula();
+  setText(fxInput(),'[Amount] / ([Order ID] - 1000)');setText(nameInput(),'Ratio');await wait(500);
+  okBtn().click();
+  await until(()=>S.steps.length===1,4000);await until(settled,3000);await wait(400);
+  const meta=S.meta&&S.meta[0];
+  ok('P3 cells that fail show the error code and the step reports them',(await cells('Ratio',2))[0]==='#DIV/0!'&&meta&&/1 cell could not be calculated/.test(meta.warning||''),JSON.stringify(meta&&meta.warning));
+  const warnChip=document.querySelector('.sc-chips .chip.c-warn');
+  ok('P3 the step chip counts the errors',!!warnChip&&warnChip.textContent==='1 error',warnChip&&warnChip.textContent);
+  await setPipeline([],0,{noUndo:true});await wait(300);
+
+  await typeQ('=[Amount]>100');
+  ok('P3 a search that starts with = filters with the formula',S.view.n===count(r=>r.amount>100),S.view.n+' vs '+count(r=>r.amount>100));
+  ok('P3 a formula search shows no problem badge',document.getElementById('searchBadge').classList.contains('hidden'));
+  await typeQ('=[Amount]>[Budget]');
+  ok('P3 a formula search can compare two columns',S.view.n===count(r=>r.amount>r.budget),S.view.n+' vs '+count(r=>r.amount>r.budget));
+  await typeQ('=AND([Amount]>100,[Status]="paid")');
+  ok('P3 a formula search can use functions and text',S.view.n===count(r=>r.amount>100&&r.status==='paid'),S.view.n);
+  await typeQ('=LEN([Name])>3');
+  ok('P3 a formula search can measure text',S.view.n===count(r=>r.name.length>3),S.view.n);
+  const t0=toasts();
+  await typeQ('=FOO(');
+  ok('P3 a broken formula search shows the badge with the reason and keeps every row',!document.getElementById('searchBadge').classList.contains('hidden')&&S.view.n===60&&toasts()===t0,S.view.n+' '+document.getElementById('searchBadge').title);
+  await typeQ('=[Nope]>1');
+  ok('P3 a formula search on a missing column says so',/Column "Nope"/.test(document.getElementById('searchBadge').title)&&S.view.n===60,document.getElementById('searchBadge').title);
+  await typeQ('=[Amount]>100');
+  const nBefore=S.view.n,stBefore=S.steps.length;
+  Commands.run('view.searchToStep');
+  await until(()=>S.steps.length===stBefore+1,4000);await until(settled,3000);await wait(300);
+  const fs=S.steps[S.steps.length-1];
+  ok('P3 Make this a step keeps a formula search as a formula condition',fs.opId==='filterRows'&&W.cfgLeaves(fs.cfg)[0].col==='@formula'&&W.cfgLeaves(fs.cfg)[0].expr==='[Amount]>100',JSON.stringify(fs));
+  ok('P3 the step keeps the same rows and clears the search',S.view.n===nBefore&&S.search==='',S.view.n+' '+S.search);
+  ok('P3 the recipe with a formula condition writes v3',/^# weft recipe v3\n/.test(W.stepsToText(S.steps,null))&&/keep rows where formula \[Amount\]>100/.test(W.stepsToText(S.steps,null)),W.stepsToText(S.steps,null));
+  await doUndo();await wait(300);
+  ok('P3 undo removes the step and brings the formula search back',S.steps.length===stBefore&&S.search==='=[Amount]>100'&&S.view.n===nBefore,S.steps.length+' '+S.search);
+  await doRedo();await wait(300);
+  ok('P3 redo applies the step again',S.steps.length===stBefore+1&&S.view.n===nBefore);
+  await setPipeline([],0,{noUndo:true});await wait(300);
+  si().value='';S.search='';await refreshView();await wait(200);
+
+  Commands.run('rows.keepWhere');await until(()=>dlg()&&dlg().querySelector('.cond-row'),3000);await wait(150);
+  const colSel=dlg().querySelector('.cond-row select[aria-label="Column"]');
+  ok('P3 the filter builder offers Formula… as a column choice',Array.from(colSel.options).some(o=>o.value==='@formula'));
+  colSel.value='@formula';colSel.dispatchEvent(new Event('change',{bubbles:true}));await wait(200);
+  const fi=dlg().querySelector('.cond-row input[aria-label="Formula"]');
+  ok('P3 choosing Formula… swaps the comparison for a formula box',!!fi&&!dlg().querySelector('.cond-row select[aria-label="Comparison"]'));
+  ok('P3 an empty formula condition keeps Add disabled and explains',okBtn().disabled&&/Enter a formula/.test(dlg().querySelector('.pv-err').textContent),dlg().querySelector('.pv-err').textContent);
+  setText(fi,'FOO(1)');await wait(300);
+  ok('P3 a bad formula condition shows the reason under the box',/Unknown function FOO/.test(dlg().querySelector('.fb-fx-hint').textContent)&&okBtn().disabled,dlg().querySelector('.fb-fx-hint').textContent);
+  setText(fi,'[Amount] > [Budget]');await wait(600);
+  ok('P3 a valid formula condition enables Add and previews the rows kept',!okBtn().disabled&&/Keeps|Removes/.test(dlg().querySelector('.pv-line')?dlg().querySelector('.pv-line').textContent:''),dlg().querySelector('.pv-line')&&dlg().querySelector('.pv-line').textContent);
+  okBtn().click();
+  await until(()=>S.steps.length===1,4000);await until(settled,3000);await wait(300);
+  ok('P3 the filter step stores the formula and keeps the matching rows',W.cfgLeaves(S.steps[0].cfg)[0].col==='@formula'&&S.view.n===count(r=>r.amount>r.budget),S.view.n+' vs '+count(r=>r.amount>r.budget));
+
+  editStep(0);await until(()=>dlg()&&dlg().querySelector('.cond-row'),3000);await wait(200);
+  ok('P3 editing a formula condition shows the formula again',dlg().querySelector('.cond-row input[aria-label="Formula"]').value==='[Amount] > [Budget]');
+  closeAll();await wait(200);
+
+  await setPipeline([],0,{noUndo:true});await wait(300);
+  QueryBar.help();await wait(300);
+  ok('P3 the search syntax sheet explains formula searches',/formula/i.test(document.querySelector('.qb-table').textContent)&&/=\[amount\] > \[budget\]/.test(document.querySelector('.qb-table').textContent));
+  closeAll();await wait(200);
+
+  await openFormula();
+  setText(fxInput(),'UPPER([Name])');setText(nameInput(),'Shout');await wait(400);
+  okBtn().click();
+  await until(()=>S.steps.length===1,4000);await until(settled,3000);await wait(300);
+  await typeQ('shout:CAROL');
+  ok('P3 a query can name the formula column',S.view.n===count(r=>r.name==='carol smith'),S.view.n);
+  await typeQ('');
+  await openFormula();
+  setText(fxInput(),'LEN([Shout])');setText(nameInput(),'Len');await wait(400);
+  okBtn().click();
+  await until(()=>S.steps.length===2,4000);await until(settled,3000);await wait(300);
+  ok('P3 a later formula can read an earlier formula column',(await cells('Len',3)).join()==='5,3,11',(await cells('Len',3)).join());
+  await setPipeline([],0,{noUndo:true});await wait(300);
+  ok('P3 formula checks leave no stray dialogs or error toasts',!dlg()&&toasts()===0,String(toasts()));
+});
+})();

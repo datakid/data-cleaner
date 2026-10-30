@@ -14,6 +14,14 @@ const ExportDialog={
     const summary=h('span',{class:'grow-1'});
     const guardBox=h('label',{class:'check'},h('input',{type:'checkbox',checked:st.guard,onchange:e=>{st.guard=e.target.checked}}),h('span',{},'Formula protection',h('small',{style:{display:'block',color:'var(--ink-mute)',fontSize:'12px'}},'Prefixes cells starting with = + - @ so spreadsheets don\'t run them')));
     const excelBox=h('label',{class:'check'},h('input',{type:'checkbox',checked:st.excel,onchange:e=>{st.excel=e.target.checked}}),'Excel-friendly (BOM and Windows line endings)');
+    const hdrInput=h('input',{type:'checkbox',checked:st.header,'data-opt':'header',onchange:e=>{st.header=e.target.checked}});
+    const hdrBox=h('label',{class:'check'},hdrInput,'Include header row');
+    const syncHeader=()=>{
+      const md=st.format==='md';
+      hdrInput.disabled=md;hdrInput.checked=md?true:st.header;
+      hdrBox.classList.toggle('is-disabled',md);
+      hdrBox.title=md?'Markdown tables always have a header row.':''
+    };
     const refresh=()=>{
       clear(scopeBox);
       const fin=finalN();
@@ -22,7 +30,7 @@ const ExportDialog={
       if(rowSel)scopeBox.append(radio('scope','selected','Selected rows ('+fmtInt(Sel.rowCount())+')',null,st.scope==='selected',v=>st.scope=v));
       guardBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
       xlNote.classList.toggle('hidden',st.format!=='xlsx');allBox.classList.toggle('hidden',!(st.format==='xlsx'&&Tabs.list.length>1));excelBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
-      setName();
+      setName();syncHeader();
       const n=st.scope==='final'?finalN():st.scope==='view'?S.view.n:Sel.rowCount();
       summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?Sel.cols.size:(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
     };
@@ -33,11 +41,11 @@ const ExportDialog={
       h('div',{class:'field'},h('label',{},'Format'),fmtSel,xlNote,allBox),
       h('div',{class:'field'},h('span',{class:'flabel'},'Rows'),scopeBox),
       colSel?h('div',{class:'field'},h('span',{class:'flabel'},'Columns'),radio('cols','all','All columns',null,st.cols==='all',v=>st.cols=v),radio('cols','selected','Selected columns ('+Sel.cols.size+')',Sel.selectedCols().join(', '),st.cols==='selected',v=>st.cols=v)):null,
-      h('div',{class:'field'},h('span',{class:'flabel'},'Options'),h('label',{class:'check'},h('input',{type:'checkbox',checked:st.header,onchange:e=>{st.header=e.target.checked}}),'Include header row'),guardBox,excelBox),
+      h('div',{class:'field'},h('span',{class:'flabel'},'Options'),hdrBox,guardBox,excelBox),
       h('div',{class:'field'},h('label',{},'File name'),fname));
-    const build=()=>withFreshView(()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:st.format,options:{header:st.header,formulaGuard:st.guard,excel:st.excel}}));
+    const build=()=>withFreshView(()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:st.format,options:{header:st.format==='md'||st.header,formulaGuard:st.guard,excel:st.excel}}));
     const d=Dialog.open({title:'Export',body,foot:[summary,
-      h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>withFreshView(()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:(st.format==='csv'||st.format==='xlsx')?'tsv':st.format,options:{header:st.header,formulaGuard:st.guard}})));const sp=st.format==='csv'||st.format==='tsv'||st.format==='xlsx';const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(sp?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),'Copy'),
+      h('button',{class:'btn btn-secondary',type:'button',onclick:async()=>{const r=await Busy.run('Preparing copy',()=>withFreshView(()=>Engine.call('export',{scope:st.scope,viewKey:S.view.key,selection:Sel.payload(),columns:st.cols==='selected'?Sel.selectedCols():null,format:(st.format==='csv'||st.format==='xlsx')?'tsv':st.format,options:{header:st.format==='md'||st.header,formulaGuard:st.guard}})));const sp=st.format==='csv'||st.format==='tsv'||st.format==='xlsx';const ok=await copyText(r.text,'Copied '+plural(r.rows,'row')+(sp?'. Paste into any spreadsheet.':'.'));if(ok)d.close(true)}},icon('copy',16),'Copy'),
       h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{
         if(st.format==='xlsx'){if(st.allTabs&&Tabs.list.length>1){d.close(true);await Tabs.exportWorkbook(fname.value);return}try{const r=await Busy.run('Building workbook',build);await Xlsx.write(r,fname.value.trim()||'weft-export.xlsx',(S.file||'Weft').replace(/\.[^.]+$/,''));Toast.show('Downloaded '+plural(r.rows,'row')+' as an Excel workbook');d.close(true)}catch(e){if(!isQuiet(e))Toast.err('Could not build the workbook: '+e.message)}return}
         const r=await Busy.run('Building file',build);const mime={csv:'text/csv',tsv:'text/tab-separated-values',json:'application/json',jsoncols:'application/json',ndjson:'application/x-ndjson',md:'text/markdown',lines:'text/plain'}[st.format];downloadText(fname.value.trim()||'weft-export.'+EXT[st.format],r.text,mime);Toast.show('Downloaded '+plural(r.rows,'row')+' ('+fmtBytes(r.bytes)+')');d.close(true)}},icon('download',16),'Download')]});
@@ -237,7 +245,7 @@ const HelpSheet={
     const draw=()=>{
       clear(grid);const f=q.value.trim().toLowerCase();
       const extra={Grid:[['Move the cursor','Arrows'],['Extend a selection','Shift + arrows'],['Edit a cell','Enter or F2'],['Select a row','Space on a row, or click its number'],['Select rows in range','Shift+click row numbers'],['Toggle one row',MOD+'click a row number'],['Select the rows of a cell range','Shift+Space'],['Select the columns of a cell range',MOD+'Space'],['Rename a column','Double-click its header'],['Search rows','/'],['Close the top menu or dialog','Esc']]};
-      Object.keys(extra).forEach(g=>{const rows=extra[g].filter(x=>!f||(x[0]+x[1]).toLowerCase().indexOf(f)!==-1);if(rows.length)grid.append(h('div',{class:'help-sec'},h('h3',{},'In the grid'),rows.map(x=>h('div',{class:'help-row'},h('span',{},x[0]),h('span',{class:'kbd'},x[1])))))});
+      Object.keys(extra).forEach(g=>{const rows=extra[g].filter(x=>!f||(x[0]+x[1]).toLowerCase().indexOf(f)!==-1);if(rows.length)grid.append(h('div',{class:'help-sec'},h('h3',{},g==='Grid'?'In the grid':g),rows.map(x=>h('div',{class:'help-row'},h('span',{},x[0]),h('span',{class:'kbd'},x[1])))))});
       GROUPS.forEach(g=>{const cs=Commands.list.filter(c=>c.group===g&&Commands.visible(c)).filter(c=>!f||(c.title+' '+c.keywords.join(' ')+' '+(c.description||'')).toLowerCase().indexOf(f)!==-1);if(!cs.length)return;grid.append(h('div',{class:'help-sec'},h('h3',{},g),cs.map(c=>h('div',{class:'help-row'},h('span',{},c.title,c.description?h('small',{},c.description):null),c.shortcut?h('span',{class:'kbd'},fmtShortcut(c.shortcut)):null))))})
     };
     q.addEventListener('input',draw);draw();

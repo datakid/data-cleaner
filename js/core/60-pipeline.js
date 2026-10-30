@@ -22,7 +22,7 @@ W.statsChips=function(stats,n0,n1){
   if(stats.removedCols)out.push({kind:'remove',text:'−'+W.plural(stats.removedCols,'column')});
   if(stats.changed)out.push({kind:'rewrite',text:W.fmtInt(stats.changed)+' changed'});
   if(stats.moved)out.push({kind:'reshape',text:W.fmtInt(stats.moved)+' moved'});
-  if(stats.failed)out.push({kind:'warn',text:W.fmtInt(stats.failed)+' not converted'});
+  if(stats.failed)out.push({kind:'warn',text:W.fmtInt(stats.failed)+' '+(stats.failedLabel?(stats.failed===1?stats.failedLabel:stats.failedLabel+'s'):'not converted')});
   if(!out.length)out.push({kind:'none',text:'No change'});
   return out
 };
@@ -69,8 +69,15 @@ W.stepToLine=function(step){
   if(!d)return pre+'# unknown step '+step.opId;
   return pre+d.toDsl(step.cfg||{})
 };
+W.recipeNeedsV3=function(steps){
+  return steps.some(st=>{
+    const cfg=st.cfg||{};
+    if(st.opId==='formulaColumn'||cfg.tree)return true;
+    return(cfg.conditions||[]).some(c=>c.col==='@formula')
+  })
+};
 W.stepsToText=function(steps,source){
-  const lines=['# weft recipe v2'];
+  const lines=['# weft recipe v'+(W.recipeNeedsV3(steps)?3:2)];
   if(source)lines.push('@source '+JSON.stringify(source));
   for(const s of steps)lines.push(W.stepToLine(s));
   return lines.join('\n')
@@ -105,7 +112,13 @@ W.stepColumns=function(step){
   const cfg=step.cfg||{};const out=new Set();
   const add=v=>{if(Array.isArray(v))v.forEach(x=>{if(x&&x!=='*'&&x!=='@row')out.add(x)});else if(typeof v==='string'&&v&&v!=='*'&&v!=='@row')out.add(v)};
   ['column','columns','from','on','idColumns','valueColumns','keyColumn','valueColumn','groupBy','onLeft','keyColumns'].forEach(k=>add(cfg[k]));
-  if(cfg.conditions)cfg.conditions.forEach(c=>add(c.col));
+  if(cfg.conditions)cfg.conditions.forEach(c=>{if(c.col!=='@formula')add(c.col)});
+  if(cfg.tree)W.treeLeaves(cfg.tree).forEach(c=>{if(c.col!=='@formula')add(c.col)});
+  const exprs=[];
+  if(typeof cfg.expr==='string')exprs.push(cfg.expr);
+  W.cfgLeaves(cfg).forEach(c=>{if(c.col==='@formula')exprs.push(c.expr)});
+  exprs.forEach(x=>add(W.F.refsOf(x)));
+  add(cfg.after);
   if(cfg.keys)cfg.keys.forEach(k=>add(k.col));
   return Array.from(out)
 };
@@ -114,7 +127,11 @@ W.remapStep=function(step,dict){
   const m=v=>typeof v==='string'&&dict[v]?dict[v]:v;
   ['column','from','keyColumn','valueColumn'].forEach(k=>{if(cfg[k])cfg[k]=m(cfg[k])});
   ['columns','on','idColumns','valueColumns','groupBy','onLeft','keyColumns','compareColumns','order'].forEach(k=>{if(Array.isArray(cfg[k]))cfg[k]=cfg[k].map(m)});
-  if(cfg.conditions)cfg.conditions.forEach(c=>{c.col=m(c.col)});
+  const mleaf=l=>l.col==='@formula'?Object.assign({},l,{expr:W.F.remap(l.expr,dict)}):Object.assign({},l,{col:m(l.col)});
+  if(cfg.conditions)cfg.conditions=cfg.conditions.map(mleaf);
+  if(cfg.tree)cfg.tree=W.mapLeaves(cfg.tree,mleaf);
+  if(typeof cfg.expr==='string')cfg.expr=W.F.remap(cfg.expr,dict);
+  if(typeof cfg.after==='string')cfg.after=m(cfg.after);
   if(cfg.keys)cfg.keys.forEach(k=>{k.col=m(k.col)});
   if(Array.isArray(cfg.metrics))cfg.metrics=cfg.metrics.map(x=>{const p=W.parseMetric(x);return p&&p.column&&dict[p.column]?dict[p.column]+':'+p.fn:x});
   return s

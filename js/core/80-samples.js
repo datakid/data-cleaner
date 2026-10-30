@@ -42,6 +42,29 @@ function vendor(n,seed,junk){
   out.push(W.toDelimited(null,[['TOTAL','','','','$'+total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),'','','']],','));
   return out.join('\n')
 }
+function orders2025(){
+  const rnd=W.mulberry32(20250101);
+  const pick=a=>a[(rnd()*a.length)|0];
+  const p2=x=>String(x).padStart(2,'0');
+  const FIRST=['Priya','Tom','Elena','Marcus','Sana','Owen','Ines','Jacob','Mei','Liam','Noor','Ravi','Clara','Jonas'];
+  const LAST=['Shah','Rees','Vidal','Cole','Iqbal','Kato','Duarte','Lund','Chen','Byrne','Haddad','Menon','Fischer','Novak'];
+  const ST=['paid','Paid','PAID','pending','Pending','shipped','Shipped','refunded','REFUNDED','cancelled'];
+  const REG=['EMEA','AMER','APAC','LATAM'];
+  const NOTES=['gift wrap','call before delivery','VIP customer','address changed','late payment'];
+  const us=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const eu=v=>{const f=v.toFixed(2).split('.');return f[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+f[1]};
+  const cols=['order_id','customer','status','region','amount_usd','amount_eur','order_date','ship_date','notes'];
+  const rows=[];
+  for(let i=0;i<120;i++){
+    const usd=15+Math.pow(rnd(),2)*2400;
+    const month=1+((rnd()*12)|0),day=1+((rnd()*28)|0);
+    const ordered=Date.UTC(2025,month-1,day);
+    const shipped=rnd()<0.12?'':new Date(ordered+(1+((rnd()*6)|0))*86400000).toISOString().slice(0,10);
+    rows.push(['ORD-'+(2025000+i),pick(FIRST)+' '+pick(LAST),pick(ST),pick(REG),us(usd),eu(usd*0.92),'2025-'+p2(month)+'-'+p2(day),shipped,rnd()<0.18?pick(NOTES):'']);
+  }
+  rows.splice(61,0,rows[60].slice());
+  return W.toDelimited(cols,rows,',')
+}
 function serverLog(){
   const rnd=W.mulberry32(3141);
   const svc=['auth','payments','edge','search','billing','sync'];
@@ -116,6 +139,7 @@ function nested(){
 }
 W.SAMPLES={
   vendor:{title:'Vendor CSV with problems',badge:'CSV',tone:'rewrite',sub:'300 invoices · title rows, totals, repeated headers',file:'vendor-invoices.csv',make:()=>({text:vendor(300,20260906,true)})},
+  orders:{title:'Orders 2025',badge:'CSV',tone:'add',sub:'121 orders · mixed-case statuses, US and EU amounts, blanks, a duplicate',file:'orders-2025.csv',make:()=>({text:orders2025()})},
   log:{title:'Server log',badge:'LOG',tone:'structure',sub:'300 lines · timestamps, levels, key=value',file:'app.log',make:()=>({text:serverLog()})},
   web:{title:'Copied web table',badge:'HTML',tone:'reshape',sub:'10 rows · merged header and a spanning cell',file:'web-table',make:()=>({html:WEB_TABLE,text:''})},
   contacts:{title:'Contact list',badge:'KV',tone:'add',sub:'40 records · key: value blocks, gaps',file:'contacts.txt',make:()=>({text:contacts()})},

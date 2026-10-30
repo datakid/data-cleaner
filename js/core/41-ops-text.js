@@ -13,7 +13,7 @@ W.defineOp({
   describe:cfg=>'Trim whitespace in '+colsText(cfg.columns)+(cfg.collapse===false?' (keep inner spaces)':''),
   apply(t,cfg){
     W.needCols(t,cfg.columns);const cols=W.resolveCols(t,cfg.columns);const col=cfg.collapse!==false;
-    const ws=c=>c<=32||c===160||c===0x2007||c===0x202F||c===0xFEFF;
+    const ws=c=>c<=32||c===160||c===0x1680||(c>=0x2000&&c<=0x200A)||c===0x2028||c===0x2029||c===0x202F||c===0x205F||c===0x3000||c===0xFEFF;
     return W.rewriteCells(t,cols,v=>{
       const L=v.length;if(!L)return v;
       if(!ws(v.charCodeAt(0))&&!ws(v.charCodeAt(L-1))&&(!col||(v.indexOf('  ')===-1&&v.indexOf('\t')===-1&&v.indexOf('\u00A0')===-1)))return v;

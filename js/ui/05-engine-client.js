@@ -56,7 +56,7 @@ const Engine={
     if(failed.size){const names=ids.filter(id=>failed.has(id)).map(id=>{const t=tabs.find(x=>x.id===id);return t?t.name:id});Toast.err('Some tables could not be restored: '+names.join(', '))}
     await run('tableUse',{id:cur});
     const vf=S.vfilter||{};
-    S.view=await run('setView',{stateIdx:S.viewIdx,sort:S.sort,search:S.search,filter:vf.filter||null,rowIds:vf.rowIds||null});
+    S.view=await run('setView',{stateIdx:S.viewIdx,sort:S.sort,search:S.search,filter:vf.filter||null,rowIds:vf.rowIds||null,colFilters:ColFilter.active()});
     Grid.pages.clear()
   },
   post(type,payload){

@@ -18,6 +18,7 @@ W.posMap=function(t){
 };
 W.typesOf=function(t,ctx){if(!t._types)t._types=W.inferTypes(t,ctx);return t._types};
 
+W.valueKey=v=>v==null?'':String(v).trim();
 W.profile=function(t,col,ctx){
   const ci=t.cols.indexOf(col);
   if(ci===-1)return null;
@@ -29,7 +30,7 @@ W.profile=function(t,col,ctx){
   const loc=W.detectNumberLocale(sm);
   let wsIssues=0;
   for(let r=0;r<t.n;r++){
-    const raw=s(c[r]);const v=raw.trim();
+    const raw=s(c[r]);const v=W.valueKey(raw);
     if(!v){empty++;continue}
     if(raw!==v||/\s{2,}/.test(raw))wsIssues++;
     if(v.length<minL)minL=v.length;if(v.length>maxL)maxL=v.length;
@@ -42,6 +43,70 @@ W.profile=function(t,col,ctx){
   return{col,type,n:t.n,empty,filled:t.n-empty,distinct:freq.size,top,minLen:isFinite(minL)?minL:0,maxLen:maxL,wsIssues,
     number:type==='number'?{min:nn?nMin:null,max:nn?nMax:null,mean:nn?sum/nn:null,sum:nn?sum:null,unparsed:notNum,locale:loc}:null,
     date:type==='date'?{min:k2d(dMin),max:k2d(dMax),unparsed:notDate,ambiguous}:null}
+};
+
+W.HIST_BINS=20;
+W.histogram=function(t,col,ctx,bins){
+  const ci=t.cols.indexOf(col);
+  if(ci===-1)return null;
+  const type=W.typesOf(t,ctx)[ci];
+  if(type!=='number'&&type!=='date')return null;
+  const k=Math.max(1,Math.min(100,bins||W.HIST_BINS));
+  const c=t.data[ci];
+  const sm=[];if(type==='number')for(let r=0;r<t.n&&sm.length<300;r++){const v=s(c[r]).trim();if(v)sm.push(v)}
+  const loc=type==='number'?W.detectNumberLocale(sm):'us';
+  const vals=new Float64Array(t.n);
+  let m=0,empty=0,skipped=0,min=Infinity,max=-Infinity;
+  const order={order:ctx&&ctx.dateOrder,yearPivot:ctx&&ctx.yearPivot};
+  for(let r=0;r<t.n;r++){
+    const v=W.valueKey(c[r]);
+    if(!v){empty++;continue}
+    let x;
+    if(type==='number'){const p=W.parseNumber(v,{locale:loc});x=p?p.value:NaN}
+    else{const d=W.parseDate(v,order);x=d?Date.UTC(d.y,d.mo-1,d.d)/86400000:NaN}
+    if(!isFinite(x)){skipped++;continue}
+    vals[m++]=x;if(x<min)min=x;if(x>max)max=x
+  }
+  const out={col,type,locale:loc,total:m,empty,skipped,min:m?min:null,max:m?max:null,bins:[],maxCount:0};
+  if(!m)return out;
+  const isDate=type==='date';
+  const iso=x=>new Date(x*86400000).toISOString().slice(0,10);
+  const numText=x=>{const q=String(Number(x.toPrecision(12)));return loc==='eu'?q.replace('.',','):q};
+  const text=x=>isDate?iso(x):numText(x);
+  let edges=[];
+  if(min===max){edges=[min,max]}
+  else if(isDate){
+    const span=max-min+1,w=Math.max(1,Math.ceil(span/k));
+    for(let e=min;e<max+1;e+=w)edges.push(e);
+    edges.push(max+1)
+  }else{
+    const w=(max-min)/k;
+    edges.push(min);
+    for(let i=1;i<k;i++){const e=Number((min+i*w).toPrecision(10));if(e>edges[edges.length-1]&&e<max)edges.push(e)}
+    edges.push(max)
+  }
+  const nb=edges.length-1;
+  const counts=new Array(nb).fill(0);
+  if(min===max)counts[0]=m;
+  else{
+    const w=isDate?edges[1]-edges[0]:(max-min)/k;
+    for(let r=0;r<m;r++){
+      const v=vals[r];
+      let i=Math.floor((v-min)/w);
+      if(i<0)i=0;if(i>nb-1)i=nb-1;
+      while(i>0&&v<edges[i])i--;
+      while(i<nb-1&&v>=edges[i+1])i++;
+      counts[i]++
+    }
+  }
+  for(let i=0;i<nb;i++){
+    const last=i===nb-1;
+    const hi=last?max:edges[i+1];
+    const shown=isDate&&!last?hi-1:hi;
+    out.bins.push({lo:text(edges[i]),hi:text(hi),shown:text(shown),last,count:counts[i]});
+    if(counts[i]>out.maxCount)out.maxCount=counts[i]
+  }
+  return out
 };
 
 function findJunkTable(t){

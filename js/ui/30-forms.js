@@ -22,9 +22,10 @@ function StepForm(opId,cfg,opts){
     };
     draw();return wrap
   }
-  function colSelect(key,source,allowAny){
+  function colSelect(key,source,allowAny,blankLabel){
     const list=source||cols;const v=getPath(f.cfg,key);
     const s=h('select',{class:'select',onchange:()=>{setPath(f.cfg,key,s.value);changed()}});
+    if(blankLabel)s.appendChild(h('option',{value:'',selected:!v},blankLabel));
     if(allowAny)s.appendChild(h('option',{value:'*'},'Any column'));
     list.forEach(c=>s.appendChild(h('option',{value:c,selected:c===v},c)));
     if(v&&list.indexOf(v)===-1&&v!=='*')s.appendChild(h('option',{value:v,selected:true},v+' (missing)'));
@@ -35,7 +36,8 @@ function StepForm(opId,cfg,opts){
     const v=getPath(f.cfg,fd.key);
     switch(fd.type){
       case'columns':ctl=colChips(fd.key,fd.allowAll);break;
-      case'column':ctl=colSelect(fd.key);ctl.id=id;break;
+      case'column':ctl=colSelect(fd.key,null,false,fd.optional?'At the end':null);ctl.id=id;break;
+      case'formula':ctl=FormulaField(f,cols,fd,changed,id);break;
       case'text':ctl=h('input',{class:'input'+(/pattern|find|delim|joiner/i.test(fd.key)?' mono':''),id,value:v==null?'':v,placeholder:fd.placeholder||'',oninput:e=>{setPath(f.cfg,fd.key,e.target.value);changed()}});break;
       case'number':ctl=h('input',{class:'input',id,type:'number',min:fd.oneBased?'1':'0',value:v==null?0:(fd.oneBased?(+v)+1:v),style:{width:'120px'},oninput:e=>{let n=parseInt(e.target.value,10);if(isNaN(n))n=0;setPath(f.cfg,fd.key,fd.oneBased?Math.max(0,n-1):n);changed()}});break;
       case'checkbox':ctl=h('label',{class:'check'},h('input',{type:'checkbox',checked:v!==false&&!!v,onchange:e=>{setPath(f.cfg,fd.key,e.target.checked);changed()}}),fd.label);break;
@@ -59,22 +61,96 @@ function StepForm(opId,cfg,opts){
   return f
 }
 
+const FX_EXAMPLES=[
+  ['[Qty] * [Price]','Multiply two columns'],
+  ['IF([Amount] > 100, "Large", "Small")','Label rows'],
+  ['UPPER(LEFT([Name], 1)) & MID([Name], 2, 99)','Capitalise a name'],
+  ['[End] - [Start]','Days between dates']
+];
+function caretText(src,e){
+  const pos=Math.max(0,Math.min(e.pos,src.length)),end=Math.max(pos+1,Math.min(e.end==null?pos+1:e.end,Math.max(src.length,pos+1)));
+  return src+'\n'+' '.repeat(pos)+'^'+'~'.repeat(Math.max(0,end-pos-1))
+}
+function FormulaField(f,cols,fd,changed,id){
+  const wrap=h('div',{class:'fx-field'});
+  const ta=h('textarea',{class:'input mono fx-input',id,rows:'3',spellcheck:false,autocomplete:'off',autocapitalize:'off','aria-describedby':id+'-msg',placeholder:fd.placeholder||'[Qty] * [Price]'});
+  ta.value=String(getPath(f.cfg,fd.key)||'');
+  const caret=h('pre',{class:'fx-caret hidden','aria-hidden':'true'});
+  const msg=h('div',{class:'fx-msg',id:id+'-msg',role:'status'});
+  const colPick=h('select',{class:'select fx-pick','aria-label':'Insert a column'},h('option',{value:''},'Insert column…'),cols.map(c=>h('option',{value:c},c)));
+  const fnPick=h('select',{class:'select fx-pick','aria-label':'Insert a function'},h('option',{value:''},'Insert function…'),W.F.NAMES.map(n=>h('option',{value:n},n)));
+  const sync=()=>{
+    const src=ta.value;
+    setPath(f.cfg,fd.key,src);
+    clear(msg);caret.classList.add('hidden');ta.removeAttribute('aria-invalid');
+    if(!src.trim())return;
+    const ck=W.F.check(src,cols);
+    if(ck.errors.length){
+      const e=ck.errors[0];
+      caret.textContent=caretText(src,e);caret.classList.remove('hidden');ta.setAttribute('aria-invalid','true')
+    }else if(ck.missing.length){
+      ta.setAttribute('aria-invalid','true');
+      msg.textContent='There is no column called "'+ck.missing[0]+'".'
+    }else msg.textContent=ck.refs.length?'Uses '+ck.refs.join(', ')+'.':'Uses no columns.'
+  };
+  const put=text=>{
+    const a=ta.selectionStart==null?ta.value.length:ta.selectionStart,b=ta.selectionEnd==null?a:ta.selectionEnd;
+    ta.value=ta.value.slice(0,a)+text+ta.value.slice(b);
+    const at=a+text.length;
+    ta.setSelectionRange(at,at);ta.focus();sync();changed()
+  };
+  ta.addEventListener('input',()=>{
+    if(/[\r\n]/.test(ta.value)){const at=ta.selectionStart;ta.value=ta.value.replace(/[\r\n]+/g,' ');ta.setSelectionRange(at,at)}
+    sync();changed()
+  });
+  ta.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation()}});
+  colPick.addEventListener('change',()=>{const v=colPick.value;colPick.value='';if(v)put('['+v.replace(/\]/g,']]')+']')});
+  fnPick.addEventListener('change',()=>{const v=fnPick.value;fnPick.value='';if(v)put(v+'(')});
+  const ex=h('div',{class:'fx-examples'},h('span',{class:'hint'},'Try:'),FX_EXAMPLES.map(x=>h('button',{type:'button',class:'btn btn-xs btn-ghost',title:x[1],onclick:()=>{ta.value=x[0];sync();changed();ta.focus()}},x[0])));
+  wrap.append(ta,caret,msg,h('div',{class:'fx-picks'},colPick,fnPick),ex);
+  sync();
+  return wrap
+}
+
 function FilterBuilder(f,cols,types,changed){
-  const c=f.cfg;c.conditions=c.conditions||[];c.match=c.match||'all';c.mode=c.mode||'remove';
+  const c=f.cfg;if(!c.tree){c.conditions=c.conditions||[];c.match=c.match||'all'}c.mode=c.mode||'remove';
   const wrap=h('div',{class:'filter-builder'});
   const typeOf=col=>col==='*'?'text':(types[cols.indexOf(col)]||'text');
   function opsFor(col){const t=typeOf(col);return W.COND_OPS.filter(o=>t==='text'?(o[2]!=='cmp'&&o[2]!=='range'):true).concat(t==='text'?W.COND_OPS.filter(o=>o[2]==='cmp'||o[2]==='range'):[])}
+  function drawTree(){
+    clear(wrap);
+    const seg=h('div',{class:'seg keeprm',role:'group','aria-label':'Keep or remove'},['keep','remove'].map(v=>h('button',{type:'button','data-v':v,'aria-pressed':String(c.mode===v),onclick:()=>{c.mode=v;drawTree();changed()}},v==='keep'?'Keep':'Remove')));
+    wrap.append(h('div',{class:'fb-top'},seg,h('span',{},'rows where')),
+      h('div',{class:'fb-tree mono','data-tree':'1',text:W.describeTree(c.tree)}),
+      h('p',{class:'dlg-note'},'These conditions use groups (and, or, not), so they are shown as text. To change them, use "Edit as text" in the recipe panel, or remove this step and filter again with the search box or the column filters.'))
+  }
   function draw(){
+    if(c.tree){drawTree();return}
     clear(wrap);
     const seg=h('div',{class:'seg keeprm',role:'group','aria-label':'Keep or remove'},['keep','remove'].map(v=>h('button',{type:'button','data-v':v,'aria-pressed':String(c.mode===v),onclick:()=>{c.mode=v;draw();changed()}},v==='keep'?'Keep':'Remove')));
     const m=h('select',{class:'select',onchange:e=>{c.match=e.target.value;changed()}},h('option',{value:'all',selected:c.match==='all'},'all'),h('option',{value:'any',selected:c.match==='any'},'any'));
     wrap.append(h('div',{class:'fb-top'},seg,h('span',{},'rows where'),m,h('span',{},'of these are true')));
     c.conditions.forEach((cd,i)=>{
-      const colS=h('select',{class:'select','aria-label':'Column',onchange:e=>{cd.col=e.target.value;const ok=opsFor(cd.col).some(o=>o[0]===cd.op);if(!ok)cd.op='contains';draw();changed()}},h('option',{value:'*',selected:cd.col==='*'},'Any column'),cols.map(x=>h('option',{value:x,selected:x===cd.col},x)));
-      const opS=h('select',{class:'select','aria-label':'Comparison',onchange:e=>{cd.op=e.target.value;draw();changed()}},opsFor(cd.col).map(o=>h('option',{value:o[0],selected:o[0]===cd.op},o[1])));
-      const k=W.COND_KIND[cd.op];const vals=h('div',{class:'vals'});
+      const isFx=cd.col==='@formula';
+      const colS=h('select',{class:'select','aria-label':'Column',onchange:e=>{
+        const was=cd.col==='@formula';
+        cd.col=e.target.value;
+        if(cd.col==='@formula'){cd.op='formula';cd.expr=cd.expr||'';delete cd.value;delete cd.value2;delete cd.values}
+        else{
+          if(was){cd.op='contains';delete cd.expr;cd.value=''}
+          const ok=opsFor(cd.col).some(o=>o[0]===cd.op);if(!ok)cd.op='contains'
+        }
+        draw();changed()
+      }},h('option',{value:'*',selected:cd.col==='*'},'Any column'),cols.map(x=>h('option',{value:x,selected:x===cd.col},x)),h('option',{value:'@formula',selected:isFx},'Formula…'));
+      const opS=isFx?h('span',{class:'hint fb-fx-label'},'is true'):h('select',{class:'select','aria-label':'Comparison',onchange:e=>{cd.op=e.target.value;draw();changed()}},opsFor(cd.col).map(o=>h('option',{value:o[0],selected:o[0]===cd.op},o[1])));
+      const k=isFx?'formula':W.COND_KIND[cd.op];const vals=h('div',{class:'vals'});
       const ph=typeOf(cd.col)==='date'?'e.g. 2025-01-31':typeOf(cd.col)==='number'?'e.g. 100':'value';
-      if(k==='text'||k==='cmp')vals.append(h('input',{class:'input'+(cd.op==='matches'?' mono':''),'aria-label':'Value',value:cd.value||'',placeholder:cd.op==='matches'?'pattern, e.g. ^ref \\d+$':ph,oninput:e=>{cd.value=e.target.value;changed()}}));
+      if(k==='formula'){
+        const inp=h('input',{class:'input mono','aria-label':'Formula',value:cd.expr||'',placeholder:'[Amount] > [Budget]',spellcheck:false,oninput:e=>{cd.expr=e.target.value.replace(/[\r\n]+/g,' ');const ck=cd.expr.trim()?W.F.check(cd.expr,cols):null;hint.textContent=ck&&ck.errors.length?ck.errors[0].message:(ck&&ck.missing.length?'There is no column called "'+ck.missing[0]+'".':'');inp.toggleAttribute('aria-invalid',!!hint.textContent);changed()}});
+        const hint=h('div',{class:'fx-msg fb-fx-hint',role:'status'});
+        vals.append(inp,hint)
+      }
+      else if(k==='text'||k==='cmp')vals.append(h('input',{class:'input'+(cd.op==='matches'?' mono':''),'aria-label':'Value',value:cd.value||'',placeholder:cd.op==='matches'?'pattern, e.g. ^ref \\d+$':ph,oninput:e=>{cd.value=e.target.value;changed()}}));
       else if(k==='range')vals.append(h('input',{class:'input','aria-label':'From',value:cd.value||'',placeholder:ph,oninput:e=>{cd.value=e.target.value;changed()}}),h('span',{class:'hint'},'and'),h('input',{class:'input','aria-label':'To',value:cd.value2||'',placeholder:ph,oninput:e=>{cd.value2=e.target.value;changed()}}));
       else if(k==='list')vals.append(h('input',{class:'input','aria-label':'Values',value:(cd.values||[]).join(', '),placeholder:'comma-separated values',oninput:e=>{cd.values=e.target.value.split(',').map(s=>s.trim()).filter(Boolean);changed()}}));
       else vals.append(h('span',{class:'hint'},'No value needed'));
@@ -161,7 +237,7 @@ function stepDialog(opId,cfg,opts){
       clear(body);
       form=StepForm(opId,form?form.cfg:cfg,{cols,types,onChange:c=>{const e=form.validate();err.textContent=e||'';okBtn.disabled=!!e;if(!e)pv.update(opId,c,stateIdx)}});
       form.rerender=()=>build();
-      body.append(opts.note?h('p',{class:'dlg-note'},opts.note):null,form.el,err,pv.el);
+      if(opts.note)body.append(h('p',{class:'dlg-note'},opts.note));body.append(form.el,err,pv.el);
       const e=form.validate();err.textContent=e||'';okBtn.disabled=!!e;if(!e)pv.update(opId,form.cfg,stateIdx)
     };
     const okBtn=h('button',{class:'btn btn-primary',type:'button',onclick:()=>{const e=form.validate();if(e){err.textContent=e;return}close(form.cfg)}},opts.editIndex!=null?'Update step':'Add step');

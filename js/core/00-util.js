@@ -1,7 +1,7 @@
 (function(G){
 'use strict';
 const W=G.WeftCore||(G.WeftCore={});
-W.version='2.6.1';
+W.version='3.0.0';
 W.OPS=W.OPS||{};
 W.OP_ORDER=W.OP_ORDER||[];
 
@@ -98,6 +98,13 @@ W.colsDsl=function(cols){return(!cols||!cols.length||cols[0]==='*')?'*':cols.map
 W.valDsl=function(v){v=String(v==null?'':v);return/^-?\d+(\.\d+)?$/.test(v)?v:W.q(v)};
 W.reDsl=function(src,cs){return'/'+String(src).replace(/\//g,'\\/')+'/'+(cs?'':'i')};
 
+const COND_LEAD=['where','and','or','not'];
+function formulaAllowed(toks){
+  const last=toks[toks.length-1];
+  if(!last)return false;
+  if(last.t==='word')return COND_LEAD.indexOf(last.v.toLowerCase())!==-1;
+  return last.t==='p'&&last.v==='('
+}
 W.lex=function(s){
   const toks=[];let i=0;const n=s.length;
   while(i<n){
@@ -136,7 +143,12 @@ W.lex=function(s){
     if(c==='('||c===')'||c===','){toks.push({t:'p',v:c});i++;continue}
     let j=i;
     while(j<n&&!/[\s"(),]/.test(s[j]))j++;
-    toks.push({t:'word',v:s.slice(i,j)});i=j
+    const wd=s.slice(i,j);
+    if(wd.toLowerCase()==='formula'&&formulaAllowed(toks)){
+      const sc=W.F.scanPrefix(s,j);
+      toks.push({t:'formula',v:sc.expr});i=sc.end;continue
+    }
+    toks.push({t:'word',v:wd});i=j
   }
   return toks
 };

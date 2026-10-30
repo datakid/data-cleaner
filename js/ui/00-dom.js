@@ -30,6 +30,7 @@ function append(el,c){
 function clear(el){while(el.firstChild)el.removeChild(el.firstChild);return el}
 
 const ICON_PATHS={
+  pin:'<path d="M9 4h6l-1 5 3 3v1.5H7V12l3-3z"/><path d="M12 13.5V20"/>',
   search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   command:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9l6 6M15 9l-6 6" opacity="0"/><path d="M9.5 8v8M9.5 12l5-4M11.5 10.5l3.5 5.5"/>',
   trash:'<path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.5h9l1-12.5"/>',
