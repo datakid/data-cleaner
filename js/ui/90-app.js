@@ -75,6 +75,9 @@ function onKey(e){
   const ed=isEditable(e.target);
   if(mod&&key==='k'){e.preventDefault();if(Palette.el)Palette.close();else Palette.open();return}
   if(key==='Escape'){if(Layers.stack.length){e.preventDefault();Layers.closeTop();return}if(!ed&&S.vfilter){VFilter.clear();return}if(!ed&&Sel.kind!=='none'){Sel.clear();return}return}
+  if(key==='F3'&&S.loaded){e.preventDefault();Find.step(e.shiftKey?-1:1);return}
+  if(mod&&e.shiftKey&&key==='l'&&S.loaded){e.preventDefault();Commands.run('view.funnels');return}
+  if(e.altKey&&!e.shiftKey&&!mod&&key==='ArrowDown'&&S.loaded&&!Layers.stack.length&&!ed){e.preventDefault();ColFilter.openCursor();return}
   if(ed)return;
   if(Layers.stack.length&&!Layers.has('halo'))return;
   if(key==='?'&&!mod){e.preventDefault();HelpSheet.open();return}
@@ -102,9 +105,9 @@ async function boot(){
   document.addEventListener('keydown',onKey,true);
   document.addEventListener('mousedown',e=>{if(Menus.el&&!e.target.closest('.menu')&&!e.target.closest('[aria-haspopup="menu"]'))Menus.close();if(Halo.el&&!e.target.closest('.halo'))Halo.close()});
   window.addEventListener('beforeunload',e=>{if(S.loaded&&S.steps.length&&S.sessionDirty){e.preventDefault();e.returnValue=''}});
-  Grid.init();Inspector.init();Panels.init();Input.init();initThemeSwitch();
+  Grid.init();QueryBar.init();ColFilter.applyFunnels();Inspector.init();Panels.init();Input.init();initThemeSwitch();
   Recipes.migrate();
-  App.renderExamples();App.renderSession();
+  App.renderExamples();App.renderSession();WhatsNew.render();{const v=$('#appVersion');if(v)v.textContent='Version '+W.version}
   $('#cmdHint').textContent=MOD+'K';$('#searchHint').textContent=MOD+'F';$('#pasteHint').textContent='or press '+MOD+'V anywhere';
   $('#btnCommands').addEventListener('click',()=>Palette.open());
   $('#stressLink').addEventListener('click',()=>Perf.run());
@@ -119,7 +122,7 @@ async function boot(){
   $('#scrubStart').addEventListener('click',()=>setViewIdx(0));$('#scrubEnd').addEventListener('click',()=>setViewIdx(S.steps.length));
   const si=$('#searchInput');
   si.addEventListener('input',debounce(()=>{S.search=si.value;refreshView()},150));
-  si.addEventListener('keydown',e=>{if(e.key==='Escape'&&si.value){e.preventDefault();e.stopPropagation();si.value='';S.search='';refreshView()}else if(e.key==='Enter'){e.preventDefault();Grid.sc.focus()}});
+  si.addEventListener('keydown',e=>{if(e.key==='Escape'&&si.value){e.preventDefault();e.stopPropagation();si.value='';S.search='';refreshView()}else if(e.key==='Enter'){e.preventDefault();if(S.search.trim())Find.step(e.shiftKey?-1:1);else Grid.sc.focus()}});
   $('#btnSearchStep').addEventListener('click',()=>Commands.run('view.searchToStep'));
   $('#pillLocal').addEventListener('click',()=>Toast.show('Your data never leaves this browser tab. Network access is blocked by this page\'s security policy.'));
   S.dateOrder=Prefs.get('dateOrder','mdy');

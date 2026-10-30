@@ -464,6 +464,7 @@ G.runCoreTests=function(){
     E.handle('tableReset',{id:'t1'})
   });
   test('reset tables',()=>{W.Engine.handle('tableReset',{id:'t1'})});
+  (G.WEFT_TEST_MODULES||[]).forEach(m=>m({test,eq,ok,W,results}));
   return results
 };
 })(typeof self!=='undefined'?self:globalThis);

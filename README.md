@@ -14,10 +14,88 @@ This is a rebuild of *Sift*. It runs entirely in the browser: no accounts, no up
 | `file://` | Opening `index.html` straight from disk works, but the background worker cannot start (the engine runs on the main thread) and the browser blocks the font files. Serve the folder over http for the full experience. |
 | `index.html?theme=dark` / `?theme=light` / `?theme=system` | Forces a theme for this visit (doesn't change the saved choice) |
 | `index.html?contrast=high` / `?contrast=normal` | Forces a contrast level for this visit |
-| `tests.html` | Engine tests: 321 checks (every step type's examples, recipe-text round-trips, 23 paste fixtures, 24 multi-table fixtures, parser parity, sort stability, suggestions scans, date shapes, search index, isolated tables) |
-| `ui-test.html` | Runs the full UI end to end (119 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs and restore) and logs results to the console |
-| `perf-test.html` | Runs the 200,000-row performance test automatically and logs the timings |
+| `tests.html` | Engine tests: 1,127 checks (the 321 from 2.6.2, the 174 golden v2 recipe checks, and the new bug, query, condition-tree, column-filter, cache, formula and polish checks, including a 500-iteration query parity fuzz on three seeds) |
+| `ui-test.html` | Runs the full UI end to end (314 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs, restore, the query bar, column filters, Find and Replace, formulas, pinned columns, the histogram and the what's new card) and logs results to the console |
+| `perf-test.html` | Runs the 200,000-row performance test automatically (now including queries, distinct values, find next and formulas) and logs the timings |
 | `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
+
+## What's new in 3.0
+Weft 3.0 lets you find, filter and compute on specific columns the way you would in a spreadsheet, and every one of those changes is still a visible, undoable step. Recipes written for 2.x load and run with identical output, and their text is unchanged. A recipe only gets the `# weft recipe v3` header when it uses an or-group, a not, or a formula.
+
+### Weft Query (the search box)
+Type plain words as before, or aim at a column. Resolved column names are underlined in the box, mistakes show an amber badge with the reason, and a `?` button opens the cheat sheet (also in Commands as "Search syntax").
+
+| Type | Meaning |
+|---|---|
+| `paid` | any column contains "paid" |
+| `paid card` | contains "paid" and "card" |
+| `"new york"` | any column contains the phrase |
+| `status:paid` | the Status column contains "paid" |
+| `status:=paid` | Status equals "paid" (trimmed, ignoring case) |
+| `status:!=paid` | Status is not "paid" |
+| `-status:paid`, `NOT status:paid` | leave those rows out |
+| `amount>100`, `amount>=100`, `amount<0` | a numeric or date comparison that reads the column's own format |
+| `amount:100..500` | between, including both ends |
+| `date>2025-01-01`, `date:2025-01-01..2025-03-31` | dates, using your date order |
+| `region:(emea\|apac)` | is one of |
+| `status:=""`, `status:!=""` | is empty, is not empty |
+| `notes:/^ref \d+$/i` | a pattern |
+| `"order id":123`, `[order id]:123` | column names with spaces |
+| `status:paid OR status:pending` | either (OR, AND and NOT are operators only in capitals) |
+| `(a:x OR b:y) -c:z` | grouping |
+| `=[amount] > [budget]` | a formula that compares columns |
+
+If the text before a colon or comparison is not a column, the whole thing is searched as ordinary text, so `10:30` and `http://example.com` keep working. Typing the start of a column name suggests columns; after `column:` it suggests the 20 most common values with counts. Free words highlight in every column, aimed words only in their own column. **Make this a step** turns what you typed into a "keep rows where…" step with exactly the same rows, and clears the search.
+
+### Column filters
+Every header has a funnel, like Excel's AutoFilter. It opens a panel with Sort A to Z and Z to A, a value checklist with counts and a Blanks entry, and type-specific conditions: text (equals, begins with, contains, matches pattern and their opposites), numbers (=, ≠, >, ≥, <, ≤, between, top N, bottom N, above or below average) and dates (before, after, between, this month, last month, this year, last N days). The value list for a column ignores that column's own filter, as in Excel. A bar above the grid shows what is filtered with a remove button on each chip, **Clear all filters** and **Make this a step**. Relative choices such as "last 7 days" or "top 10" are turned into fixed values when you make them a step, and the step says "(fixed on …)". `Alt+↓` opens the funnel for the cursor column and `Ctrl+Shift+L` shows or hides the funnels. On a phone the panel is a bottom sheet. Filters belong to their tab and disappear, with a message, if a step removes their column.
+
+### Find and Replace
+With the search box focused, `Enter` and `Shift+Enter` (or `F3` and `Shift+F3` anywhere) move to the next or previous matching cell, with an outline and a count such as "3 of 128 matches". `Ctrl+H` opens Find and Replace: Find, Replace with, Within (all columns, chosen columns or the selection), Match case, Whole cell and Use pattern, with a live "N cells in M columns will change" preview of the first five before and after. Replace creates the ordinary find and replace step. Within a selection it records the cells themselves, because selections are not portable between files, and the dialog says so.
+
+### Formulas
+**Add column from formula…** (Commands, the Columns menu and the column header menu) makes a new column from an Excel-style formula such as `[Qty] * [Price]` or `IF([Amount] >= 1000, "Large", "Small")`. The dialog checks as you type, puts a caret under the problem, and offers column and function pickers and examples. Forty-eight functions are available: IF, IFS, IFERROR, AND, OR, NOT, ISBLANK, ISNUMBER, COALESCE, LEN, LEFT, RIGHT, MID, UPPER, LOWER, PROPER, TRIM, CONCAT, TEXTJOIN, SUBSTITUTE, REPLACE, FIND, SEARCH, CONTAINS, STARTSWITH, ENDSWITH, VALUE, TEXT, ROUND, ROUNDUP, ROUNDDOWN, ABS, MIN, MAX, SUM, AVERAGE, MOD, INT, DATE, YEAR, MONTH, DAY, WEEKDAY, DATEDIF, EDATE, REGEXMATCH, REGEXEXTRACT and REGEXREPLACE. A cell that cannot be calculated shows `#VALUE!`, `#DIV/0!`, `#REF!`, `#NAME?`, `#NUM!` or `#N/A`, and the step warns with the first three examples. `TODAY`, `NOW` and `RAND` are refused so a recipe gives the same answer every time. The recipe text line is `add column "Total" = [Qty] * [Price]`, and a formula can also be a condition: `keep rows where formula [Amount] > [Budget]`. Formulas are read by Weft's own parser; nothing is evaluated as program code.
+
+### Also new
+- **Pin column:** in the column header menu. Pinned columns stay at the left while you scroll sideways, and the choice is remembered for that file name.
+- **Distribution:** the Column tab shows a 20-bar chart for number and date columns. Click a bar to filter the column to that range, click it again to clear.
+- **Selection statistics:** with a column selected, the status bar shows Count, Sum, Avg, Min and Max, and says "of filtered rows" when a search or filter is active.
+- **Example "Orders 2025":** 121 orders with mixed-case statuses, US and European amounts, dates, blanks and one duplicate, made to try filters and formulas on.
+- **What's new card:** the start screen shows four things to try, each with a Try it button that opens the example. Help ▸ What's new brings it back.
+
+### Bug fixes
+- **B1:** a quick filter on a row's whole text now hides the same rows as the matching step.
+- **B2:** the first search, later searches, the highlighter and a step now agree on capital I with a dot, ß, long s and Greek final sigma, because they share one normaliser.
+- **B3:** the count in the Column tab and the rows it selects use one shared way of grouping values. This could not be reproduced as a difference, so a shared key and a test were added.
+- **B4:** rows no longer stay blank after fast typing or sorting evicts the engine's view; the grid refreshes once, or tells you.
+- **B5:** "any column" comparisons read each column in its own number or date format, including European numbers.
+- **B6:** changing the date order recomputes only the open table; the others are recomputed when you open them.
+- **B7:** the Markdown export always writes a header row, and the header option is greyed out with the reason.
+- **B8:** phrases such as `"new york"` can be searched exactly.
+- **B9:** "Make this a step" from a search keeps exactly the rows the view showed, checked by a 500-iteration fuzz on three seeds.
+- **B10:** the query bar, autocomplete, funnel panel, Find and Replace and the formula form were looked at in Light, Dark and High contrast and on a 390 px phone width, and nothing overflows. The older screens were not re-inspected (see Not done yet).
+
+### Measured performance
+200,000 rows (18.7 MB), background engine, headless Chromium on a shared machine. The 2.6.2 column is the baseline run recorded before any 3.0 change (`docs/v3-baseline.md`); the 3.0 column is one run of `perf-test.html`. Times vary by about ±30% between runs, so five alternating runs of each version were also compared: free-text search had a median of 64 ms on 2.6.2 and 46 ms on 3.0, and read, trim, sort, remove and undo were within the noise of each other.
+
+| Action | 2.6.2 | 3.0 | Budget |
+|---|---|---|---|
+| Read and detect | 502 ms | 598 ms | 3 s |
+| Trim all columns | 282 ms | 322 ms | 0.6 s |
+| Sort as a step | 374 ms | 229 ms | 0.9 s |
+| Remove rows | 117 ms | 81 ms | 0.9 s |
+| Free-text search, first run | 83 ms | 56 ms | 0.25 s |
+| Fetch a page while scrolling | 21 ms | 6 ms | 0.1 s |
+| Undo | 26 ms | 26 ms | 0.6 s |
+| Query `amount>500 AND payment_status:paid`, first run | n/a | 146 ms | 0.25 s |
+| Same query again | n/a | 42 ms | 0.06 s |
+| Query with a pattern | n/a | 50 ms | 0.25 s |
+| Distinct values of a text column | n/a | 52 ms | 0.15 s |
+| Find the next match | n/a | 3 ms | 0.05 s |
+| Formula column `ROUND(amount * 1.15, 2)` | n/a | 326 ms | 0.4 s |
+| Formula search `=[amount] > 500`, first run | n/a | 77 ms | 0.6 s |
+
+Page freezes: most runs show none. Some runs show one or two main-thread tasks of 50 to 70 ms; 2.6.2 shows the same (71 ms in its baseline run).
 
 ## What's new in 2.6.2
 - **App-styled controls:** every dropdown opens an in-app menu instead of the browser's own list, checkboxes and radio buttons are drawn by Weft, number fields have Weft steppers, the search box has its own clear button, and the "Examples of steps" disclosure uses an app chevron. The underlying form fields are unchanged, so values, events and keyboard use work as before.
@@ -144,9 +222,10 @@ tools/bench.html             benchmark for each engine stage
 css/weft.css                 design tokens + components
 js/theme.js                  WeftTheme: applies System/Light/Dark before first paint, follows the device live
 js/worker.js                 Web Worker host (importScripts core)
-js/core/*.js                 engine, no DOM: parsing, detectors, table splitting (35-tables.js), 33 step types, pipeline, insights, samples
-js/ui/*.js                   interface: DOM helpers, engine client, state, selection, grid, forms, commands, panels, dialogs, tabs (58-tabs.js)
-js/tests/*.js                fixtures, engine tests, UI drive test
+js/core/*.js                 engine, no DOM: parsing, detectors, table splitting (35-tables.js), 34 step types, Weft Query and condition trees (45-query.js), formulas (46-formula.js, 47-ops-formula.js), pipeline, insights, samples
+js/ui/*.js                   interface: DOM helpers, engine client, state, selection, grid, forms, commands, panels, dialogs, query bar (52), column filters (53), find and replace (54), what's new (57), tabs (58)
+js/tests/*.js                fixtures, engine tests (golden v2, bugs, query, trees, filters, cache, formulas, polish), UI drive tests (ui-drive, ui-v3, ui-p2, ui-p3, ui-p4)
+docs/v3-baseline.md          the 2.6.2 test counts and timings that 3.0 is compared against
 ```
 
 ## Data and storage
@@ -154,8 +233,9 @@ js/tests/*.js                fixtures, engine tests, UI drive test
 - **Browser storage keys:**
   - `weft.session.v1`: the autosaved recipe.
   - `weft.library.v2`: saved recipes. Old `sift_library_v1` entries are migrated automatically.
-  - `weft.prefs.v1`: settings, including `theme` (`system`, `light` or `dark`; missing means `system`), `contrast` (`system`, `high` or `normal`), density, date order and column widths.
-  - `weft.recentCommands`, `weft.tips.v1`.
+  - `weft.prefs.v1`: settings, including `theme` (`system`, `light` or `dark`; missing means `system`), `contrast` (`system`, `high` or `normal`), density, date order, column widths and `pinned` (pinned column names by file name; missing means none).
+  - `weft.recentCommands`, and `weft.tips.v1`, which holds the getting-started flag and, from 3.0, the dismissed what's new card (`whatsNew`). The old value `true` is still read as "getting started dismissed".
+  - Each tab also keeps its column filters (`colFilters`) and pinned columns while the page is open. They are view state, not part of the recipe, and they are not saved to the browser database.
 - **Optional data storage:** IndexedDB `weft-data/sessions`, used only if you turn on "Remember my data". With several tabs open it stores each tab's source text, recipe and reading (`v: 2`); with one tab it keeps the older single-table shape. Both shapes also keep the reference files used by joins and diffs.
 
 ## Measured performance
@@ -190,4 +270,9 @@ Freezes: Weft's own code no longer runs longer than about 50 ms at a time.
 - **High contrast:** View ▸ Contrast offers Match device (default, following the operating system's "increase contrast" setting), High or Standard. It works with Light, Dark and System, uses the same design tokens, and is applied before first paint. `?contrast=high` forces it for one visit.
 
 ## Not done yet
-- High contrast passed its automated check, but hasn't been looked over by eye on every screen yet.
+- High contrast has been looked over by eye only on the 3.0 surfaces (query bar, autocomplete, funnel panel, Find and Replace, the formula form, pinned columns and the distribution chart), not on every older screen, and no contrast ratios were measured.
+- Column filters and pinned columns are not saved by "Remember my data"; filters reset when the page is reloaded and pins come back by file name.
+- A query that mixes AND and OR without parentheses is still refused in a recipe line, as in 2.x; the query box accepts it, and "Make this a step" writes explicit parentheses.
+- Relative filters (last N days, top N, above average) are view-only until you make them a step, when they become fixed values.
+- A formula is a single line, and `TEXT` supports a limited set of formats (no scientific notation or multi-part formats).
+- Occasional main-thread tasks of 50 to 70 ms still appear in some performance runs, as they did in 2.6.2.

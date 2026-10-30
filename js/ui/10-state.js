@@ -3,17 +3,17 @@ const S={
   loaded:false,file:'',reading:null,readings:[],baseSchema:null,warnings:[],scan:null,hasHtml:false,lineCount:0,size:0,
   steps:[],meta:[],states:[],viewIdx:0,
   view:{key:null,n:0,total:0,stateIdx:0,schema:{n:0,cols:[]}},
-  search:'',vfilter:null,sort:[],
+  search:'',vfilter:null,colFilters:{},sort:[],pinned:[],
   undo:[],redo:[],refs:[],
   showWs:!!Prefs.get('showWs',false),dateOrder:Prefs.get('dateOrder','mdy'),
   recent:lsGet('weft.recentCommands',[]),lastCmds:[],
   pendingRecipe:null,sessionDirty:false,sourceText:null
 };
-const TAB_FIELDS=['file','reading','readings','baseSchema','warnings','scan','hasHtml','lineCount','size','chosenIndex','steps','meta','states','viewIdx','view','search','vfilter','sort','undo','redo','sourceText','htmlTables','htmlCount','contract'];
+const TAB_FIELDS=['file','reading','readings','baseSchema','warnings','scan','hasHtml','lineCount','size','chosenIndex','steps','meta','states','viewIdx','view','search','vfilter','colFilters','pinned','sort','undo','redo','sourceText','htmlTables','htmlCount','contract'];
 function defaultTabState(){
   return{loaded:false,file:'',reading:null,readings:[],baseSchema:null,warnings:[],scan:null,hasHtml:false,lineCount:0,size:0,chosenIndex:0,
     steps:[],meta:[],states:[],viewIdx:0,view:{key:null,n:0,total:0,stateIdx:0,schema:{n:0,cols:[]}},
-    search:'',vfilter:null,sort:[],undo:[],redo:[],sourceText:null,htmlTables:null,htmlCount:0,contract:null,
+    search:'',vfilter:null,colFilters:{},pinned:[],sort:[],undo:[],redo:[],sourceText:null,htmlTables:null,htmlCount:0,contract:null,
     pendingRecipe:null,refs:[],refsRaw:[]}
 }
 let stepSeq=0;
@@ -28,7 +28,7 @@ const finalN=()=>S.states.length?S.states[S.states.length-1].n:0;
 function loadState(r,opts){
   opts=opts||{};
   const o={loaded:true,file:r.fileName||opts.fileName||'',reading:r.reading,readings:r.readings,baseSchema:r.baseSchema,warnings:r.warnings||[],scan:r.scan,hasHtml:r.hasHtml,lineCount:r.lineCount,size:r.size,chosenIndex:r.chosenIndex,meta:r.stepsMeta,states:r.states};
-  if(!opts.keepSteps){o.steps=[];o.undo=[];o.redo=[];o.sort=[];o.search='';o.vfilter=null}
+  if(!opts.keepSteps){o.steps=[];o.undo=[];o.redo=[];o.sort=[];o.search='';o.vfilter=null;o.colFilters={};o.pinned=Pin.saved(o.file)}
   o.viewIdx=(opts.keepSteps?S.steps:o.steps).length;
   return o
 }
@@ -60,7 +60,7 @@ async function setPipelineNow(steps,from,opts){
   let r;
   try{r=await Busy.run(opts.label||'Updating steps',()=>Engine.call('setPipeline',{steps:next,fromIndex:Math.max(0,from|0)}))}
   catch(e){if(!isQuiet(e))Toast.err('Something went wrong: '+e.message);return false}
-  S.steps=next;S.meta=r.stepsMeta;S.states=r.states;
+  S.steps=next;S.meta=r.stepsMeta;S.states=r.states;S.pruneFilters=true;
   S.viewIdx=Math.max(0,Math.min(opts.viewIdx==null?next.length:opts.viewIdx,next.length));
   if(!opts.noUndo){S.undo.push(prev);if(S.undo.length>100)S.undo.shift();S.redo=[]}
   await refreshView();
@@ -130,7 +130,14 @@ async function doUndo(){
     const snap=S.undo[S.undo.length-1];const cur={steps:cleanSteps(S.steps),viewIdx:S.viewIdx};
     const ok=await setPipelineNow(snap.steps,0,{viewIdx:snap.viewIdx,noUndo:true,label:'Undoing'});
     if(!ok)return false;
-    S.undo.pop();S.redo.push(cur);
+    S.undo.pop();
+    if(snap.restore){
+      cur.clearFilters=true;
+      S.search=snap.restore.search;$('#searchInput').value=S.search;
+      if(snap.restore.colFilters)S.colFilters=W.clone(snap.restore.colFilters);
+      await refreshView()
+    }
+    S.redo.push(cur);
     Toast.show('Undone. '+plural(S.steps.length,'step')+' in the recipe.');
     return true
   })
@@ -143,6 +150,11 @@ async function doRedo(){
     const ok=await setPipelineNow(snap.steps,0,{viewIdx:snap.viewIdx,noUndo:true,label:'Redoing'});
     if(!ok)return false;
     S.redo.pop();S.undo.push(cur);
+    if(snap.clearFilters){
+      S.undo[S.undo.length-1].restore={search:S.search,colFilters:W.clone(S.colFilters)};
+      S.search='';$('#searchInput').value='';S.colFilters={};
+      await refreshView()
+    }
     Toast.show('Redone.');
     return true
   })
@@ -152,18 +164,23 @@ let viewReq=0;
 async function refreshView(keepScroll){
   if(!S.loaded)return;
   const vf=S.vfilter||{};
+  const sent=S.search;
   let r;
-  try{r=await Engine.call('setView',{stateIdx:S.viewIdx,sort:S.sort,search:S.search,filter:vf.filter||null,rowIds:vf.rowIds||null,rowIdsState:vf.stateIdx},'view')}
+  try{r=await Engine.call('setView',{stateIdx:S.viewIdx,sort:S.sort,search:S.search,filter:vf.filter||null,rowIds:vf.rowIds||null,rowIdsState:vf.stateIdx,colFilters:ColFilter.active()},'view')}
   catch(e){if(isQuiet(e))return;Toast.err('Could not show this step: '+e.message);return}
+  if(r.query)r.query.src=sent;
   S.view=r;
   const names=new Set(curCols());
   Sel.pruneCols(names);
   S.sort=S.sort.filter(k=>names.has(k.col));
+  if(S.pruneFilters){S.pruneFilters=false;ColFilter.prune(names)}
   Grid.reset(keepScroll);
   await yieldUI();
   Status.render();
   $('#btnSearchStep').classList.toggle('hidden',!S.search.trim());
-  VFilter.render()
+  VFilter.render();
+  QueryBar.render();
+  Find.reset()
 }
 async function setViewIdx(i){
   i=Math.max(0,Math.min(i,S.steps.length));
@@ -180,11 +197,22 @@ const VFilter={
   clear(){if(!S.vfilter)return;S.vfilter=null;refreshView()},
   render(){
     const el=$('#vfilter');
-    if(!S.vfilter){el.classList.add('hidden');return}
+    const chips=ColFilter.chips();
+    if(!S.vfilter&&!chips.length){el.classList.add('hidden');clear(el);return}
     el.classList.remove('hidden');
-    clear(el).append(icon('filter',14),h('span',{text:'Showing '+plural(S.view.n,'row')+': '+S.vfilter.label}),
-      S.vfilter.filter?h('button',{class:'btn btn-xs btn-secondary',type:'button',onclick:()=>openFilterBuilder({mode:'remove',match:S.vfilter.filter.match||'all',conditions:W.clone(S.vfilter.filter.conditions).map(c=>Object.assign({caseSensitive:false,value:''},c))})},'Make this a step'):null,
-      h('button',{class:'btn btn-xs btn-ghost',type:'button',onclick:()=>VFilter.clear()},'Show all rows'))
+    const parts=[icon('filter',14)];
+    const showing=S.vfilter&&!chips.length?'Showing '+plural(S.view.n,'row')+': '+S.vfilter.label:'Showing '+fmtInt(S.view.n)+' of '+fmtInt(S.view.total)+' rows';
+    parts.push(h('span',{class:'vf-count',text:showing}));
+    const list=h('span',{class:'vf-chips',role:'list'});
+    chips.forEach(c=>list.append(h('span',{class:'vf-chip',role:'listitem','data-col':c.col},h('button',{class:'vf-chip-text',type:'button',title:'Edit this filter',onclick:()=>ColFilter.openFor(c.col)},c.text),h('button',{class:'vf-chip-x',type:'button','aria-label':'Remove the filter on '+c.col,onclick:()=>ColFilter.set(c.col,null)},icon('close',12)))));
+    if(S.vfilter&&chips.length)list.append(h('span',{class:'vf-chip',role:'listitem'},h('span',{class:'vf-chip-text static'},S.vfilter.label),h('button',{class:'vf-chip-x',type:'button','aria-label':'Remove the quick filter',onclick:()=>VFilter.clear()},icon('close',12))));
+    if(chips.length)parts.push(list);
+    parts.push(h('span',{class:'grow-1'}));
+    if(S.vfilter&&S.vfilter.filter&&!chips.length)parts.push(h('button',{class:'btn btn-xs btn-secondary',type:'button',onclick:()=>openFilterBuilder({mode:'remove',match:S.vfilter.filter.match||'all',conditions:W.clone(S.vfilter.filter.conditions).map(c=>Object.assign({caseSensitive:false,value:''},c))})},'Make this a step'));
+    if(chips.length)parts.push(h('button',{class:'btn btn-xs btn-secondary',type:'button','data-act':'filters-step',onclick:()=>ColFilter.makeStep()},'Make this a step'));
+    if(chips.length)parts.push(h('button',{class:'btn btn-xs btn-ghost',type:'button','data-act':'filters-clear',onclick:()=>{ColFilter.clearAll();if(S.vfilter)VFilter.clear()}},'Clear all filters'));
+    else parts.push(h('button',{class:'btn btn-xs btn-ghost',type:'button',onclick:()=>VFilter.clear()},'Show all rows'));
+    clear(el).append(...parts)
   }
 };
 

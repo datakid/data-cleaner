@@ -87,12 +87,55 @@ const Inspector={
     kv.push(['Length',p.minLen===p.maxLen?String(p.minLen):p.minLen+'–'+p.maxLen+' characters']);
     if(p.wsIssues)kv.push(['Extra spaces',fmtInt(p.wsIssues)]);
     body.append(h('dl',{class:'kv'},kv.map(x=>[h('dt',{},x[0]),h('dd',{},x[1])])));
+    if(p.type==='number'||p.type==='date'){
+      const slot=h('div',{class:'hist-slot'});
+      body.append(slot);
+      this.drawHistogram(slot,col,tab0,vi0)
+    }
     if(p.top.length){
       const max=p.top[0].count;
       body.append(h('div',{class:'sec-title'},'Most common values'),h('div',{class:'topv prof-'+p.type},p.top.map(t=>h('button',{type:'button',title:'Select rows with this value',onclick:async()=>{const r=await Engine.call('columnValues',{stateIdx:S.viewIdx,col,value:t.value});Sel.selectRowIds(r.rowIds,'"'+col+'" is "'+trunc(t.value,20)+'"')}},h('span',{class:'tv'},t.value),h('span',{class:'tc'},fmtInt(t.count)),h('span',{class:'bar'},h('i',{style:{width:Math.max(3,t.count/max*100)+'%'}}))))))
     }
     body.append(h('div',{class:'sec-title',style:{marginTop:'16px'}},'Quick actions'),h('div',{style:{display:'flex',flexWrap:'wrap',gap:'6px'}},
       ['columns.rename','text.trim','rows.removeWhere','columns.split','view.sortAsc'].map(id=>{const c=Commands.get(id);return h('button',{type:'button',class:'btn btn-xs btn-secondary',onclick:()=>{if(!(Sel.kind==='cols'&&Sel.cols.has(col)))Sel.selectCol(col);Commands.run(c)}},c.title.replace(/…$/,''))})))
+  },
+  histTree(col,b){
+    return{op:'and',children:[{col,op:'gte',value:b.lo,caseSensitive:false},{col,op:b.last?'lte':'lt',value:b.hi,caseSensitive:false}]}
+  },
+  async drawHistogram(slot,col,tab0,vi0){
+    let r;try{r=await Engine.call('histogram',{stateIdx:S.viewIdx,col},'hist')}catch(e){return}
+    if(!r||!r.bins.length||this.tab!=='column'||Tabs.active!==tab0||S.viewIdx!==vi0||!slot.isConnected)return;
+    const NS='http://www.w3.org/2000/svg';
+    const el=(tag,attrs)=>{const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,String(attrs[k]));return n};
+    const W0=248,H0=84,top=6,base=H0-6,n=r.bins.length,gap=n>1?2:0,bw=(W0-gap*(n-1))/n;
+    const active=(S.colFilters||{})[col];
+    const svg=el('svg',{class:'hist-svg',viewBox:'0 0 '+W0+' '+H0,role:'group','aria-label':'Distribution of '+col+' in '+n+' groups'});
+    svg.appendChild(el('line',{x1:0,x2:W0,y1:base+.5,y2:base+.5,class:'hist-axis'}));
+    r.bins.forEach((b,i)=>{
+      const tree=this.histTree(col,b);
+      const on=!!active&&JSON.stringify(active)===JSON.stringify(tree);
+      const hh=b.count?Math.max(2,Math.round(b.count/r.maxCount*(base-top))):0;
+      const x=i*(bw+gap);
+      const range=b.lo===b.shown?b.lo:b.lo+' to '+b.shown;
+      const label=range+': '+plural(b.count,'row')+(on?'. Selected. Press to clear this filter.':'. Press to show only these rows.');
+      const g=el('g',{class:'hb'+(on?' on':''),role:'button',tabindex:'0','aria-label':label,'aria-pressed':on?'true':'false'});
+      const tip=el('title',{});tip.textContent=range+' · '+plural(b.count,'row');
+      g.appendChild(tip);
+      g.appendChild(el('rect',{class:'hb-hit',x:x-gap/2,y:0,width:bw+gap,height:base,fill:'transparent'}));
+      if(hh)g.appendChild(el('rect',{class:'hb-bar',x,y:base-hh,width:bw,height:hh,rx:Math.min(2,bw/2)}));
+      const go=()=>{ColFilter.set(col,on?null:tree).then(()=>{if(this.tab==='column')this.render()})};
+      g.addEventListener('click',go);
+      g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}});
+      svg.appendChild(g)
+    });
+    const fmt=v=>r.type==='date'?v:W.fmtNum(Number(String(v).replace(',','.')));
+    const lo=r.bins[0].lo,hi=r.bins[n-1].hi;
+    clear(slot).append(
+      h('div',{class:'sec-title'},'Distribution'),
+      svg,
+      h('div',{class:'hist-axis-labels'},h('span',{},fmt(lo)),h('span',{},fmt(hi))),
+      h('p',{class:'insp-note hist-note'},(r.skipped?plural(r.skipped,'value')+' that are not '+(r.type==='date'?'dates':'numbers')+' are left out. ':'')+'Click a bar to show only the rows in that range.')
+    )
   },
   async renderCell(body){
     clear(body);

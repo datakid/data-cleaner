@@ -481,6 +481,7 @@ async function run(){
       ok('G3 the clear control empties the search box and hides itself',si.value===''&&sc.classList.contains('hidden'));
       host.remove()
     }
+    for(const m of (window.WEFT_UI_MODULES||[]))await m({ok,until,wait,log});
     let blocked=false;try{await fetch('data:,x')}catch(e){blocked=true}ok('csp blocks fetch',blocked);
   }catch(e){log('ERROR '+e.message+' '+e.stack)}
   const f=results.filter(r=>!r[1]);log('DONE '+(results.length-f.length)+'/'+results.length);

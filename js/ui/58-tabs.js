@@ -31,6 +31,7 @@ const Tabs={
   },
   restore(t){
     Object.assign(S,t.ui);S.loaded=true;
+    if(!S.colFilters)S.colFilters={};
     $('#searchInput').value=S.search||'';
     Sel.clear(true);Sel.cursor={pos:0,col:0};
     Inspector.cell=null;Inspector.col=null;

@@ -1,4 +1,19 @@
 'use strict';
+const Pin={
+  list(){return Array.isArray(S.pinned)?S.pinned:[]},
+  has(col){return this.list().indexOf(col)!==-1},
+  set(){const names=new Set(S.view.schema.cols.map(c=>c.name));return new Set(this.list().filter(c=>names.has(c)))},
+  saved(file){const m=Prefs.get('pinned',{});const v=m&&m[file||''];return Array.isArray(v)?v.filter(x=>typeof x==='string'):[]},
+  save(){const m=Object.assign({},Prefs.get('pinned',{}));const k=S.file||'';if(this.list().length)m[k]=this.list().slice();else delete m[k];Prefs.set('pinned',m)},
+  apply(cols,on){
+    const cur=this.list();
+    const next=on?cur.concat(cols.filter(c=>cur.indexOf(c)===-1)):cur.filter(c=>cols.indexOf(c)===-1);
+    if(next.length===cur.length&&next.every((c,i)=>c===cur[i]))return;
+    S.pinned=next;this.save();
+    Grid.renderHead();Grid.paint();
+    announce((on?'Pinned ':'Unpinned ')+(cols.length===1?cols[0]:plural(cols.length,'column'))+'.')
+  }
+};
 const Grid={
   pool:[],widths:[],idxW:64,pages:new Map(),lru:[],inflight:new Set(),rowH:34,lastTop:0,editing:null,dragSel:null,
   init(){
@@ -18,7 +33,7 @@ const Grid={
     this.body.addEventListener('contextmenu',e=>this.onContext(e));
     this.head.addEventListener('contextmenu',e=>this.onContext(e));
     this.head.addEventListener('click',e=>this.onHeadClick(e));
-    this.head.addEventListener('dblclick',e=>{const g=e.target.closest('.gh[data-col]');if(g&&!e.target.closest('.gresize,.gh-menu,.typebadge'))this.renameInline(g)});
+    this.head.addEventListener('dblclick',e=>{const g=e.target.closest('.gh[data-col]');if(g&&!e.target.closest('.gresize,.gh-menu,.gh-filter,.typebadge'))this.renameInline(g)});
     this.head.addEventListener('mousedown',e=>this.onHeadDown(e));
     this.sc.addEventListener('keydown',e=>this.onKey(e));
     let lp=null;
@@ -46,7 +61,7 @@ const Grid={
   computeWidths(){
     const cols=S.view.schema.cols;const saved=Prefs.get('colWidths',{});
     this.idxW=Math.max(56,String(S.view.n).length*8+28);
-    this.widths=cols.map(c=>{if(saved[c.name])return saved[c.name];return Math.min(300,Math.max(96,c.name.length*8+64))});
+    this.widths=cols.map(c=>{if(saved[c.name])return saved[c.name];return Math.min(300,Math.max(112,c.name.length*8+88))});
     this.autoFitPending=true
   },
   autoFit(){
@@ -56,13 +71,25 @@ const Grid={
     const saved=Prefs.get('colWidths',{});
     S.view.schema.cols.forEach((c,i)=>{
       if(saved[c.name])return;
-      let mx=c.name.length*8+64;
+      let mx=c.name.length*8+88;
       for(const row of p.rows.slice(0,250)){const v=row[i]||'';const L=Math.min(v.length,60);if(L*7.3+30>mx)mx=L*7.3+30}
       this.widths[i]=Math.round(Math.min(360,Math.max(80,mx)))
     });
     const hs=this.head.children;for(let i=0;i<this.widths.length;i++)if(hs[i+1])hs[i+1].style.width=this.widths[i]+'px';
+    this.pinCalc();this.pinHead();
     this.layout();this.paint()
   },
+  pinCalc(){
+    const cols=S.view.schema.cols,set=Pin.set(),left=new Array(cols.length);
+    let acc=this.idxW,last=-1;
+    for(let i=0;i<cols.length;i++){if(set.has(cols[i].name)){left[i]=acc;acc+=this.widths[i];last=i}else left[i]=-1}
+    this.pinLeft=left;this.pinLast=last;this.pinW=acc-this.idxW
+  },
+  pinHead(){
+    const hs=this.head.children;
+    for(let i=0;i<this.pinLeft.length;i++){const g=hs[i+1];if(!g)continue;const pl=this.pinLeft[i];g.classList.toggle('pin',pl>=0);g.classList.toggle('pinend',i===this.pinLast);g.style.left=pl>=0?pl+'px':''}
+  },
+  pinnedIn(c0,c1){if(!this.pinLeft)return false;for(let i=c0;i<=c1;i++)if(this.pinLeft[i]>=0)return true;return false},
   totalW(){return this.idxW+this.widths.reduce((a,b)=>a+b,0)},
   layout(){const hh=(S.view.n*this.rowH+40)+'px',ww=this.totalW()+'px',st=S.view.total+'|'+S.view.n;if(this._lay===hh+ww+st)return;this._lay=hh+ww+st;this.sizer.style.height=(S.view.n*this.rowH+40)+'px';this.sizer.style.width=this.totalW()+'px';this.head.style.width=this.totalW()+'px';$('#gridEmpty').classList.toggle('hidden',S.view.n>0);$('#gridEmpty').textContent=S.view.total&&!S.view.n?'No rows match. Clear the search or filter to see all rows.':'This step has no rows.'},
   renderHead(){
@@ -73,7 +100,9 @@ const Grid={
       const el=h('div',{class:'gh t-'+c.type+(Sel.kind==='cols'&&Sel.cols.has(c.name)?' colsel':''),role:'columnheader','aria-colindex':String(i+2),'aria-sort':sk?(sk.dir==='desc'?'descending':'ascending'):'none','data-col':c.name,'data-ci':String(i),title:c.name,draggable:'true',style:{width:this.widths[i]+'px'}},
         h('span',{class:'typebadge',title:'Change type','data-act':'type'},c.type==='number'?'123':c.type==='date'?'DATE':'ABC'),
         h('span',{class:'gh-name',text:c.name}),
+        Pin.has(c.name)?h('span',{class:'gh-pin',title:'Pinned. Stays in view while you scroll sideways.','aria-hidden':'true'},icon('pin',12)):null,
         sk?h('button',{class:'gh-sort',type:'button',title:'Sorted '+(sk.dir==='desc'?'descending':'ascending')+'. Click to change.','data-act':'sort'},icon(sk.dir==='desc'?'sortDesc':'sortAsc',14)):null,
+        h('button',{class:'gh-filter'+(ColFilter.has(c.name)?' on':''),type:'button','aria-label':'Filter '+c.name+(ColFilter.has(c.name)?' (filter active)':''),'aria-haspopup':'dialog','aria-expanded':'false','data-act':'filter',title:ColFilter.has(c.name)?ColFilter.describe(c.name,S.colFilters[c.name]):'Filter this column'},icon('filter',13)),
         h('button',{class:'gh-menu',type:'button','aria-label':'Column menu for '+c.name,'data-act':'menu'},icon('chevDown',14)),
         h('div',{class:'gresize','data-ci':String(i)}),
         c.fill!=null?h('span',{class:'gh-fill'+(c.fill<0.5?' low':c.fill<0.95?' mid':'')+(c.fill<1?' can':''),'data-act':c.fill<1?'fill':null,title:Math.round(c.fill*1000)/10+'% of rows have a value'+(c.fill<1?'. Click to show the empty ones.':''),'aria-hidden':'true'},h('i',{style:{width:(c.fill*100).toFixed(1)+'%'}})):null);
@@ -81,6 +110,7 @@ const Grid={
     });
     this.headSelKey=null;
     clear(this.head).append(...frag);
+    this.pinCalc();this.pinHead();
     const g=$('#grid');g.setAttribute('aria-rowcount',String(S.view.n+1));g.setAttribute('aria-colcount',String(cols.length+1))
   },
   pageOf(pos){return Math.floor(pos/256)},
@@ -95,7 +125,15 @@ const Grid={
       this.pages.set(pi,r);this.lru.push(pi);
       while(this.lru.length>40){const old=this.lru.shift();if(old!==pi)this.pages.delete(old)}
       this.paint();if(pi===0)this.autoFit()
-    }catch(e){}
+    }catch(e){
+      if(isQuiet(e))return;
+      if(/out of date/.test(e.message)){
+        if(vk===S.view.key&&!this.healing){this.healing=true;try{await refreshView(true)}finally{this.healing=false}}
+        return
+      }
+      const now=Date.now();
+      if(now-(this.errAt||0)>4000){this.errAt=now;Toast.err('Could not load rows: '+e.message)}
+    }
     finally{this.inflight.delete(key)}
   },
   paint(topArg){
@@ -110,9 +148,21 @@ const Grid={
     const dir=top>=this.lastTop?1:-1;this.lastTop=top;
     const pre=dir>0?pl+1:pf-1;if(pre>=0&&pre*256<S.view.n)this.fetchPage(pre);
     const cols=S.view.schema.cols;const types=cols.map(c=>c.type);
-    const sq=S.search.trim().toLowerCase();
-    if(sq!==this._sq){this._sq=sq;this._terms=sq?sq.split(/\s+/).filter(Boolean).sort((a,b)=>b.length-a.length):null}
-    const terms=this._terms;
+    if(!this.pinLeft||this.pinLeft.length!==cols.length)this.pinCalc();
+    const pinLeft=this.pinLeft,pinLast=this.pinLast;
+    const sq=S.search.trim();
+    const hl=S.view.query&&S.view.query.highlights;
+    const hlSig=sq+'\u0002'+S.view.key;
+    if(hlSig!==this._hlSig){
+      this._hlSig=hlSig;
+      const byLen=(a,b)=>b.length-a.length;
+      if(!sq)this._colTerms=null;
+      else if(hl){
+        const all=hl.all||[];
+        this._colTerms=cols.map(c=>{const m=all.concat((hl.cols&&hl.cols[c.name])||[]);return m.length?m.sort(byLen):null})
+      }else{const t=W.Q.terms(sq).sort(byLen);this._colTerms=cols.map(()=>t)}
+    }
+    const colTerms=this._colTerms;
     const t0=performance.now();
     let deferred=false;
     for(let i=0;i<this.pool.length;i++){
@@ -136,7 +186,7 @@ const Grid={
         const ch=data&&data.changed?new Set(data.changed):null;
         for(let ci=0;ci<cols.length;ci++){
           const cell=r.cells[ci+1];const v=data?data.row[ci]:'';
-          if(S.showWs&&data)this.fillWs(cell,v);else if(terms&&data&&v)this.fillMark(cell,v,terms);else cell.textContent=v;
+          if(S.showWs&&data)this.fillWs(cell,v);else if(colTerms&&colTerms[ci]&&data&&v)this.fillMark(cell,v,colTerms[ci]);else cell.textContent=v;
           let cls='gc';if(types[ci]==='number')cls+=' num';if(!data)cls+=' pending';else if(v.trim()==='')cls+=' empty';if(ch&&ch.has(ci))cls+=' changed';
           cell.dataset.base=cls
         }
@@ -145,6 +195,10 @@ const Grid={
         const cell=r.cells[ci+1];let cls=cell.dataset.base||'gc';
         if(Sel.kind==='cols'&&Sel.cols.has(cols[ci].name))cls+=' colsel';
         if(Sel.cursor.pos===pos&&Sel.cursor.col===ci&&document.activeElement===this.sc)cls+=' cursor';
+        if(Find.cur&&Find.cur.pos===pos&&Find.cur.col===ci)cls+=' findcur';
+        const pl=pinLeft[ci];
+        if(pl>=0)cls+=ci===pinLast?' pin pinend':' pin';
+        if(cell._pl!==pl){cell._pl=pl;cell.style.left=pl>=0?pl+'px':''}
         if(cell.className!==cls)cell.className=cls;
         const wv=this.widths[ci];if(cell._w!==wv){cell._w=wv;cell.style.width=wv+'px'}
       }
@@ -165,7 +219,7 @@ const Grid={
     if(last<v.length)cell.appendChild(document.createTextNode(v.slice(last)))
   },
   fillMark(cell,v,terms){
-    const low=v.toLowerCase();let i=0,hit=false;const parts=[];
+    const low=W.Q.norm(v);let i=0,hit=false;const parts=[];
     while(i<low.length){
       let best=-1,bl=0;
       for(const tm of terms){const j=low.indexOf(tm,i);if(j!==-1&&(best===-1||j<best||(j===best&&tm.length>bl))){best=j;bl=tm.length}}
@@ -178,10 +232,13 @@ const Grid={
     clear(cell);
     for(const p of parts)cell.appendChild(typeof p==='string'?document.createTextNode(p):h('mark',{class:'hit',text:p.m}))
   },
+  visX(ci){const x=this.colX(ci),pl=this.pinLeft?this.pinLeft[ci]:-1;return pl>=0?Math.max(x,this.sc.scrollLeft+pl):x},
   colX(ci){let x=this.idxW;for(let i=0;i<ci;i++)x+=this.widths[i];return x},
   paintRect(){
     if(Sel.kind!=='cells'||!Sel.rect||(Sel.rect.r0===Sel.rect.r1&&Sel.rect.c0===Sel.rect.c1)){this.rect.classList.add('hidden');return}
-    const r=Sel.rect;const x=this.colX(r.c0),w=this.colX(r.c1+1)-x;
+    const r=Sel.rect;
+    if(this.sc.scrollLeft>0&&this.pinnedIn(r.c0,r.c1)){this.rect.classList.add('hidden');return}
+    const x=this.colX(r.c0),w=this.colX(r.c1+1)-x;
     Object.assign(this.rect.style,{left:x+'px',top:(r.r0*this.rowH+40)+'px',width:w+'px',height:((r.r1-r.r0+1)*this.rowH)+'px'});
     this.rect.classList.remove('hidden')
   },
@@ -214,7 +271,7 @@ const Grid={
     if(!rz)return;
     e.preventDefault();e.stopPropagation();
     const ci=+rz.dataset.ci;const sx=e.clientX,sw=this.widths[ci];rz.classList.add('on');
-    const mv=ev=>{this.widths[ci]=Math.max(48,Math.min(800,sw+ev.clientX-sx));this.head.children[ci+1].style.width=this.widths[ci]+'px';this.layout();this.paint()};
+    const mv=ev=>{this.widths[ci]=Math.max(48,Math.min(800,sw+ev.clientX-sx));this.head.children[ci+1].style.width=this.widths[ci]+'px';this.pinCalc();this.pinHead();this.layout();this.paint()};
     const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);rz.classList.remove('on');const s=Prefs.get('colWidths',{});s[curCols()[ci]]=this.widths[ci];Prefs.set('colWidths',s)};
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
     rz.ondblclick=()=>{const s=Prefs.get('colWidths',{});delete s[curCols()[ci]];Prefs.set('colWidths',s);this.autoFitPending=true;this.autoFit()}
@@ -224,6 +281,7 @@ const Grid={
     if(e.target.closest('.gresize'))return;
     const col=g.dataset.col;
     const act=e.target.closest('[data-act]');
+    if(act&&act.dataset.act==='filter'){e.stopPropagation();ColFilter.open(col,act);return}
     if(act&&act.dataset.act==='menu'){e.stopPropagation();const r=act.getBoundingClientRect();if(!(Sel.kind==='cols'&&Sel.cols.has(col)))Sel.selectCol(col);Menus.openContext('colHeader',r.left,r.bottom+4,act);return}
     if(act&&act.dataset.act==='type'){e.stopPropagation();if(!(Sel.kind==='cols'&&Sel.cols.has(col)))Sel.selectCol(col);const r=act.getBoundingClientRect();Menus.openList(Commands.byPrefix('columns.type.'),r.left,r.bottom+4,act);return}
     if(act&&act.dataset.act==='sort'){e.stopPropagation();cycleViewSort(col);return}
@@ -261,7 +319,13 @@ const Grid={
   scrollToPos(pos,col){
     const rh=this.rowH,top=pos*rh,vh=this.sc.clientHeight-40;
     if(top<this.sc.scrollTop)this.sc.scrollTop=top;else if(top+rh>this.sc.scrollTop+vh)this.sc.scrollTop=top+rh-vh;this.scrollY=this.sc.scrollTop;
-    if(col!=null&&col>=0){const x=this.colX(col),w=this.widths[col];const vw=this.sc.clientWidth;if(x-this.idxW<this.sc.scrollLeft)this.sc.scrollLeft=x-this.idxW;else if(x+w>this.sc.scrollLeft+vw)this.sc.scrollLeft=x+w-vw}
+    if(col!=null&&col>=0){
+      const x=this.colX(col),w=this.widths[col],vw=this.sc.clientWidth;
+      const pinned=this.pinLeft&&this.pinLeft[col]>=0;
+      const edge=this.idxW+(pinned?0:(this.pinW||0));
+      if(!pinned&&x-edge<this.sc.scrollLeft)this.sc.scrollLeft=Math.max(0,x-edge);
+      else if(x+w>this.sc.scrollLeft+vw)this.sc.scrollLeft=x+w-vw
+    }
   },
   onKey(e){
     if(this.editing)return;
@@ -306,7 +370,7 @@ const Grid={
     const d=this.rowAt(pos);if(!d)return;
     this.scrollToPos(pos,ci);
     const full=await Engine.call('getCell',{stateIdx:S.viewIdx,rowId:d.id,col:cols[ci]});
-    const x=this.colX(ci),y=pos*this.rowH+40;
+    const x=this.visX(ci),y=pos*this.rowH+40;
     const inp=h('input',{class:'cell-edit',value:initial!=null?initial:(full.value||''),'aria-label':'Edit cell'});
     Object.assign(inp.style,{left:x+'px',top:y+'px',width:Math.max(this.widths[ci],180)+'px',height:this.rowH+'px'});
     this.sizer.appendChild(inp);inp.focus();if(initial==null)inp.select();

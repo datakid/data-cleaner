@@ -51,12 +51,49 @@ W.fmtDateAs=function(d,fmt){
 W.dateKey=function(d){return d?d.y*10000+d.mo*100+d.d:NaN};
 
 const CUR=/[$€£¥₹₩₽₺₴₦₪﷼]/g;
+function moneyFast(s){
+  const n=s.length;let i=0,c=s.charCodeAt(0),neg=false;
+  if(c===45){neg=true;i++;while(i<n&&s.charCodeAt(i)===32)i++}
+  if(s.charCodeAt(i)===36){i++;while(i<n&&s.charCodeAt(i)===32)i++}
+  const st=i;let commas=false,g=0,first=true;
+  for(;i<n;i++){
+    c=s.charCodeAt(i);
+    if(c>=48&&c<=57){g++;continue}
+    if(c===44){
+      if(first){if(g<1||g>3)return null;first=false}else if(g!==3)return null;
+      commas=true;g=0;continue
+    }
+    break
+  }
+  if(i===st)return null;
+  if(commas&&g!==3)return null;
+  if(!commas&&g!==i-st)return null;
+  let end=i;
+  if(i<n){
+    if(s.charCodeAt(i)!==46)return null;
+    let j=i+1;
+    if(j>=n)return null;
+    for(;j<n;j++){c=s.charCodeAt(j);if(c<48||c>57)return null}
+    end=n
+  }
+  let num;
+  if(!commas)num=Number(s.slice(st,end));
+  else{
+    let acc=0,digits=0;
+    for(let k=st;k<i;k++){c=s.charCodeAt(k);if(c!==44){acc=acc*10+(c-48);digits++}}
+    if(digits>15)num=Number(s.slice(st,end).replace(/,/g,''));
+    else num=end>i?Number(acc+s.slice(i,end)):acc
+  }
+  if(!isFinite(num))return null;
+  return{value:neg?-Math.abs(num):num,isPercent:false,negative:neg}
+}
 W.parseNumber=function(raw,opts){
   opts=opts||{};
   const locale=opts.locale||'us';
   let s=String(raw==null?'':raw).trim();
   if(s===''||s.length>40)return null;
   if(s.length<16){const c0=s.charCodeAt(0);if((c0>=48&&c0<=57)||c0===45){if(locale==='eu'?/^-?\d+$/.test(s):/^-?\d+(\.\d+)?$/.test(s)){const v=+s;return{value:v,isPercent:false,negative:c0===45}}}}
+  if(locale!=='eu'){const f=moneyFast(s);if(f)return f}
   let neg=false;
   if(s.length>1&&s[0]==='('&&s[s.length-1]===')'){neg=true;s=s.slice(1,-1).trim()}
   if(s[0]==='-'||s[0]==='−'){neg=true;s=s.slice(1).trim()}

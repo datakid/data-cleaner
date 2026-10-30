@@ -3,13 +3,14 @@
 const W=G.WeftCore;
 const CTX={dateOrder:'mdy',yearPivot:69};
 const REFS={};
-function newSession(){return{src:null,base:null,steps:[],states:[],meta:[],refs:REFS,ctx:CTX,views:new Map(),nextRowId:0,staged:null}}
+function newSession(){return{src:null,base:null,steps:[],states:[],meta:[],refs:REFS,ctx:CTX,views:new Map(),nextRowId:0,staged:null,dirty:false}}
 const T={map:new Map(),active:'t1',viewSeq:0};
 let E=newSession();
 T.map.set('t1',E);
 W.E=E;W.T=T;
-function useSession(id){const x=T.map.get(id);if(!x)throw new Error('That table is no longer open.');E=x;W.E=x;T.active=id}
-function withSession(x,fn){const prev=E,pid=T.active;E=x;W.E=x;try{return fn()}finally{E=prev;W.E=prev;T.active=pid}}
+function settle(x){x.dirty=false;if(x.base)recompute(0)}
+function useSession(id){const x=T.map.get(id);if(!x)throw new Error('That table is no longer open.');E=x;W.E=x;T.active=id;if(x.dirty)settle(x)}
+function withSession(x,fn){const prev=E,pid=T.active;E=x;W.E=x;try{if(x.dirty)settle(x);return fn()}finally{E=prev;W.E=prev;T.active=pid}}
 const s=v=>v==null?'':String(v);
 
 function fillOf(t){
@@ -96,7 +97,7 @@ const SEARCH_KEEP=[];
 function searchIndex(t){
   if(!t._search){
     const n=t.n,w=t.cols.length,idx=new Array(n);
-    for(let r=0;r<n;r++){let x='';for(let c=0;c<w;c++){const v=t.data[c][r];if(v!=null&&v!=='')x+=String(v).toLowerCase()+'\u0001'}idx[r]=x}
+    for(let r=0;r<n;r++){let x='';for(let c=0;c<w;c++){const v=t.data[c][r];if(v!=null&&v!=='')x+=W.Q.norm(v)+'\u0001'}idx[r]=x}
     t._search=idx;
     SEARCH_KEEP.push(t);
     while(SEARCH_KEEP.length>2){const old=SEARCH_KEEP.shift();if(old!==t)delete old._search}
@@ -110,19 +111,55 @@ function buildSearchIndex(t){
   if(bytes>INDEX_BUDGET){t._noIndex=true;return}
   searchIndex(t)
 }
-function makeView(p){
-  const si=p.stateIdx==null||p.stateIdx<0?E.states.length-1:Math.min(p.stateIdx,E.states.length-1);
-  const t=E.states[si];
+const NATURAL=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
+const FIND_CAP=100000;
+function findMatcher(v,query){
+  const t=v.t;
+  const parsed=W.Q.parse(query,t.cols);
+  const tree=parsed.tree;
+  if(!tree)return null;
+  const nc=t.cols.length;
+  const byCol=[];for(let c=0;c<nc;c++)byCol.push([]);
+  const walk=(nd,neg)=>{
+    if(!nd)return;
+    if(W.isTreeGroup(nd)){if(nd.op==='not')walk(nd.child,!neg);else nd.children.forEach(c=>walk(c,neg));return}
+    if(neg)return;
+    let L;try{L=W.compileLeaf(t,nd,E.ctx)}catch(e){return}
+    if(L.neg||L.mode==='allEmpty'||L.mode==='row'||L.mode==='fn')return;
+    if(L.mode==='col')byCol[L.ci].push(L.test);
+    else if(L.mode==='anyCmp')for(const x of L.tests)byCol[x.k].push(x.f);
+    else for(let c=0;c<nc;c++)byCol[c].push(L.test)
+  };
+  walk(W.resolveRelative(tree,t,E.ctx),false);
+  if(!byCol.some(a=>a.length))return null;
+  const data=t.data;
+  return(r,c)=>{const fs=byCol[c];if(!fs.length)return false;const x=data[c][r];const sv=x==null?'':String(x);for(let i=0;i<fs.length;i++)if(fs[i](sv))return true;return false}
+}
+function findCodes(v,query){
+  if(v._find&&v._find.sig===query)return v._find;
+  const t=v.t,nc=t.cols.length,n=v.pos.length;
+  const m=findMatcher(v,query);
+  const codes=[];let capped=false;
+  if(m){
+    outer:for(let i=0;i<n;i++){const r=v.pos[i];for(let c=0;c<nc;c++)if(m(r,c)){if(codes.length>=FIND_CAP){capped=true;break outer}codes.push(i*nc+c)}}
+  }
+  v._find={sig:query,codes,capped};
+  return v._find
+}
+function computeFilter(t,p,exclude){
   let pos=null;
-  const q=s(p.search).trim().toLowerCase();
-  if(q){
-    const terms=q.split(/\s+/).filter(Boolean);pos=[];
-    const w=t.cols.length,cols=t.data;
+  const parsed=W.Q.parse(p.search,t.cols);
+  const qerrors=parsed.errors.slice();
+  const pure=W.Q.pureFreeTerms(parsed.tree);
+  const qtree=parsed.tree;
+  if(pure&&pure.length){
+    const terms=pure.map(v=>W.Q.norm(v));
+    pos=[];
+    const w=t.cols.length,cols=t.data,norm=W.Q.norm,nt=terms.length;
     if(!t._search&&!t._noIndex){t._searches=(t._searches||0)+1;if(t._searches>=2)buildSearchIndex(t)}
-    if(t._search){const idx=t._search;for(let r=0;r<t.n;r++){const x=idx[r];let ok=true;for(const tm of terms)if(x.indexOf(tm)===-1){ok=false;break}if(ok)pos.push(r)}}
-    else{
-      const res=terms.map(tm=>new RegExp(tm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'));
-      const nt=res.length;
+    if(t._search){const idx=t._search;for(let r=0;r<t.n;r++){const x=idx[r];let ok=true;for(let k=0;k<nt;k++)if(x.indexOf(terms[k])===-1){ok=false;break}if(ok)pos.push(r)}}
+    else if(terms.every(tm=>!NON_ASCII_TERM.test(tm))){
+      const res=terms.map(foldRegex);
       for(let r=0;r<t.n;r++){
         let all=true;
         for(let k=0;k<nt;k++){
@@ -132,12 +169,37 @@ function makeView(p){
         }
         if(all)pos.push(r)
       }
+    }else{
+      const cells=new Array(w);
+      for(let r=0;r<t.n;r++){
+        for(let c=0;c<w;c++){const v=cols[c][r];cells[c]=v?norm(v):''}
+        let all=true;
+        for(let k=0;k<nt&&all;k++){
+          const tm=terms[k];let hit=false;
+          for(let c=0;c<w;c++)if(cells[c]&&cells[c].indexOf(tm)!==-1){hit=true;break}
+          if(!hit)all=false
+        }
+        if(all)pos.push(r)
+      }
     }
+  }else if(qtree){
+    const test=W.treeTester(t,qtree,E.ctx,(leaf,e)=>qerrors.push({start:0,end:0,level:'error',message:e.message,col:leaf.col}));
+    const out=[];for(let r=0;r<t.n;r++)if(test(r))out.push(r);
+    pos=out
   }
   if(p.filter&&p.filter.conditions&&p.filter.conditions.length){
-    const valid=p.filter.conditions.filter(c=>c.col==='*'||t.cols.indexOf(c.col)!==-1);
+    const valid=p.filter.conditions.filter(c=>c.col==='*'||c.col==='@row'||t.cols.indexOf(c.col)!==-1);
     if(valid.length){
       const test=W.rowTester(t,{match:p.filter.match||'all',conditions:valid.map(c=>Object.assign({caseSensitive:false},c))},E.ctx);
+      const base=pos||W.identity(t.n);pos=base.filter(r=>test(r))
+    }
+  }
+  const filterErrors=[];
+  const cf=W.colFiltersTree(p.colFilters,exclude);
+  if(cf){
+    const tree=W.pruneTree(W.resolveRelative(cf,t,E.ctx),l=>W.leafColumnOk(t,l));
+    if(tree){
+      const test=W.treeTester(t,tree,E.ctx,(leaf,e)=>filterErrors.push({col:leaf.col,message:e.message}));
       const base=pos||W.identity(t.n);pos=base.filter(r=>test(r))
     }
   }
@@ -145,6 +207,32 @@ function makeView(p){
     const pm=W.posMap(t);const set=new Set();for(const id of p.rowIds){const x=pm.get(id);if(x!==undefined)set.add(x)}
     const base=pos||W.identity(t.n);pos=base.filter(r=>set.has(r))
   }
+  return{pos,parsed,qerrors,filterErrors,qtree}
+}
+const NON_ASCII_TERM=/[^\u0000-\u007f]/;
+const FOLD_CLASS={i:'[i\\u0130]',s:'[s\\u017f]',k:'[k\\u212a]'};
+function foldRegex(term){
+  let src='';
+  for(const ch of term)src+=FOLD_CLASS[ch]||ch.replace(/[.*+?^${}()|[\]\\\/-]/g,'\\$&');
+  return new RegExp(src,'i')
+}
+function filterPositions(t,p,exclude){
+  if(p.rowIds&&p.rowIds.length)return computeFilter(t,p,exclude);
+  const c=E.ctx;
+  const sig=JSON.stringify([p.search==null?'':p.search,p.filter||null,p.colFilters||null,exclude==null?null:exclude,c.dateOrder||null,c.yearPivot||null,c.today||null]);
+  const cache=t._fp||(t._fp=new Map());
+  if(cache.has(sig)){const hit=cache.get(sig);cache.delete(sig);cache.set(sig,hit);return hit}
+  const out=computeFilter(t,p,exclude);
+  cache.set(sig,out);
+  while(cache.size>4)cache.delete(cache.keys().next().value);
+  return out
+}
+function makeView(p){
+  const si=p.stateIdx==null||p.stateIdx<0?E.states.length-1:Math.min(p.stateIdx,E.states.length-1);
+  const t=E.states[si];
+  const f=filterPositions(t,p);
+  let pos=f.pos;
+  const parsed=f.parsed,qerrors=f.qerrors,filterErrors=f.filterErrors,qtree=f.qtree;
   if(!pos)pos=W.identity(t.n);
   if(p.sort&&p.sort.length){
     const types=W.typesOf(t,E.ctx);
@@ -152,9 +240,9 @@ function makeView(p){
     if(sets.length)pos=W.sortPositions(pos,sets)
   }
   const key='v'+(++T.viewSeq);
-  E.views.set(key,{si,pos,t});
+  E.views.set(key,{si,pos,t,qtree});
   if(E.views.size>8){const first=E.views.keys().next().value;E.views.delete(first)}
-  return{viewKey:key,key,n:pos.length,stateIdx:si,total:t.n,schema:schemaOf(t)}
+  return{viewKey:key,key,n:pos.length,stateIdx:si,total:t.n,schema:schemaOf(t),query:{tokens:parsed.tokens,errors:qerrors,matchedCols:parsed.matchedCols,highlights:W.Q.highlights(qtree)},filterErrors}
 }
 function getView(k){const v=E.views.get(k);if(!v)throw new Error('The view is out of date. Refresh.');return v}
 function selectedPositions(v,sel){
@@ -213,7 +301,7 @@ const H={
   ping:()=>({version:W.version}),
   setCtx(p){
     Object.assign(CTX,p||{});
-    T.map.forEach(x=>{x.states.forEach(t=>{t._types=null});x.views.clear();if(x.base)withSession(x,()=>recompute(0))});
+    T.map.forEach(x=>{x.states.forEach(t=>{t._types=null});x.views.clear();if(x.base){if(x===E)recompute(0);else x.dirty=true}});
     return E.base?pipelineResult():{}
   },
   tableNew(p){if(T.map.has(p.id))throw new Error('A table with that id is already open.');const x=newSession();T.map.set(p.id,x);useSession(p.id);return{id:p.id}},
@@ -320,6 +408,7 @@ const H={
     return{stats:res.stats||{},chips:W.statsChips(res.stats,t.n,o.n),warning:res.warning||null,n0:t.n,n1:o.n,cols0:t.cols,cols1:o.cols,removedSample:removed,after,before,touchedCols:res.touched?Array.from(res.touched.keys()):[],describe:d.describe(p.step.cfg)}
   },
   profile(p){const t=stateAt(p.stateIdx);return W.profile(t,p.col,E.ctx)},
+  histogram(p){const t=stateAt(p.stateIdx);return W.histogram(t,p.col,E.ctx,p.bins)},
   issues(p){const t=stateAt(p.stateIdx);return{issues:W.issues(t,E.ctx)}},
   lineage(p){need();return{items:W.lineage(E.states,E.steps,p.rowId,p.col,p.uptoIdx==null?E.states.length-1:p.uptoIdx)}},
   likeThese(p){const t=stateAt(p.stateIdx);return{candidates:W.likeThese(t,p.rowIds||[],E.ctx)}},
@@ -368,9 +457,110 @@ const H={
   drift(p){const t=stateAt(p.stateIdx);return{drift:W.diffContracts(p.contract,W.shapeContract(t))}},
   parseRecipe(p){return W.textToSteps(p.text)},
   recipeText(p){return{text:W.stepsToText(p.steps||E.steps,p.source===undefined?(E.src&&E.src.reading?{kind:E.src.reading.kind,params:E.src.reading.params}:null):p.source)}},
+  distinctValues(p){
+    const t=stateAt(p.stateIdx);const ci=t.cols.indexOf(p.col);
+    if(ci===-1)return{values:[],blanks:0,total:0,truncated:false,rows:0};
+    const limit=Math.max(1,p.limit||1000);
+    const search=p.search!=null?p.search:(p.query||'');
+    const others={};if(p.colFilters)for(const k of Object.keys(p.colFilters))if(k!==p.col)others[k]=p.colFilters[k];
+    const sig=JSON.stringify([p.col,search,others,p.filter||null,p.rowIds?W.hashString(p.rowIds.join(',')):null,E.ctx.dateOrder,E.ctx.today||null,limit]);
+    const cache=t._dv||(t._dv=new Map());
+    if(cache.has(sig)){const hit=cache.get(sig);cache.delete(sig);cache.set(sig,hit);return hit}
+    const f=filterPositions(t,Object.assign({},p,{search,colFilters:others}),p.col);
+    const col=t.data[ci],counts=new Map();let blanks=0;
+    const total_=f.pos?f.pos.length:t.n;
+    for(let i=0;i<total_;i++){const r=f.pos?f.pos[i]:i;const k=W.valueKey(col[r]);if(k==='')blanks++;else counts.set(k,(counts.get(k)||0)+1)}
+    const arr=Array.from(counts,e=>({v:e[0],n:e[1]}));
+    arr.sort((a,b)=>b.n-a.n||NATURAL.compare(a.v,b.v)||(a.v<b.v?-1:a.v>b.v?1:0));
+    const out={values:arr.slice(0,limit),blanks,total:arr.length,truncated:arr.length>limit,rows:total_};
+    cache.set(sig,out);
+    while(cache.size>12)cache.delete(cache.keys().next().value);
+    return out
+  },
+  filterTree(p){
+    const t=stateAt(p.stateIdx);
+    const parsed=W.Q.parse(p.search==null?'':p.search,t.cols);
+    const kids=[];
+    if(parsed.tree)kids.push(parsed.tree);
+    const cf=W.colFiltersTree(p.colFilters);
+    if(cf){const r=W.pruneTree(W.resolveRelative(cf,t,E.ctx),l=>W.leafColumnOk(t,l));if(r)kids.push(r)}
+    return{tree:W.normTree({op:'and',children:kids}),errors:parsed.errors,today:W.todayISO(E.ctx)}
+  },
+  replacePreview(p){
+    const v=p.viewKey&&p.selection?getView(p.viewKey):null;
+    const t=v?v.t:stateAt(p.stateIdx);
+    const cfg=W.clone(p.cfg||{});
+    const empty=m=>({error:m||null,cells:0,columns:0,samples:[],overrides:[]});
+    const bad=W.OPS.replace.validate(cfg,{cols:t.cols});
+    if(bad)return empty(bad);
+    let r;
+    try{r=W.OPS.replace.apply(t,cfg,engineCtx())}catch(e){return empty(e.message)}
+    const out=r.table;
+    let rowSet=null,colSet=null;
+    if(v){
+      const sel=p.selection;
+      if(sel.kind==='rows')rowSet=new Set(selectedPositions(v,sel));
+      else if(sel.kind==='cols')colSet=new Set((sel.cols||[]).map(c=>t.cols.indexOf(c)).filter(i=>i!==-1));
+      else if(sel.kind==='cells'&&sel.rect){
+        rowSet=new Set();
+        for(let i=Math.max(0,sel.rect.r0);i<=Math.min(v.pos.length-1,sel.rect.r1);i++)rowSet.add(v.pos[i]);
+        colSet=new Set();
+        for(let c=sel.rect.c0;c<=sel.rect.c1;c++)if(c>=0&&c<t.cols.length)colSet.add(c)
+      }else return empty(null)
+    }
+    const cis=W.resolveCols(t,cfg.columns).filter(ci=>(!colSet||colSet.has(ci))&&t.data[ci]!==out.data[ci]);
+    const rows=rowSet?Array.from(rowSet).sort((x,y)=>x-y):null;
+    const total=rows?rows.length:t.n;
+    let cells=0;const hit=new Set(),samples=[],overrides=[];
+    for(let i=0;i<total;i++){
+      const row=rows?rows[i]:i;
+      for(const ci of cis){
+        const x=t.data[ci][row],y=out.data[ci][row];
+        const bx=x==null?'':String(x),by=y==null?'':String(y);
+        if(bx===by)continue;
+        cells++;hit.add(ci);
+        if(samples.length<5)samples.push({col:t.cols[ci],before:bx,after:by});
+        if(p.overrides&&overrides.length<200000)overrides.push({col:t.cols[ci],rowId:t.rowIds[row],value:by})
+      }
+    }
+    return{error:null,cells,columns:hit.size,samples,overrides:p.overrides?overrides:[],capped:!!p.overrides&&cells>overrides.length}
+  },
+  findCount(p){
+    const v=getView(p.viewKey);const c=findCodes(v,p.query);
+    return{total:c.codes.length,capped:c.capped}
+  },
+  findCells(p){
+    const v=getView(p.viewKey);const t=v.t;
+    const m=findMatcher(v,p.query);
+    if(!m)return{pos:-1,col:-1,index:0,total:0,capped:false};
+    const nc=t.cols.length,n=v.pos.length;
+    const dir=p.dir<0?-1:1;
+    let pos=p.from&&p.from.pos!=null?p.from.pos:(dir>0?0:n-1);
+    let col=p.from&&p.from.col!=null?p.from.col:(dir>0?-1:nc);
+    let wrapped=false;
+    let found=null;
+    for(let step=0;step<=n&&!found;step++){
+      if(pos<0||pos>=n){if(step>=n)break;pos=dir>0?0:n-1;col=dir>0?-1:nc;wrapped=true}
+      const r=v.pos[pos];
+      if(dir>0){for(let c=col+1;c<nc;c++)if(m(r,c)){found={pos,col:c};break}}
+      else{for(let c=col-1;c>=0;c--)if(m(r,c)){found={pos,col:c};break}}
+      if(!found){pos+=dir;col=dir>0?-1:nc}
+    }
+    if(!found)return{pos:-1,col:-1,index:0,total:0,capped:false};
+    const cached=v._find&&v._find.sig===p.query?v._find:null;
+    let index=null,total=null,capped=false;
+    if(cached){
+      total=cached.codes.length;capped=cached.capped;
+      const code=found.pos*nc+found.col;
+      let lo=0,hi=cached.codes.length;
+      while(lo<hi){const mid=(lo+hi)>>1;if(cached.codes[mid]<code)lo=mid+1;else hi=mid}
+      if(cached.codes[lo]===code)index=lo+1
+    }
+    return{pos:found.pos,col:found.col,rowId:t.rowIds[v.pos[found.pos]],index,total,capped,wrapped}
+  },
   columnValues(p){
     const t=stateAt(p.stateIdx);const ci=t.cols.indexOf(p.col);if(ci===-1)return{rowIds:[]};
-    const out=[];const v=s(p.value).trim();for(let r=0;r<t.n;r++)if(s(t.data[ci][r]).trim()===v)out.push(t.rowIds[r]);return{rowIds:out}
+    const out=[];const v=W.valueKey(p.value);for(let r=0;r<t.n;r++)if(W.valueKey(t.data[ci][r])===v)out.push(t.rowIds[r]);return{rowIds:out}
   },
   stats(){return{states:E.states.length,rows:E.base?E.base.n:0}},
   pipelineInfo(){need();return pipelineResult()}

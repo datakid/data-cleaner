@@ -142,8 +142,10 @@ const Status={
     const tab0=Tabs.active,vi0=S.viewIdx;
     let r;try{r=await withFreshView(()=>Engine.call('selectionStats',{viewKey:S.view.key,selection:Sel.payload()},'selstats'))}catch(e){return}
     if(Tabs.active!==tab0||S.viewIdx!==vi0)return;
-    if(!r.numericCount){el.textContent='';return}
-    el.textContent='Sum '+W.fmtNum(r.sum)+' · Avg '+W.fmtNum(r.avg)+' · Min '+W.fmtNum(r.min)+' · Max '+W.fmtNum(r.max)
+    if(!r.numericCount){el.textContent='';el.removeAttribute('title');return}
+    const filt=Sel.kind==='cols'&&S.view.n!==S.view.total;
+    el.textContent='Count '+fmtInt(r.numericCount)+' · Sum '+W.fmtNum(r.sum)+' · Avg '+W.fmtNum(r.avg)+' · Min '+W.fmtNum(r.min)+' · Max '+W.fmtNum(r.max)+(filt?' · of filtered rows':'');
+    if(filt)el.title='These numbers cover the '+fmtInt(S.view.n)+' rows that match the search and filters, not all '+fmtInt(S.view.total)+' rows.';else el.removeAttribute('title')
   },120),
   work(label){const el=$('#sbWork');if(!el)return;if(label){el.classList.remove('hidden');el.lastChild.textContent='Working… '+label}else el.classList.add('hidden')}
 };
@@ -172,12 +174,18 @@ const Toolbar={
   refreshState(){if(!this.undoBtn)return;this.undoBtn.setAttribute('aria-disabled',String(!S.undo.length));this.redoBtn.setAttribute('aria-disabled',String(!S.redo.length))}
 };
 
+const Tips={
+  KEY:'weft.tips.v1',
+  read(){const v=lsGet(this.KEY,false);if(v===true)return{coach:true};return v&&typeof v==='object'&&!Array.isArray(v)?v:{}},
+  get(k){return this.read()[k]},
+  set(k,val){const cur=this.read();cur[k]=val;lsSet(this.KEY,cur)}
+};
 const Coach={
-  maybeShow(){if(!lsGet('weft.tips.v1',false))this.show()},
+  maybeShow(){if(!Tips.get('coach'))this.show()},
   show(){
     const el=$('#coach');clear(el).classList.remove('hidden');
     const tips=[['This is how Weft read your text. Change it in the bar above.','#readingBar'],['Click row numbers to select rows. Press Delete to remove them.','#grid'],['Every change becomes a step on the left. Undo, mute or reorder any time.','#rail']];
     el.append(h('ol',{},tips.map((t,i)=>h('li',{},h('span',{class:'n'},String(i+1)),h('span',{class:'t'},t[0]),h('button',{type:'button',onclick:()=>{const x=$(t[1]);if(!x)return;if(x.classList.contains('closed')||x.classList.contains('hidden'))Panels.toggle(t[1].slice(1));x.classList.add('pulse-ring');setTimeout(()=>x.classList.remove('pulse-ring'),2000)}},'Show me')))),
-      h('button',{type:'button',class:'btn btn-xs btn-secondary',onclick:()=>{el.classList.add('hidden');lsSet('weft.tips.v1',true);Grid.paint()}},'Got it'))
+      h('button',{type:'button',class:'btn btn-xs btn-secondary',onclick:()=>{el.classList.add('hidden');Tips.set('coach',true);Grid.paint()}},'Got it'))
   }
 };

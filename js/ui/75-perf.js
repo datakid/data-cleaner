@@ -1,6 +1,6 @@
 'use strict';
 const Perf={
-  BUDGET:{load:3000,trim:600,sort:900,search:250,scroll:100,longtask:50},
+  BUDGET:{load:3000,trim:600,sort:900,search:250,scroll:100,longtask:50,queryFirst:250,queryRepeat:60,distinct:150,find:50,formula:400,formulaSearch:600},
   async run(nRows){
     nRows=nRows||200000;
     if(S.loaded&&S.steps.length&&!(await Dialog.confirm('Run the performance test?','This replaces your current data with 200,000 generated rows. Your recipe stays in autosave.','Run test')))return;
@@ -16,12 +16,23 @@ const Perf={
     await time('Read and detect '+fmtBytes(bytes)+' of CSV ('+fmtInt(nRows)+' rows)','load',async()=>{await Input.loadStaged(st.fileName);for(let i=0;i<100&&(!Grid.pages.has(0)||Grid.autoFitPending);i++)await sleep(20);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await sleep(30)});
     const afterLoad=mark();this.afterLoad=afterLoad;
     await time('Trim whitespace on all columns','trim',()=>addStep('trim',{columns:['*'],collapse:true},{silent:true}));
+    await time('Weft Query, first run: amount>500 AND payment_status:paid','queryFirst',async()=>{S.search='amount>500 AND payment_status:paid';await refreshView()});
+    await time('Weft Query, same query again','queryRepeat',async()=>{await refreshView()});
+    await time('Weft Query with a regex: full_name:/^a.*son$/i','queryFirst',async()=>{S.search='full_name:/^a.*son$/i';await refreshView()});
+    S.search='';await refreshView();
+    await time('List the distinct values of "full_name"','distinct',async()=>{await Engine.call('distinctValues',{col:'full_name',stateIdx:S.viewIdx})});
+    await time('Find the next "lovelace" from the middle','find',async()=>{await Engine.call('findCells',{viewKey:S.view.viewKey,query:'lovelace',dir:1,from:{pos:Math.floor(S.view.n/2),col:0}})});
     await time('Sort by "amount" (as a step)','sort',()=>addStep('sortRows',{keys:[{col:'amount',dir:'desc',type:'auto'}]},{silent:true}));
     await time('Remove rows where "payment_status" is "paid"','sort',()=>addStep('filterRows',{mode:'remove',match:'all',conditions:[{col:'payment_status',op:'equals',value:'paid',caseSensitive:false}]},{silent:true}));
     await time('Search rows for "lovelace"','search',async()=>{S.search='lovelace';await refreshView()});
     S.search='';await refreshView();
     await time('Fetch a page of rows while scrolling (middle of the table)','scroll',async()=>{const pi=Math.floor(S.view.n/2/256);Grid.pages.delete(pi);await Grid.fetchPage(pi)});
     await time('Undo the last step','trim',()=>doUndo());
+    await time('Add a formula column: ROUND(amount * 1.15, 2)','formula',()=>addStep('formulaColumn',{name:'with_tax',expr:'ROUND([amount] * 1.15, 2)',after:''},{silent:true}));
+    await time('Add a text formula column: IF(amount > 500, "big", "small")','formula',()=>addStep('formulaColumn',{name:'size',expr:'IF([amount] > 500, "big", "small")',after:''},{silent:true}));
+    await time('Formula search, first run: =[amount] > 500','formulaSearch',async()=>{S.search='=[amount] > 500';await refreshView()});
+    await time('Formula search, same formula again','queryRepeat',async()=>{await refreshView()});
+    S.search='';await refreshView();
     await sleep(60);
     if(obs)obs.disconnect();
     const lt=long.filter(e=>e.t>=afterLoad);
