@@ -120,3 +120,7 @@ python3 -m http.server 8000
 Then open `http://localhost:8000`. Opening `index.html` from disk works, but the background worker cannot start and the browser blocks the font files.
 
 More: [`docs/structure.md`](docs/structure.md) · [`docs/performance.md`](docs/performance.md) · [`docs/design.md`](docs/design.md) · [`CHANGELOG.md`](CHANGELOG.md)
+
+## License
+
+MIT. See `LICENSE`. Bundled third-party components keep their own licences.
