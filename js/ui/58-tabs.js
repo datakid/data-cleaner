@@ -224,13 +224,13 @@ const Tabs={
     const t=await this.fromResult(cur.name+' · copy','duplicate',{text:r.text,fileName:S.file,htmlTables:null,hint:{kind:'delimited',params:{delimiter:'\t',quote:'"',header:true},force:true}});
     if(t)Toast.show('Opened a copy of the result as a new table')
   },
-  async exportWorkbook(name){
+  async exportWorkbook(name,header){
     if(this.list.length<2)return;
     if(Busy.n>0){Toast.show('Wait for the current step to finish.');return}
     this.stash(true);
     const sheets=[];
     for(const t of this.list){
-      const r=await Busy.run('Building workbook',()=>Engine.call('exportTable',{id:t.id,format:'xlsx',options:{header:true}}));
+      const r=await Busy.run('Building workbook',()=>Engine.call('exportTable',{id:t.id,format:'xlsx',options:{header:header!==false}}));
       sheets.push({r,name:t.name})
     }
     let fn=String(name||'').trim()||'weft-tables.xlsx';if(!/\.xlsx$/i.test(fn))fn+='.xlsx';

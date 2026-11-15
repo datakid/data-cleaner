@@ -67,6 +67,35 @@
     ok('B1a a CSV download keeps the typed name as it was',cap2.text.length===1&&cap2.text[0]==='plain',cap2.text.join(','))
   }
   {
+    await load('Sales\n| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\nReturns\n| x | y |\n|---|---|\n| 5 | 6 |\n| 7 | 8 |');
+    await until(()=>Tabs.list.length===2);
+    const calls=[],errs=[];const c0=Engine.call,wb0=Xlsx.writeBook,te0=Toast.err;let fail=false;
+    Engine.call=function(t,p,c){if(t==='exportTable'){calls.push(p);if(fail)return Promise.reject(new Error('boom'))}return c0.apply(this,arguments)};
+    Xlsx.writeBook=async()=>{};
+    Toast.err=function(m){errs.push(String(m));return te0.apply(this,arguments)};
+    const everyTable=()=>Array.from(dlg().querySelectorAll('label.check')).find(l=>/every open table/.test(l.textContent)).querySelector('input');
+    try{
+      ExportDialog.open();await wait(150);
+      await pick('Excel');
+      everyTable().click();
+      dlg().querySelector('input[data-opt="header"]').click();
+      await press('Download');
+      ok('B1b exporting every open table follows the header checkbox',calls.length===2&&calls.every(p=>p.options&&p.options.header===false),JSON.stringify(calls.map(p=>p.options)));
+      calls.length=0;
+      ExportDialog.open();await wait(150);
+      await pick('Excel');
+      everyTable().click();
+      await press('Download');
+      ok('B1b exporting every open table keeps the header when the box stays ticked',calls.length===2&&calls.every(p=>p.options&&p.options.header===true),JSON.stringify(calls.map(p=>p.options)));
+      fail=true;errs.length=0;
+      ExportDialog.open();await wait(150);
+      await pick('Excel');
+      everyTable().click();
+      await press('Download');
+      ok('B1b a failing every-open-table export tells the user why',errs.some(m=>/Could not build the workbook: boom/.test(m)),errs.join(' | '))
+    }finally{Engine.call=c0;Xlsx.writeBook=wb0;Toast.err=te0;closeAll()}
+  }
+  {
     await load(CSV);
     const r=await Engine.call('export',{scope:'final',viewKey:S.view.key,selection:Sel.payload(),columns:null,format:'xlsx',options:{header:true}});
     const X=await Xlsx.load();const ws=Xlsx.sheet(X,r);
