@@ -166,7 +166,7 @@ function SortKeys(f,cols,changed){
     clear(wrap);wrap.append(h('div',{class:'flabel',style:{marginBottom:'6px'}},'Sort by'));
     c.keys.forEach((k,i)=>{
       wrap.append(h('div',{class:'cond-row',style:{gridTemplateColumns:'1.4fr 1fr 1fr 32px'}},
-        h('select',{class:'select','aria-label':'Column',onchange:e=>{k.col=e.target.value;changed()}},cols.map(x=>h('option',{value:x,selected:x===k.col},x))),
+        h('select',{class:'select','aria-label':'Column',onchange:e=>{k.col=e.target.value;changed()}},cols.map(x=>h('option',{value:x,selected:x===k.col},x)),k.col&&cols.indexOf(k.col)===-1?h('option',{value:k.col,selected:true},k.col+' (missing)'):null),
         h('select',{class:'select','aria-label':'Direction',onchange:e=>{k.dir=e.target.value;changed()}},h('option',{value:'asc',selected:k.dir!=='desc'},'Ascending (A→Z, 1→9)'),h('option',{value:'desc',selected:k.dir==='desc'},'Descending (Z→A, 9→1)')),
         h('select',{class:'select','aria-label':'Compare as',onchange:e=>{k.type=e.target.value;changed()}},[['auto','Detect type'],['text','As text'],['number','As numbers'],['date','As dates']].map(o=>h('option',{value:o[0],selected:(k.type||'auto')===o[0]},o[1]))),
         h('button',{type:'button',class:'icon-btn','aria-label':'Remove sort key',disabled:c.keys.length<2,onclick:()=>{c.keys.splice(i,1);draw();changed()}},icon('close',14))))

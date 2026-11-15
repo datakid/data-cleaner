@@ -121,5 +121,13 @@
     ok('B2 choosing Any column for a condition on a missing column takes effect',f.cfg.conditions[0].col==='*',String(f.cfg.conditions[0].col));
     closeAll();boxEl.removeChild(f.el)
   }
+  {
+    const f=await openForm('sortRows',{keys:[{col:'ghost',dir:'asc',type:'auto'}]},['id','name'],['number','text']);
+    const sel=f.el.querySelector('select[aria-label="Column"]');
+    ok('B2 a sort key on a missing column shows that column and not the first column',shownOf(sel)==='ghost',String(shownOf(sel)));
+    await choose(sel,'id');
+    ok('B2 choosing the first column for a sort key on a missing column takes effect',f.cfg.keys[0].col==='id',String(f.cfg.keys[0].col));
+    closeAll();boxEl.removeChild(f.el)
+  }
 });
 })();
