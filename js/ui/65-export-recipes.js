@@ -34,7 +34,7 @@ const ExportDialog={
       const n=st.scope==='final'?finalN():st.scope==='view'?S.view.n:Sel.rowCount();
       summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?Sel.cols.size:(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
     };
-    const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;refresh()}},[['xlsx','Excel workbook (.xlsx)'],['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0]},o[1])));
+    const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;refresh()}},[['xlsx','Excel workbook (.xlsx)'],['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0],selected:o[0]===st.format},o[1])));
     const xlNote=h('p',{class:'hint hidden',style:{marginTop:'-6px'}},'Numbers and ISO dates are stored as real Excel values. Filters are turned on for the header row. Formulas are never created.');
     const allBox=h('label',{class:'check hidden'},h('input',{type:'checkbox',onchange:e=>{st.allTabs=e.target.checked}}),'Include every open table (one sheet each)');
     const body=h('div',{class:'dlg-body'},
