@@ -15,6 +15,10 @@
     cap.restore=()=>{Xlsx.write=w0;window.downloadText=d0};
     return cap
   };
+  const boxEl=document.createElement('div');document.body.appendChild(boxEl);
+  const openForm=async(id,cfg,cols,types)=>{const f=StepForm(id,cfg,{cols,types,onChange:()=>{}});boxEl.appendChild(f.el);await wait(60);return f};
+  const shownOf=s=>{const o=s.options[s.selectedIndex];return o?o.value:null};
+  const choose=async(s,label)=>{s.parentNode.querySelector('.dd-trigger').click();await wait(80);const it=Array.from(document.querySelectorAll('.dd-opt')).find(b=>b.textContent.trim().indexOf(label)===0);if(it)it.click();await wait(80)};
   const CSV='id,zip,when,amt\n1,02134,2024-01-05,10.5\n2,90210,2024-02-10,20\n3,00501,2024-03-15,7';
   {
     await load(CSV);
@@ -108,6 +112,14 @@
     ok('B1 the written workbook is a real xlsx file',u[0]===0x50&&u[1]===0x4B,u[0]+' '+u[1]);
     const back=X.read(u,{type:'array',cellDates:false});const bs=back.Sheets[back.SheetNames[0]];
     ok('B1 the workbook reads back with the same values',bs.B2.v==='02134'&&bs.D2.v===10.5&&bs.A4.v===3,JSON.stringify([bs.B2&&bs.B2.v,bs.D2&&bs.D2.v,bs.A4&&bs.A4.v]))
+  }
+  {
+    const f=await openForm('filterRows',{mode:'remove',match:'all',conditions:[{col:'ghost',op:'isEmpty',value:'',caseSensitive:false}]},['id','name'],['number','text']);
+    const sel=f.el.querySelector('select[aria-label="Column"]');
+    ok('B2 a filter condition on a missing column shows that column and not Any column',shownOf(sel)==='ghost',String(shownOf(sel)));
+    await choose(sel,'Any column');
+    ok('B2 choosing Any column for a condition on a missing column takes effect',f.cfg.conditions[0].col==='*',String(f.cfg.conditions[0].col));
+    closeAll();boxEl.removeChild(f.el)
   }
 });
 })();

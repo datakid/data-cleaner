@@ -141,7 +141,7 @@ function FilterBuilder(f,cols,types,changed){
           const ok=opsFor(cd.col).some(o=>o[0]===cd.op);if(!ok)cd.op='contains'
         }
         draw();changed()
-      }},h('option',{value:'*',selected:cd.col==='*'},'Any column'),cols.map(x=>h('option',{value:x,selected:x===cd.col},x)),h('option',{value:'@formula',selected:isFx},'Formula…'));
+      }},h('option',{value:'*',selected:cd.col==='*'},'Any column'),cols.map(x=>h('option',{value:x,selected:x===cd.col},x)),cd.col&&cd.col!=='*'&&!isFx&&cols.indexOf(cd.col)===-1?h('option',{value:cd.col,selected:true},cd.col+' (missing)'):null,h('option',{value:'@formula',selected:isFx},'Formula…'));
       const opS=isFx?h('span',{class:'hint fb-fx-label'},'is true'):h('select',{class:'select','aria-label':'Comparison',onchange:e=>{cd.op=e.target.value;draw();changed()}},opsFor(cd.col).map(o=>h('option',{value:o[0],selected:o[0]===cd.op},o[1])));
       const k=isFx?'formula':W.COND_KIND[cd.op];const vals=h('div',{class:'vals'});
       const ph=typeOf(cd.col)==='date'?'e.g. 2025-01-31':typeOf(cd.col)==='number'?'e.g. 100':'value';
