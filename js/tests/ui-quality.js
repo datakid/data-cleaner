@@ -4,6 +4,7 @@
   const dlg=()=>document.querySelector('.dialog');
   const shown=()=>{const c=dlg().querySelector('.dd-cur');return c?c.textContent.trim():''};
   const nameBox=()=>dlg().querySelector('input.input');
+  const typeName=v=>{const n=nameBox();n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}))};
   const pick=async label=>{dlg().querySelector('.dd-trigger').click();await wait(80);const it=Array.from(document.querySelectorAll('.dd-opt')).find(b=>b.textContent.trim().indexOf(label)===0);if(it)it.click();await wait(80)};
   const press=async text=>{const b=Array.from(dlg().querySelectorAll('button')).find(x=>x.textContent.trim()===text);if(b)b.click();await wait(700)};
   const closeAll=()=>{while(Layers.closeTop());};
@@ -37,6 +38,33 @@
       await press('Download')
     }finally{cap.restore();closeAll()}
     ok('B1 pressing Download without touching the format still writes a CSV',cap.text.length===1&&cap.wrote.length===0&&/\.csv$/.test(cap.text[0]||''),cap.text.join(',')+' '+cap.wrote.join(','))
+  }
+  {
+    await load(CSV);
+    const names=[];
+    try{
+      ExportDialog.open();await wait(150);
+      typeName('report.csv');
+      for(const l of ['TSV','JSON records','Excel','Markdown','Plain lines','CSV']){await pick(l);names.push(nameBox().value)}
+    }finally{closeAll()}
+    ok('B1a a typed file name follows the format through every switch',names.join('|')==='report.tsv|report.json|report.xlsx|report.md|report.txt|report.csv',names.join('|'));
+    const cap=capture();let kept=[];
+    try{
+      ExportDialog.open();await wait(150);
+      typeName('my export');
+      await pick('TSV');kept.push(nameBox().value);
+      await pick('Excel');kept.push(nameBox().value);
+      await press('Download')
+    }finally{cap.restore();closeAll()}
+    ok('B1a a typed name without a known extension is left alone when the format changes',kept.join('|')==='my export|my export',kept.join('|'));
+    ok('B1a an Excel download always ends in .xlsx',cap.wrote.length===1&&cap.wrote[0]==='my export.xlsx',String(cap.wrote[0]));
+    const cap2=capture();
+    try{
+      ExportDialog.open();await wait(150);
+      typeName('plain');
+      await press('Download')
+    }finally{cap2.restore();closeAll()}
+    ok('B1a a CSV download keeps the typed name as it was',cap2.text.length===1&&cap2.text[0]==='plain',cap2.text.join(','))
   }
   {
     await load(CSV);
