@@ -49,7 +49,7 @@ const Xlsx={
     const hdr=data.header!==false;const aoa=hdr?[data.cols].concat(data.rows):data.rows.slice();
     const ws=X.utils.aoa_to_sheet(aoa,{cellDates:false});
     const types=data.types||[];
-    const safeNum=data.cols.map((_,C)=>types[C]==='number'&&!data.rows.some(r=>{const v=String(r[C]==null?'':r[C]).trim();return/^[+-]?0\d/.test(v)||v.replace(/\D/g,'').length>15||/e/i.test(v)}));
+    const safeNum=data.cols.map((_,C)=>types[C]==='number'&&!data.rows.some(r=>{const v=String(r[C]==null?'':r[C]).trim();return/^[+-]?0\d/.test(v)||v.replace(/\D/g,'').length>15||/^[+-]?\d+(\.\d+)?e[+-]?\d+$/i.test(v)}));
     if(ws['!ref']){
       const r=X.utils.decode_range(ws['!ref']);
       for(let R=hdr?1:0;R<=r.e.r;R++)for(let C=0;C<=r.e.c;C++){

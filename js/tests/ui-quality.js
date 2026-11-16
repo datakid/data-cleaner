@@ -149,5 +149,26 @@
     closeAll();boxEl.removeChild(f.el);
     await App.reset()
   }
+  {
+    const sheetOf=async(text,pickIds)=>{
+      await load(text);
+      const g=await Engine.call('getRows',{viewKey:S.view.key,start:0,count:50});
+      const sel=pickIds?{kind:'rows',rows:{all:false,ids:pickIds.map(i=>g.rowIds[i]),except:[]},cols:[],rect:null}:Sel.payload();
+      const r=await Engine.call('export',{scope:pickIds?'selected':'final',viewKey:S.view.key,selection:sel,columns:null,format:'xlsx',options:{header:true}});
+      return Xlsx.sheet(await Xlsx.load(),r)
+    };
+    const nums='id,amount\n1,10\n2,20\n3,30\n4,ITEM\n5,50\n6,60\n7,70\n8,80\n9,90\n10,100';
+    let ws=await sheetOf(nums.replace('ITEM','none'));
+    ok('B7 one word with an e in a number column does not turn off number conversion',ws.B2.t==='n'&&ws.B2.v===10&&ws.B11.v===100,JSON.stringify([ws.B2,ws.B11]));
+    ok('B7 the word itself stays as text',ws.B5.t==='s'&&ws.B5.v==='none',JSON.stringify(ws.B5));
+    ws=await sheetOf(nums.replace('ITEM','n/a'));
+    ok('B7 n/a in a number column leaves the other cells as numbers',ws.B2.t==='n'&&ws.B5.t==='s',JSON.stringify([ws.B2,ws.B5]));
+    ws=await sheetOf(nums.replace('ITEM','1e5'));
+    ok('B7 scientific notation in a number column still keeps the column as text',ws.B2.t==='s'&&ws.B5.v==='1e5',JSON.stringify([ws.B2,ws.B5]));
+    ws=await sheetOf(nums.replace('ITEM','2.5E-3'));
+    ok('B7 scientific notation with a sign and capital E is recognised',ws.B2.t==='s',JSON.stringify(ws.B2));
+    ws=await sheetOf('id,amount\n1,10\n2,20\n3,30\n4,12345678901234567890\n5,50');
+    ok('B7 a value with more than 15 digits still keeps the column as text',ws.B2.t==='s'&&ws.B5.v==='12345678901234567890',JSON.stringify([ws.B2,ws.B5]))
+  }
 });
 })();
