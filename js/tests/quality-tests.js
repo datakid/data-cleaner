@@ -53,5 +53,16 @@
     ok(x.text.indexOf("'")===-1,x.text);
     eq(x.text,'item\tamount\nA\t-1.234,56\nB\t-2.345,00\n')
   });
+
+  test('B9 the file pickers accept every spreadsheet format the README lists',()=>{
+    const x=new XMLHttpRequest();x.open('GET','index.html',false);x.send();
+    ok(!!x.responseText,'index.html could not be read; serve the folder over http as the README describes');
+    const doc=new DOMParser().parseFromString(x.responseText,'text/html');
+    const acc=id=>(doc.getElementById(id).getAttribute('accept')||'').split(',');
+    const sheets=['.xlsx','.xlsm','.xlsb','.xls','.ods'];
+    const gone=(id)=>sheets.filter(e=>acc(id).indexOf(e)===-1);
+    eq(gone('fileInput'),[]);
+    eq(gone('refInput'),[])
+  });
 })
 })(typeof self!=='undefined'?self:globalThis);
