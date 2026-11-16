@@ -170,5 +170,16 @@
     ws=await sheetOf('id,amount\n1,10\n2,20\n3,30\n4,12345678901234567890\n5,50');
     ok('B7 a value with more than 15 digits still keeps the column as text',ws.B2.t==='s'&&ws.B5.v==='12345678901234567890',JSON.stringify([ws.B2,ws.B5]))
   }
+  {
+    const sheetOf=async(text,pickIds)=>{
+      await load(text);
+      const g=await Engine.call('getRows',{viewKey:S.view.key,start:0,count:50});
+      const sel={kind:'rows',rows:{all:false,ids:pickIds.map(i=>g.rowIds[i]),except:[]},cols:[],rect:null};
+      const r=await Engine.call('export',{scope:'selected',viewKey:S.view.key,selection:sel,columns:null,format:'xlsx',options:{header:true}});
+      return Xlsx.sheet(await Xlsx.load(),r)
+    };
+    const ws=await sheetOf('item;amount\nA;1.234,56\nB;2.000,00\nC;-3,5\nD;12',[1,2]);
+    ok('B6 European numbers exported from selected rows keep their values',ws.B2.t==='n'&&ws.B2.v===2000&&ws.B3.t==='n'&&ws.B3.v===-3.5,JSON.stringify([ws.B2,ws.B3]))
+  }
 });
 })();
