@@ -324,7 +324,7 @@ const Grid={
       const pinned=this.pinLeft&&this.pinLeft[col]>=0;
       const edge=this.idxW+(pinned?0:(this.pinW||0));
       if(!pinned&&x-edge<this.sc.scrollLeft)this.sc.scrollLeft=Math.max(0,x-edge);
-      else if(x+w>this.sc.scrollLeft+vw)this.sc.scrollLeft=x+w-vw
+      else if(x+w>this.sc.scrollLeft+vw)this.sc.scrollLeft=pinned?x+w-vw:Math.min(x+w-vw,x-edge)
     }
   },
   onKey(e){
