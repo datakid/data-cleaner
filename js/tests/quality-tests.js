@@ -64,5 +64,61 @@
     eq(gone('fileInput'),[]);
     eq(gone('refInput'),[])
   });
+
+  test('E every export format writes the right contents for each header and column choice',()=>{
+    const src='id,name,note\n01,"Ann, A.","line1\nline2"\n2,Bob,"say ""hi"""\n3,Zoë,a|b\n4,,=1+1';
+    const grid=W.parseDelimited(src,',','"');
+    const bad=[];
+    for(const colSet of [null,['name','id'],['note']]){
+      for(const header of [true,false]){
+        fresh(src);
+        const names=colSet||grid[0];
+        const idx=names.map(n=>grid[0].indexOf(n));
+        const body=grid.slice(1).map(r=>idx.map(i=>r[i]));
+        const run=(fmt,extra)=>E.handle('export',{scope:'final',format:fmt,columns:colSet,options:Object.assign({header},extra||{})});
+        const tag=(fmt,why)=>bad.push(fmt+' header='+header+' cols='+(colSet||'all')+': '+why);
+        const asObjects=()=>body.map(r=>{const o={};names.forEach((n,k)=>{o[n]=r[k]});return o});
+        for(const [fmt,d] of [['csv',','],['tsv','\t']]){
+          const x=run(fmt);const back=W.parseDelimited(x.text,d,'"');
+          const want=(header?[names]:[]).concat(body);
+          if(JSON.stringify(back)!==JSON.stringify(want))tag(fmt,'round trip differs');
+          if(x.rows!==body.length||x.cols!==names.length)tag(fmt,'counts '+x.rows+'x'+x.cols)
+        }
+        {
+          const x=run('csv',{excel:true});
+          if(x.text.charCodeAt(0)!==0xFEFF||x.text.indexOf('\r\n')===-1)tag('csv excel','BOM or CRLF missing')
+        }
+        {
+          const on=run('csv',{formulaGuard:true});
+          if(names.indexOf('note')!==-1&&on.text.indexOf("'=1+1")===-1)tag('csv guard','formula not protected');
+          const off=run('csv',{formulaGuard:false});
+          if(off.text.indexOf("'=")!==-1)tag('csv guard off','apostrophe added')
+        }
+        if(JSON.stringify(JSON.parse(run('json').text))!==JSON.stringify(asObjects()))tag('json','records differ');
+        {
+          const want={};names.forEach((n,k)=>{want[n]=body.map(r=>r[k])});
+          if(JSON.stringify(JSON.parse(run('jsoncols').text))!==JSON.stringify(want))tag('jsoncols','columns differ')
+        }
+        {
+          const lines=run('ndjson').text.split('\n').filter(Boolean).map(l=>JSON.parse(l));
+          if(JSON.stringify(lines)!==JSON.stringify(asObjects()))tag('ndjson','lines differ')
+        }
+        {
+          const md=run('md').text.split('\n').filter(Boolean);
+          if(md.length!==body.length+2||!/^\| /.test(md[0])||!/^\|( --- \|)+$/.test(md[1]))tag('md','header or row count wrong: '+md.length)
+        }
+        {
+          const x=run('lines');
+          if(x.rows!==body.length)tag('lines','row count');
+          if(names.length>1&&header&&x.text.indexOf(names.join(' '))!==0)tag('lines','header missing')
+        }
+        {
+          const x=JSON.parse(run('xlsx').text);
+          if(x.header!==header||x.rows.length!==body.length||x.cols.join()!==names.join())tag('xlsx','payload differs')
+        }
+      }
+    }
+    eq(bad,[])
+  });
 })
 })(typeof self!=='undefined'?self:globalThis);
