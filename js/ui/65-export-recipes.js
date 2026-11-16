@@ -1,8 +1,10 @@
 'use strict';
 const ExportDialog={
-  open(){
+  async open(){
     const viewDiffers=S.search||S.sort.length||S.vfilter||!atEnd();
     const rowSel=Sel.kind==='rows'&&Sel.rowCount()>0;const colSel=Sel.kind==='cols'&&Sel.cols.size>0;
+    let finalCols=null;
+    if(colSel&&!atEnd()){try{finalCols=(await Engine.call('schema',{stateIdx:S.states.length-1})).cols.map(c=>c.name)}catch(e){finalCols=null}}
     const st={format:'csv',scope:rowSel?'selected':'final',cols:colSel?'selected':'all',header:true,guard:true,excel:false,name:''};
     const base=(S.file||'').replace(/\.[^.]+$/,'')||'weft-export';
     const EXT={xlsx:'xlsx',csv:'csv',tsv:'tsv',json:'json',jsoncols:'json',ndjson:'ndjson',md:'md',lines:'txt'};
@@ -32,7 +34,7 @@ const ExportDialog={
       xlNote.classList.toggle('hidden',st.format!=='xlsx');allBox.classList.toggle('hidden',!(st.format==='xlsx'&&Tabs.list.length>1));excelBox.classList.toggle('hidden',!(st.format==='csv'||st.format==='tsv'));
       setName();syncHeader();
       const n=st.scope==='final'?finalN():st.scope==='view'?S.view.n:Sel.rowCount();
-      summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?Sel.cols.size:(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
+      summary.textContent=plural(n,'row')+' × '+plural(st.cols==='selected'?(st.scope==='final'&&finalCols?Sel.selectedCols().filter(c=>finalCols.indexOf(c)!==-1).length:Sel.cols.size):(st.scope==='final'?(S.states[S.states.length-1]||{cols:0}).cols:curCols().length),'column')
     };
     const fmtSel=h('select',{class:'select',onchange:e=>{st.format=e.target.value;if(st.nameTouched)fname.value=fname.value.replace(/\.(xlsx|csv|tsv|json|ndjson|md|txt)$/i,'.'+EXT[st.format]);refresh()}},[['xlsx','Excel workbook (.xlsx)'],['csv','CSV (comma-separated)'],['tsv','TSV (tab-separated)'],['json','JSON records'],['jsoncols','JSON columns'],['ndjson','NDJSON (one record per line)'],['md','Markdown table'],['lines','Plain lines']].map(o=>h('option',{value:o[0],selected:o[0]===st.format},o[1])));
     const xlNote=h('p',{class:'hint hidden',style:{marginTop:'-6px'}},'Numbers and ISO dates are stored as real Excel values. Filters are turned on for the header row. Formulas are never created.');

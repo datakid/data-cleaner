@@ -194,5 +194,26 @@
     ok('B3 a script that loads without defining the reader reports the failure',/did not start/.test(failed),failed);
     ok('B3 a later Excel load tries again after that failure',!!again&&typeof again.read==='function',err||'no reader');
   }
+  {
+    const summaryText=()=>{const e=Array.from(dlg().querySelectorAll('.grow-1')).map(x=>x.textContent).find(t=>/ × /.test(t));return e||''};
+    const colsIn=t=>Number((t.match(/× (\d+) column/)||[])[1]);
+    const scopeRadio=txt=>Array.from(dlg().querySelectorAll('label.radio')).find(l=>l.textContent.indexOf(txt)===0).querySelector('input');
+    await load('a,b,c,d\n1,2,3,4\n5,6,7,8');
+    await addStep('dropColumn',{columns:['b']});
+    await setViewIdx(0);
+    Sel.kind='cols';Sel.cols=new Set(['b','c']);Sel.rect=null;
+    try{
+      ExportDialog.open();await wait(250);
+      const viaFinal=colsIn(summaryText());
+      const f=await Engine.call('export',{scope:'final',viewKey:S.view.key,selection:Sel.payload(),columns:Sel.selectedCols(),format:'csv',options:{header:true}});
+      ok('B8 the summary counts only the selected columns the final result still has',viaFinal===f.cols,viaFinal+' shown, '+f.cols+' exported');
+      scopeRadio('Current view').click();await wait(250);
+      const viaView=colsIn(summaryText());
+      const v=await Engine.call('export',{scope:'view',viewKey:S.view.key,selection:Sel.payload(),columns:Sel.selectedCols(),format:'csv',options:{header:true}});
+      ok('B8 the summary for the current view at an earlier step counts the selected columns',viaView===v.cols&&v.cols===2,viaView+' shown, '+v.cols+' exported')
+    }finally{closeAll();Sel.clear(true)}
+    await setViewIdx(S.steps.length);
+    Sel.clear(true)
+  }
 });
 })();
