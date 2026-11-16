@@ -259,6 +259,17 @@ function exportRows(p){
   if(p.columns&&p.columns.length)ci=p.columns.map(c=>t.cols.indexOf(c)).filter(i=>i!==-1);
   return{t,pos,ci}
 }
+function utf8Length(str){
+  let n=str.length;
+  for(let i=0;i<str.length;i++){
+    const c=str.charCodeAt(i);
+    if(c<128)continue;
+    if(c<2048)n++;
+    else if(c>=0xD800&&c<=0xDBFF&&i+1<str.length&&(str.charCodeAt(i+1)&0xFC00)===0xDC00){n+=2;i++}
+    else n+=2
+  }
+  return n
+}
 function buildExport(p){
   const{t,pos,ci}=exportRows(p);const o=p.options||{};
   const cols=ci.map(i=>t.cols[i]);
@@ -294,7 +305,7 @@ function buildExport(p){
   }else throw new Error('Unknown format "'+fmt+'".');
   chunks.push(buf);
   const text=chunks.join('');
-  return{text,rows:pos.length,cols:cols.length,bytes:text.length}
+  return{text,rows:pos.length,cols:cols.length,bytes:utf8Length(text)}
 }
 
 const H={
