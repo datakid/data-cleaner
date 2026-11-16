@@ -6,7 +6,7 @@ const Xlsx={
     if(this.loading)return this.loading;
     this.loading=new Promise((res,rej)=>{
       const s=document.createElement('script');s.src='vendor/xlsx.full.min.js';s.async=true;
-      s.onload=()=>window.XLSX?res(window.XLSX):rej(new Error('The Excel reader did not start.'));
+      s.onload=()=>{if(window.XLSX)res(window.XLSX);else{this.loading=null;rej(new Error('The Excel reader did not start.'))}};
       s.onerror=()=>{this.loading=null;rej(new Error('The Excel reader (vendor/xlsx.full.min.js) could not be loaded.'))};
       document.head.appendChild(s)
     });

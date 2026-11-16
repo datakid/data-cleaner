@@ -181,5 +181,18 @@
     const ws=await sheetOf('item;amount\nA;1.234,56\nB;2.000,00\nC;-3,5\nD;12',[1,2]);
     ok('B6 European numbers exported from selected rows keep their values',ws.B2.t==='n'&&ws.B2.v===2000&&ws.B3.t==='n'&&ws.B3.v===-3.5,JSON.stringify([ws.B2,ws.B3]))
   }
+  {
+    const x0=window.XLSX,ap0=document.head.appendChild;
+    let failed='',again=null,err='';
+    try{
+      window.XLSX=undefined;Xlsx.loading=null;
+      document.head.appendChild=function(n){if(n&&n.tagName==='SCRIPT'&&/xlsx/.test(n.src)){setTimeout(()=>{if(n.onload)n.onload()},0);return n}return ap0.call(document.head,n)};
+      try{await Xlsx.load()}catch(e){failed=e.message}
+      delete document.head.appendChild;
+      try{again=await Xlsx.load()}catch(e){err=e.message}
+    }finally{delete document.head.appendChild;if(!window.XLSX)window.XLSX=x0;Xlsx.loading=null}
+    ok('B3 a script that loads without defining the reader reports the failure',/did not start/.test(failed),failed);
+    ok('B3 a later Excel load tries again after that failure',!!again&&typeof again.read==='function',err||'no reader');
+  }
 });
 })();
