@@ -215,5 +215,16 @@
     await setViewIdx(S.steps.length);
     Sel.clear(true)
   }
+  {
+    await load('id,name,amount\n1,Ann,10\n2,Bob,\n3,Cy,30');
+    const bar=()=>(document.getElementById('selStats')||{}).textContent||'';
+    Sel.selectCol('id');Sel.selectCol('name',true);
+    await until(()=>/Count/.test(bar()),4000);await wait(200);
+    ok('B10 a text column in the selection does not inflate the status bar count',/^Count 3 ·/.test(bar()),bar());
+    Sel.selectCol('amount');
+    await until(()=>/Count 2/.test(bar()),4000);await wait(200);
+    ok('B10 empty cells in a number column are not counted',/^Count 2 · Sum 40/.test(bar()),bar());
+    Sel.clear(true)
+  }
 });
 })();
