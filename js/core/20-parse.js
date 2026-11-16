@@ -60,7 +60,7 @@ W.toDelimited=function(cols,rows,delim,opts){
   const guard=opts.formulaGuard;
   const q=v=>{
     let s=String(v==null?'':v);
-    if(guard&&/^[=+\-@\t\r]/.test(s)&&W.parseNumber(s)===null)s="'"+s;
+    if(guard&&/^[=+\-@\t\r]/.test(s)&&W.parseNumber(s)===null&&W.parseNumber(s,{locale:'eu'})===null)s="'"+s;
     return(s.indexOf(delim)!==-1||s.indexOf('"')!==-1||s.indexOf('\n')!==-1||s.indexOf('\r')!==-1)?'"'+s.replace(/"/g,'""')+'"':s
   };
   const out=[];
