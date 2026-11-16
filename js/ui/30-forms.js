@@ -183,7 +183,7 @@ function MetricsEditor(f,cols,types,changed){
     c.metrics.forEach((m,i)=>{
       const p=W.parseMetric(m)||{column:null,fn:'count'};
       const fnS=h('select',{class:'select','aria-label':'Calculation',onchange:e=>{const fn=e.target.value;c.metrics[i]=fn==='count'&&!p.column?'count':(p.column||cols[0])+':'+fn;draw();changed()}},FN.map(o=>h('option',{value:o[0],selected:o[0]===p.fn},o[1])));
-      const colS=h('select',{class:'select','aria-label':'Column',onchange:e=>{c.metrics[i]=e.target.value==='*'?'count':e.target.value+':'+p.fn;draw();changed()}},p.fn==='count'?h('option',{value:'*',selected:!p.column},'(all rows)'):null,cols.map(x=>h('option',{value:x,selected:x===p.column},x)));
+      const colS=h('select',{class:'select','aria-label':'Column',onchange:e=>{c.metrics[i]=e.target.value==='*'?'count':e.target.value+':'+p.fn;draw();changed()}},p.fn==='count'?h('option',{value:'*',selected:!p.column},'(all rows)'):null,cols.map(x=>h('option',{value:x,selected:x===p.column},x)),p.column&&cols.indexOf(p.column)===-1?h('option',{value:p.column,selected:true},p.column+' (missing)'):null);
       wrap.append(h('div',{class:'cond-row',style:{gridTemplateColumns:'1fr 1.3fr 32px'}},fnS,colS,h('button',{type:'button',class:'icon-btn','aria-label':'Remove',disabled:c.metrics.length<2,onclick:()=>{c.metrics.splice(i,1);draw();changed()}},icon('close',14))))
     });
     wrap.append(h('button',{type:'button',class:'btn btn-sm btn-ghost',onclick:()=>{const num=cols.find((x,i)=>types[i]==='number');c.metrics.push((num||cols[0])+':sum');draw();changed()}},icon('plus',14),'Add calculation'))

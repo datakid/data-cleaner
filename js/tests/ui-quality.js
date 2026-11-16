@@ -129,5 +129,13 @@
     ok('B2 choosing the first column for a sort key on a missing column takes effect',f.cfg.keys[0].col==='id',String(f.cfg.keys[0].col));
     closeAll();boxEl.removeChild(f.el)
   }
+  {
+    const f=await openForm('aggregate',{groupBy:['name'],metrics:['ghost:sum']},['id','name','amount'],['number','text','number']);
+    const sel=f.el.querySelector('[data-key="metrics"] select[aria-label="Column"]');
+    ok('B2 a calculation on a missing column shows that column and not the first column',shownOf(sel)==='ghost',String(shownOf(sel)));
+    await choose(sel,'id');
+    ok('B2 choosing the first column for a calculation on a missing column takes effect',f.cfg.metrics[0]==='id:sum',String(f.cfg.metrics[0]));
+    closeAll();boxEl.removeChild(f.el)
+  }
 });
 })();
