@@ -137,5 +137,17 @@
     ok('B2 choosing the first column for a calculation on a missing column takes effect',f.cfg.metrics[0]==='id:sum',String(f.cfg.metrics[0]));
     closeAll();boxEl.removeChild(f.el)
   }
+  {
+    await load(CSV);
+    await Engine.call('refLoad',{text:'id,city\n1,Cairo\n2,Giza',name:'cities',replace:true});
+    S.refs=(await Engine.call('refList',{})).refs;
+    const f=await openForm('join',{refName:'regions',type:'left',onLeft:['id'],onRight:[],columns:[],normTrim:true,normCaseFold:false,normNumeric:false,onDuplicate:'first'},['id','name'],['number','text']);
+    const sel=f.el.querySelector('[data-key="refName"] select');
+    ok('B2 a join on a reference file that is not loaded shows that name and not another file',shownOf(sel)==='regions',String(shownOf(sel)));
+    await choose(sel,'cities');
+    ok('B2 choosing the only loaded reference file for a join on a missing one takes effect',f.cfg.refName==='cities',String(f.cfg.refName));
+    closeAll();boxEl.removeChild(f.el);
+    await App.reset()
+  }
 });
 })();

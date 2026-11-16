@@ -47,7 +47,7 @@ function StepForm(opId,cfg,opts){
       case'conditions':ctl=FilterBuilder(f,cols,types,changed);break;
       case'sortkeys':ctl=SortKeys(f,cols,changed);break;
       case'metrics':ctl=MetricsEditor(f,cols,types,changed);break;
-      case'reference':{const refs=S.refs.map(r=>r.name);ctl=h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}});const s=h('select',{class:'select',style:{flex:'1'},onchange:()=>{setPath(f.cfg,fd.key,s.value);changed();f.rerender&&f.rerender()}});if(!refs.length)s.appendChild(h('option',{value:''},'No reference files loaded'));refs.forEach(n=>s.appendChild(h('option',{value:n,selected:n===v},n)));ctl.append(s,h('button',{type:'button',class:'btn btn-sm btn-secondary',onclick:()=>loadReference(()=>f.rerender&&f.rerender())},'Load file…'));break}
+      case'reference':{const refs=S.refs.map(r=>r.name);ctl=h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}});const s=h('select',{class:'select',style:{flex:'1'},onchange:()=>{setPath(f.cfg,fd.key,s.value);changed();f.rerender&&f.rerender()}});if(!refs.length)s.appendChild(h('option',{value:''},'No reference files loaded'));refs.forEach(n=>s.appendChild(h('option',{value:n,selected:n===v},n)));if(v&&refs.length&&refs.indexOf(v)===-1)s.appendChild(h('option',{value:v,selected:true},v+' (missing)'));ctl.append(s,h('button',{type:'button',class:'btn btn-sm btn-secondary',onclick:()=>loadReference(()=>f.rerender&&f.rerender())},'Load file…'));break}
       case'refColumns':{const ref=S.refs.find(r=>r.name===f.cfg.refName);ctl=ref?colChips(fd.key,false,fd.optional,ref.cols):h('div',{class:'hint'},'Load and pick a reference file first.');break}
     }
     if(!ctl)continue;
