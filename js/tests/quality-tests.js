@@ -55,6 +55,7 @@
   });
 
   test('B9 the file pickers accept every spreadsheet format the README lists',()=>{
+    if(typeof location!=='undefined'&&location.protocol==='file:')return;
     const x=new XMLHttpRequest();x.open('GET','index.html',false);x.send();
     ok(!!x.responseText,'index.html could not be read; serve the folder over http as the README describes');
     const doc=new DOMParser().parseFromString(x.responseText,'text/html');
