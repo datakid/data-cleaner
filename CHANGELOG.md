@@ -2,6 +2,22 @@
 
 Newest first. Moved out of the README.
 
+## Fixes after 3.0
+A quality pass over export, Excel files, step forms and the grid. Every fix has a test that failed before it.
+
+- **Export to Excel works from the dialog.** Choosing "Excel workbook" in Export showed Excel but still saved a CSV. The format shown is now always the format saved.
+- **File names follow the format.** If you type a file name and then switch format, a known extension changes with it (`report.csv` becomes `report.xlsx`), and an Excel download always ends in `.xlsx`. Names without a known extension are left alone.
+- **"Include every open table" follows the header checkbox** and says what went wrong if the workbook cannot be built.
+- **The download message shows the real size.** Text with accents or emoji was counted in characters, so the size was too small.
+- **European negative numbers are not prefixed.** Formula protection no longer puts an apostrophe in front of values such as `-1.234,56`. Real formulas, `@` and a lone `-` are still protected.
+- **The Export summary counts the columns you will get.** If some selected columns are gone from the final result, they are no longer counted.
+- **Excel workbooks keep numbers as numbers** in a column that also has a word such as `none`. Only scientific notation such as `1e5` still keeps a column as text.
+- **A failed start of the Excel reader recovers.** Before, one failed attempt stopped every later Excel file until you reloaded the page.
+- **Step forms never show a different value from the step.** When a filter condition, sort key, calculation or reference file points at a column or file that is no longer there, the form shows it as "name (missing)" instead of silently showing another choice.
+- **Reference files can be `.xlsm` and `.xlsb`**, as the main picker already allowed.
+- **Moving to a wide column** no longer leaves its first part hidden under the pinned columns in a narrow window.
+- **Tests:** 10 new engine checks and 40 new UI checks. This also resolved the one UI check that failed at a window width of 1280 pixels.
+
 ## What's new in 3.0
 Weft 3.0 lets you find, filter and compute on specific columns the way you would in a spreadsheet, and every one of those changes is still a visible, undoable step. Recipes written for 2.x load and run with identical output, and their text is unchanged. A recipe only gets the `# weft recipe v3` header when it uses an or-group, a not, or a formula.
 

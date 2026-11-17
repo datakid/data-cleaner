@@ -96,8 +96,8 @@ Your text and files stay in the tab. The page cannot make network requests, and 
 | `file://` | Opening `index.html` straight from disk works, but the background worker cannot start (the engine runs on the main thread) and the browser blocks the font files. Serve the folder over http for the full experience. |
 | `index.html?theme=dark` / `?theme=light` / `?theme=system` | Forces a theme for this visit (doesn't change the saved choice) |
 | `index.html?contrast=high` / `?contrast=normal` | Forces a contrast level for this visit |
-| `tests.html` | Engine tests: 1,127 checks (the 321 from 2.6.2, the 174 golden v2 recipe checks, and the new bug, query, condition-tree, column-filter, cache, formula and polish checks, including a 500-iteration query parity fuzz on three seeds) |
-| `ui-test.html` | Runs the full UI end to end (314 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs, restore, the query bar, column filters, Find and Replace, formulas, pinned columns, the histogram and the what's new card) and logs results to the console |
+| `tests.html` | Engine tests: 1,137 checks (the 321 from 2.6.2, the 174 golden v2 recipe checks, and the new bug, query, condition-tree, column-filter, cache, formula and polish checks, including a 500-iteration query parity fuzz on three seeds) |
+| `ui-test.html` | Runs the full UI end to end (354 checks, including theme, contrast, fill-bar filtering, tabs, joins between tabs, restore, the query bar, column filters, Find and Replace, formulas, pinned columns, the histogram and the what's new card) and logs results to the console |
 | `perf-test.html` | Runs the 200,000-row performance test automatically (now including queries, distinct values, find next and formulas) and logs the timings |
 | `tools/bench.html` | Times each engine stage on its own (parsing, steps, view, issues, export), with no UI |
 
